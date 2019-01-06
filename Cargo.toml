@@ -23,7 +23,7 @@ authors = ["piaoliu <441594700@qq.com>"]
 
 [dependencies.diesel]
 features = ["postgres", "chrono", "uuid", "r2d2"]
-version = "^1.3.0"
+version = "^1.3.3"
 
 [dependencies.chrono]
 features = ["serde"]
