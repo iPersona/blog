@@ -75,15 +75,15 @@ pub struct NewComments {
 }
 
 impl NewComments {
-    fn into_insert_comments(self, user_id: Uuid) -> InsertComments {
+    fn into_insert_comments(&self, user_id: Uuid) -> InsertComments {
         InsertComments {
-            comment: self.comment,
+            comment: self.comment.clone(),
             article_id: self.article_id,
             user_id,
         }
     }
 
-    pub fn insert(self, conn: &PgConnection, redis_pool: &Arc<RedisPool>, cookie: &str) -> bool {
+    pub fn insert(&self, conn: &PgConnection, redis_pool: &Arc<RedisPool>, cookie: &str) -> bool {
         let info =
             serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info")).unwrap();
         self.into_insert_comments(info.id).insert(conn)

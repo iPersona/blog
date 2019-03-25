@@ -8,6 +8,9 @@ services:
     volumes:
     - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     - ./nginx/log/:/var/log/nginx/:rw
+    - ./nginx/entrypoint.sh:/var/tmp/entrypoint.sh:ro
+    entrypoint: /var/tmp/entrypoint.sh
+    #network_mode: "host"
 
   postgres:
     image: postgres:alpine

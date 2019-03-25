@@ -17,7 +17,7 @@ impl Relations {
     pub fn new(article_id: Uuid, tag_id: Uuid) -> Relations {
         Relations { tag_id, article_id }
     }
-
+//
     pub fn insert(&self, conn: &PgConnection) -> bool {
         diesel::insert_into(relation::table)
             .values(self)

@@ -1,81 +1,87 @@
-use sapper::{Error as SapperError, Request, Response, Result as SapperResult, SapperModule,
-             SapperRouter};
-use sapper_std::{JsonParams, SessionVal};
-use serde_json;
-
-use super::super::{ArticlesWithTag, ChangePassword, DeleteComment, EditUser, LoginUser,
-                   NewComments, Permissions, Postgresql, Redis, UserInfo, UserNotify};
+use crate::api::{ApiResult, JsonResponse, InnerContext};
+use crate::models::token::Token;
+use crate::models::user::DeleteUser;
+use crate::models::user::LoginUser;
+use crate::{AppState, ChangePassword, EditUser, UserInfo, NewComments, ArticlesWithTag, UserNotify, DeleteComment};
+use actix_web::middleware::session::RequestSession;
+use actix_web::{Error, Form, HttpRequest, Json, App};
+use futures::Future;
+use actix_web::http::Method;
 
 pub struct User;
 
 impl User {
-    fn view_user(req: &mut Request) -> SapperResult<Response> {
-        let cookie = req.ext().get::<SessionVal>().unwrap();
-        let redis_pool = req.ext().get::<Redis>().unwrap();
-        let mut res = json!({
-                    "status": true,
-                });
-        res["data"] =
-            serde_json::from_str(&UserInfo::view_user_with_cookie(redis_pool, cookie)).unwrap();
-        res_json!(res)
+    fn view_user(req: &HttpRequest<AppState>) -> JsonResponse {
+        let token = Token::from_request(req);
+        if token.is_none() {
+            return api_resp_ok!();
+        }
+        let token = token.unwrap().into_inner();
+        let redis_pool = &req.state().cache.into_inner();
+        let user_info = UserInfo::view_user_with_cookie(redis_pool, token.as_str());
+        api_resp_data!(user_info.as_str())
     }
 
-    fn change_pwd(req: &mut Request) -> SapperResult<Response> {
-        let body: ChangePassword = get_json_params!(req);
-        let cookie = req.ext().get::<SessionVal>().unwrap();
-        let redis_pool = req.ext().get::<Redis>().unwrap();
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let res = match body.change_password(&pg_pool, redis_pool, cookie) {
-            Ok(data) => json!({
-                    "status": true,
-                    "data": data
-                }),
-            Err(err) => json!({
-                    "status": false,
-                    "error": err
-                }),
-        };
-        res_json!(res)
+    fn change_pwd((req, params): (HttpRequest<AppState>, Form<ChangePassword>)) -> JsonResponse {
+        let token = Token::from_request(&req);
+        if token.is_none() {
+            return api_resp_ok!();
+        }
+        let token = token.unwrap().into_inner();
+        let redis_pool = &req.state().cache.into_inner();
+        let pg_pool = &req.state().db.into_inner().get().unwrap();
+        match params.into_inner().change_password(pg_pool, redis_pool, &token) {
+            Ok(data) => api_resp_data!(data),
+            Err(err) => api_resp_err!(&*err),
+        }
     }
 
-    fn edit(req: &mut Request) -> SapperResult<Response> {
-        let body: EditUser = get_json_params!(req);
-        let cookie = req.ext().get::<SessionVal>().unwrap();
-        let redis_pool = req.ext().get::<Redis>().unwrap();
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let res = match body.edit_user(&pg_pool, redis_pool, cookie) {
-            Ok(num_edit) => json!({
-                "status": true,
-                "num_edit": num_edit
-            }),
-            Err(err) => json!({
-                "status": false,
-                "error": err
-            }),
-        };
-        res_json!(res)
+    fn edit((req, params): (HttpRequest<AppState>, Form<EditUser>)) -> JsonResponse {
+        let token = Token::from_request(&req);
+        if token.is_none() {
+            return api_resp_ok!();
+        }
+        let token = token.unwrap().into_inner();
+        let redis_pool = &req.state().cache.into_inner();
+        let pg_pool = &req.state().db.into_inner().get().unwrap();
+        match params.into_inner().edit_user(pg_pool, redis_pool, &token) {
+            Ok(num_edit) => api_resp_data!(num_edit),
+            Err(err) => api_resp_err!(&*err),
+        }
     }
 
-    fn sign_out(req: &mut Request) -> SapperResult<Response> {
-        let cookie = req.ext().get::<SessionVal>().unwrap();
-        let redis_pool = req.ext().get::<Redis>().unwrap();
-        let res = json!({ "status": LoginUser::sign_out(redis_pool, cookie) });
-        res_json!(res)
+    fn sign_out(req: &HttpRequest<AppState>) -> JsonResponse {
+        let token = Token::from_request(&req);
+        if token.is_none() {
+            return api_resp_ok!();
+        }
+        let token = token.unwrap().into_inner();
+        let redis_pool = &req.state().cache.into_inner();
+        let res = LoginUser::sign_out(redis_pool, &token);
+        if res {
+            api_resp_ok!()
+        } else {
+            api_resp_err!("sign_out failed!")
+        }
     }
 
-    fn new_comment(req: &mut Request) -> SapperResult<Response> {
-        let mut body: NewComments = get_json_params!(req);
-        let cookie = req.ext().get::<SessionVal>().unwrap();
-        let redis_pool = req.ext().get::<Redis>().unwrap();
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
+    fn new_comment((req, params): (HttpRequest<AppState>, Form<NewComments>)) -> JsonResponse {
+        let mut params = params.into_inner().clone();
+        let token = Token::from_request(&req);
+        if token.is_none() {
+            return api_resp_ok!();
+        }
+        let token = token.unwrap().into_inner();
+        let redis_pool = &req.state().cache.into_inner();
+        let pg_pool = &req.state().db.into_inner().get().unwrap();
         let user =
-            serde_json::from_str::<UserInfo>(&UserInfo::view_user_with_cookie(redis_pool, cookie))
+            serde_json::from_str::<UserInfo>(&UserInfo::view_user_with_cookie(redis_pool, &token))
                 .unwrap();
-        let admin = UserInfo::view_admin(&pg_pool, redis_pool);
+        let admin = UserInfo::view_admin(pg_pool, redis_pool);
         let article =
-            ArticlesWithTag::query_without_article(&pg_pool, body.article_id(), false).unwrap();
-
-        match body.reply_user_id() {
+            ArticlesWithTag::query_without_article(&req.state(), params.article_id(), false).unwrap();
+        let reply_user_id = params.reply_user_id();
+        match reply_user_id {
             // Reply comment
             Some(reply_user_id) => {
                 // Notification replyee
@@ -115,55 +121,51 @@ impl User {
             }
         }
 
-        let res = json!({
-                "status": body.insert(&pg_pool, redis_pool, cookie)
-        });
-        res_json!(res)
+        let res = params.insert(&pg_pool, redis_pool, &token);
+        if res {
+            api_resp_ok!()
+        } else {
+            api_resp_err!("new_comment failed!")
+        }
     }
-
-    fn delete_comment(req: &mut Request) -> SapperResult<Response> {
-        let body: DeleteComment = get_json_params!(req);
-        let permission = req.ext().get::<Permissions>().unwrap();
-        let cookie = req.ext().get::<SessionVal>().unwrap();
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let redis_pool = req.ext().get::<Redis>().unwrap();
-        let res = json!({
-                "status": body.delete(&pg_pool, redis_pool, cookie, permission)
-            });
-        res_json!(res)
-    }
-}
-
-impl SapperModule for User {
-    fn before(&self, req: &mut Request) -> SapperResult<()> {
-        let permission = req.ext().get::<Permissions>().unwrap();
-        match *permission {
-            Some(_) => Ok(()),
-            None => {
-                let res = json!({
-                    "status": false,
-                    "error": String::from("Verification error")
-                });
-                Err(SapperError::CustomJson(res.to_string()))
-            }
+    fn delete_comment((req, params): (HttpRequest<AppState>, Form<DeleteComment>)) -> JsonResponse {
+        let token = Token::from_request(&req);
+        if token.is_none() {
+            return api_resp_ok!();
+        }
+        let token = token.unwrap().into_inner();
+        let permission = req.extensions().get::<InnerContext>().unwrap().permission;
+        let pg_pool = &req.state().db.into_inner().get().unwrap();
+        let redis_pool = &req.state().cache.into_inner();
+        let res = params.into_inner().delete(pg_pool, redis_pool, &token, &permission);
+        if res {
+            api_resp_ok!()
+        } else {
+            api_resp_err!("delete_comment failed!")
         }
     }
 
-    fn router(&self, router: &mut SapperRouter) -> SapperResult<()> {
-        // http post :8888/user/change_pwd old_password=1234 new_password=12345
-        router.post("/user/change_pwd", User::change_pwd);
-
-        // http get :8888/user/view
-        router.get("/user/view", User::view_user);
-
-        router.get("/user/sign_out", User::sign_out);
-
-        router.post("/user/edit", User::edit);
-
-        router.post("/comment/new", User::new_comment);
-
-        router.post("/comment/delete", User::delete_comment);
-
-        Ok(())
+    pub fn configure(app: App<AppState>) -> App<AppState> {
+        app.scope("/user", |scope| {
+            scope
+                .resource("/change_pwd", |r| {
+                    r.method(Method::POST).with(User::change_pwd)
+                })
+                .resource("/view", |r| {
+                    r.get().f(User::view_user)
+                })
+                .resource("/sign_out", |r| {
+                    r.get().f(User::sign_out)
+                })
+                .resource("/edit", |r| {
+                    r.method(Method::POST).with(User::edit)
+                })
+                .resource("/new", |r| {
+                    r.method(Method::POST).with(User::new_comment)
+                })
+                .resource("/delete", |r| {
+                    r.method(Method::POST).with(User::delete_comment)
+                })
+        })
     }
 }

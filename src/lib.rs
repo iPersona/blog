@@ -14,9 +14,6 @@ extern crate r2d2;
 extern crate r2d2_redis;
 extern crate rand;
 extern crate redis;
-extern crate sapper;
-#[macro_use]
-extern crate sapper_std;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -46,12 +43,18 @@ pub(crate) use models::{ChangePassword, ChangePermission, DisabledUser, EditUser
 pub(crate) use models::{Comments, DeleteComment, NewComments};
 pub(crate) use models::{NewTag, TagCount, Tags};
 pub(crate) use schema::{article_tag_relation, article_with_tag, articles, comments, tags, users};
-#[cfg(not(feature = "monitor"))]
-pub(crate) use util::visitor_log;
-pub use util::{create_redis_pool, get_identity_and_web_context, Permissions, Redis, RedisPool,
-               WebContext};
-pub use util::{create_pg_pool, Postgresql};
-pub(crate) use util::{get_github_account_nickname_address, get_github_primary_email,
-                      get_github_token};
+pub use util::{RedisPool};
+//pub(crate) use util::{get_github_account_nickname_address, get_github_primary_email, get_github_token};
 pub(crate) use util::{get_password, markdown_render, random_string, sha3_256_encode};
 pub use web::{Admin, ArticleWeb};
+pub use actix::Addr;
+
+// pub type DbAddr = Addr<crate::util::postgresql_pool::DataBase>;
+// pub type CacheAddr = Addr<crate::util::redis_pool::Cache>;
+
+pub struct AppState {
+    pub db: crate::util::postgresql_pool::DataBase,
+    pub cache: crate::util::redis_pool::Cache,
+}
+
+

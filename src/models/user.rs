@@ -9,8 +9,18 @@ use serde_json;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::super::{get_github_primary_email, get_password, random_string, RedisPool,
+use super::super::{/*get_github_primary_email, */get_password, random_string, RedisPool,
                    sha3_256_encode};
+use crate::AppState;
+use chrono::format::Item;
+use crate::models::InnerError;
+use futures::{Future, future::{ok, err}};
+use actix::{Message, Handler};
+use crate::util::postgresql_pool::DataBase;
+use crate::util::redis_pool::Cache;
+use std::cell::Ref;
+use std::collections::HashMap;
+use crate::models::token::Token;
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize)]
 pub struct Users {
@@ -28,11 +38,12 @@ pub struct Users {
 }
 
 impl Users {
-    pub fn delete(
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        id: Uuid,
-    ) -> Result<usize, String> {
+   pub fn delete(
+       state: &AppState,
+       id: Uuid,
+   ) -> Result<usize, String> {
+       let conn = &state.db.into_inner().get().unwrap();
+       let redis_pool = &state.cache.into_inner();
         let res = diesel::delete(all_users.find(id)).execute(conn);
         match res {
             Ok(data) => {
@@ -41,40 +52,42 @@ impl Users {
             }
             Err(err) => Err(format!("{}", err)),
         }
-    }
+   }
 
-    pub fn change_permission(conn: &PgConnection, data: ChangePermission) -> Result<usize, String> {
-        let res = diesel::update(all_users.filter(users::id.eq(data.id)))
+   pub fn change_permission(state: &AppState, data: ChangePermission) -> Result<usize, String> {
+       let conn = &state.db.into_inner().get().unwrap();
+       let res = diesel::update(all_users.filter(users::id.eq(data.id)))
             .set(users::groups.eq(data.permission))
             .execute(conn);
         match res {
             Ok(num_update) => Ok(num_update),
             Err(err) => Err(format!("{}", err)),
         }
-    }
+   }
 
-    pub fn into_user_info(self) -> UserInfo {
-        UserInfo {
-            id: self.id,
-            account: self.account,
-            nickname: self.nickname,
-            groups: self.groups,
-            say: self.say,
-            email: self.email,
-            create_time: self.create_time,
-            github: self.github,
-        }
-    }
+   pub fn into_user_info(self) -> UserInfo {
+       UserInfo {
+           id: self.id,
+           account: self.account,
+           nickname: self.nickname,
+           groups: self.groups,
+           say: self.say,
+           email: self.email,
+           create_time: self.create_time,
+           github: self.github,
+       }
+   }
 
-    pub fn disabled_user(conn: &PgConnection, data: DisabledUser) -> Result<usize, String> {
-        let res = diesel::update(all_users.filter(users::id.eq(data.id)))
+   pub fn disabled_user(state: &AppState, data: DisabledUser) -> Result<usize, String> {
+       let conn = &state.db.into_inner().get().unwrap();
+       let res = diesel::update(all_users.filter(users::id.eq(data.id)))
             .set(users::disabled.eq(data.disabled))
             .execute(conn);
         match res {
             Ok(data) => Ok(data),
             Err(err) => Err(format!("{}", err)),
         }
-    }
+   }
 }
 
 #[derive(Insertable, Debug, Clone, Deserialize, Serialize)]
@@ -90,49 +103,51 @@ struct NewUser {
 }
 
 impl NewUser {
-    fn new(reg: RegisteredUser) -> Self {
-        let salt = random_string(6);
+   fn new(reg: RegisteredUser) -> Self {
+       let salt = random_string(6);
 
-        NewUser {
-            account: reg.account,
-            password: sha3_256_encode(get_password(&reg.password) + &salt),
-            salt,
-            nickname: reg.nickname,
-            say: reg.say,
-            email: reg.email,
-            github: None,
-        }
-    }
+       NewUser {
+           account: reg.account,
+           password: sha3_256_encode(get_password(&reg.password) + &salt),
+           salt,
+           nickname: reg.nickname,
+           say: reg.say,
+           email: reg.email,
+           github: None,
+       }
+   }
 
-    fn new_with_github(email: String, github: String, account: String, nickname: String) -> Self {
-        NewUser {
-            account: account,
-            password: sha3_256_encode(random_string(8)),
-            salt: random_string(6),
-            email: email,
-            say: None,
-            nickname: nickname,
-            github: Some(github),
-        }
-    }
+   fn new_with_github(email: String, github: String, account: String, nickname: String) -> Self {
+       NewUser {
+           account: account,
+           password: sha3_256_encode(random_string(8)),
+           salt: random_string(6),
+           email: email,
+           say: None,
+           nickname: nickname,
+           github: Some(github),
+       }
+   }
 
-    fn insert(&self, conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Result<String, String> {
-        match diesel::insert_into(users::table)
-            .values(self)
-            .get_result::<Users>(conn)
-        {
-            Ok(info) => self.set_cookies(redis_pool, info.into_user_info()),
-            Err(err) => Err(format!("{}", err)),
-        }
-    }
+   fn insert(&self, conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Result<Token, String> {
+       match diesel::insert_into(users::table)
+           .values(self)
+           .get_result::<Users>(conn)
+           {
+               Ok(info) => self.set_cookies(redis_pool, info.into_user_info()),
+               Err(err) => Err(format!("{}", err)),
+           }
+   }
 
-    fn set_cookies(&self, redis_pool: &Arc<RedisPool>, info: UserInfo) -> Result<String, String> {
-        let cookie = sha3_256_encode(random_string(8));
-        redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
-        redis_pool.hset(&cookie, "info", json!(info).to_string());
-        redis_pool.expire(&cookie, 24 * 3600);
-        Ok(cookie)
-    }
+   fn set_cookies(&self, redis_pool: &Arc<RedisPool>, info: UserInfo) -> Result<Token, String> {
+//       let cookie = sha3_256_encode(random_string(8));
+       let token = Token::new();
+       let cookie = token.into_inner();
+       redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
+       redis_pool.hset(&cookie, "info", json!(info).to_string());
+       redis_pool.expire(&cookie, 24 * 3600);
+       Ok(token)
+   }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -145,13 +160,13 @@ pub struct RegisteredUser {
 }
 
 impl RegisteredUser {
-    pub fn insert(
-        self,
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-    ) -> Result<String, String> {
-        NewUser::new(self).insert(conn, redis_pool)
-    }
+   pub fn insert(
+       self,
+       conn: &PgConnection,
+       redis_pool: &Arc<RedisPool>,
+   ) -> Result<Token, String> {
+       NewUser::new(self).insert(conn, redis_pool)
+   }
 }
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize)]
@@ -167,36 +182,37 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
-    pub fn view_user(conn: &PgConnection, id: Uuid) -> Result<Self, String> {
-        let res = all_users
-            .select((
-                users::id,
-                users::account,
-                users::nickname,
-                users::groups,
-                users::say,
-                users::email,
-                users::create_time,
-                users::github,
-            ))
-            .filter(users::id.eq(id))
-            .get_result::<UserInfo>(conn);
-        match res {
-            Ok(data) => Ok(data),
-            Err(err) => Err(format!("{}", err)),
-        }
-    }
+   pub fn view_user(conn: &PgConnection, id: Uuid) -> Result<Self, String> {
+       let res = all_users
+           .select((
+               users::id,
+               users::account,
+               users::nickname,
+               users::groups,
+               users::say,
+               users::email,
+               users::create_time,
+               users::github,
+           ))
+           .filter(users::id.eq(id))
+           .get_result::<UserInfo>(conn);
+       match res {
+           Ok(data) => Ok(data),
+           Err(err) => Err(format!("{}", err)),
+       }
+   }
 
-    pub fn view_user_with_cookie(redis_pool: &Arc<RedisPool>, cookie: &str) -> String {
-        redis_pool.hget::<String>(cookie, "info")
-    }
+   pub fn view_user_with_cookie(redis_pool: &Arc<RedisPool>, cookie: &str) -> String {
+       redis_pool.hget::<String>(cookie, "info")
+   }
 
-    pub fn view_user_list(
-        conn: &PgConnection,
-        limit: i64,
-        offset: i64,
-    ) -> Result<Vec<Self>, String> {
-        let res = all_users
+   pub fn view_user_list(
+       state: &AppState,
+       limit: i64,
+       offset: i64,
+   ) -> Result<Vec<Self>, String> {
+       let conn = &state.db.into_inner().get().unwrap();
+       let res = all_users
             .select((
                 users::id,
                 users::account,
@@ -215,32 +231,32 @@ impl UserInfo {
             Ok(data) => Ok(data),
             Err(err) => Err(format!("{}", err)),
         }
-    }
+   }
 
-    /// Get admin information, cache on redis
-    /// key is `admin_info`
-    pub fn view_admin(conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Self {
-        if redis_pool.exists("admin_info") {
-            serde_json::from_str::<UserInfo>(&redis_pool.get("admin_info")).unwrap()
-        } else {
-            let info = all_users
-                .select((
-                    users::id,
-                    users::account,
-                    users::nickname,
-                    users::groups,
-                    users::say,
-                    users::email,
-                    users::create_time,
-                    users::github,
-                ))
-                .filter(users::account.eq("admin"))
-                .get_result::<UserInfo>(conn)
-                .unwrap();
-            redis_pool.set("admin_info", &json!(&info).to_string());
-            info
-        }
-    }
+   /// Get admin information, cache on redis
+   /// key is `admin_info`
+   pub fn view_admin(conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Self {
+       if redis_pool.exists("admin_info") {
+           serde_json::from_str::<UserInfo>(&redis_pool.get("admin_info")).unwrap()
+       } else {
+           let info = all_users
+               .select((
+                   users::id,
+                   users::account,
+                   users::nickname,
+                   users::groups,
+                   users::say,
+                   users::email,
+                   users::create_time,
+                   users::github,
+               ))
+               .filter(users::account.eq("admin"))
+               .get_result::<UserInfo>(conn)
+               .unwrap();
+           redis_pool.set("admin_info", &json!(&info).to_string());
+           info
+       }
+   }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -250,39 +266,39 @@ pub struct ChangePassword {
 }
 
 impl ChangePassword {
-    pub fn change_password(
-        &self,
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        cookie: &str,
-    ) -> Result<usize, String> {
-        let info =
-            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info")).unwrap();
+   pub fn change_password(
+       &self,
+       conn: &PgConnection,
+       redis_pool: &Arc<RedisPool>,
+       cookie: &str,
+   ) -> Result<usize, String> {
+       let info =
+           serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info")).unwrap();
 
-        if !self.verification(conn, &info.id) {
-            return Err("Verification error".to_string());
-        }
+       if !self.verification(conn, &info.id) {
+           return Err("Verification error".to_string());
+       }
 
-        let salt = random_string(6);
-        let password = sha3_256_encode(get_password(&self.new_password) + &salt);
-        let res = diesel::update(all_users.filter(users::id.eq(info.id)))
-            .set((users::password.eq(&password), users::salt.eq(&salt)))
-            .execute(conn);
-        match res {
-            Ok(num_update) => Ok(num_update),
-            Err(err) => Err(format!("{}", err)),
-        }
-    }
+       let salt = random_string(6);
+       let password = sha3_256_encode(get_password(&self.new_password) + &salt);
+       let res = diesel::update(all_users.filter(users::id.eq(info.id)))
+           .set((users::password.eq(&password), users::salt.eq(&salt)))
+           .execute(conn);
+       match res {
+           Ok(num_update) => Ok(num_update),
+           Err(err) => Err(format!("{}", err)),
+       }
+   }
 
-    fn verification(&self, conn: &PgConnection, id: &Uuid) -> bool {
-        let old_user = all_users.filter(users::id.eq(id)).get_result::<Users>(conn);
-        match old_user {
-            Ok(old) => {
-                old.password == sha3_256_encode(get_password(&self.old_password) + &old.salt)
-            }
-            Err(_) => false,
-        }
-    }
+   fn verification(&self, conn: &PgConnection, id: &Uuid) -> bool {
+       let old_user = all_users.filter(users::id.eq(id)).get_result::<Users>(conn);
+       match old_user {
+           Ok(old) => {
+               old.password == sha3_256_encode(get_password(&self.old_password) + &old.salt)
+           }
+           Err(_) => false,
+       }
+   }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -293,29 +309,29 @@ pub struct EditUser {
 }
 
 impl EditUser {
-    pub fn edit_user(
-        self,
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        cookie: &str,
-    ) -> Result<usize, String> {
-        let info =
-            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info")).unwrap();
-        let res = diesel::update(all_users.filter(users::id.eq(info.id)))
-            .set((
-                users::nickname.eq(self.nickname),
-                users::say.eq(self.say),
-                users::email.eq(self.email),
-            ))
-            .get_result::<Users>(conn);
-        match res {
-            Ok(data) => {
-                redis_pool.hset(cookie, "info", json!(data.into_user_info()).to_string());
-                Ok(1)
-            }
-            Err(err) => Err(format!("{}", err)),
-        }
-    }
+   pub fn edit_user(
+       self,
+       conn: &PgConnection,
+       redis_pool: &Arc<RedisPool>,
+       cookie: &str,
+   ) -> Result<usize, String> {
+       let info =
+           serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info")).unwrap();
+       let res = diesel::update(all_users.filter(users::id.eq(info.id)))
+           .set((
+               users::nickname.eq(self.nickname),
+               users::say.eq(self.say),
+               users::email.eq(self.email),
+           ))
+           .get_result::<Users>(conn);
+       match res {
+           Ok(data) => {
+               redis_pool.hset(cookie, "info", json!(data.into_user_info()).to_string());
+               Ok(1)
+           }
+           Err(err) => Err(format!("{}", err)),
+       }
+   }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -332,109 +348,142 @@ pub struct LoginUser {
 }
 
 impl LoginUser {
-    pub fn verification(
-        &self,
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        max_age: &Option<i64>,
-    ) -> Result<String, String> {
-        let res = all_users
-            .filter(users::disabled.eq(0))
-            .filter(users::account.eq(self.account.to_owned()))
-            .get_result::<Users>(conn);
-        match res {
-            Ok(data) => {
-                if data.password == sha3_256_encode(get_password(&self.password) + &data.salt) {
-                    let ttl = match *max_age {
-                        Some(t) => t * 3600,
-                        None => 24 * 60 * 60,
-                    };
+   pub fn verification(
+       &self,
+       conn: &PgConnection,
+       redis_pool: &Arc<RedisPool>,
+       max_age: &Option<i64>,
+   ) -> Result<Token, String> {
+       let res = all_users
+           .filter(users::disabled.eq(0))
+           .filter(users::account.eq(self.account.to_owned()))
+           .get_result::<Users>(conn);
+       match res {
+           Ok(data) => {
+               if data.password == sha3_256_encode(get_password(&self.password) + &data.salt) {
+                   let ttl = match *max_age {
+                       Some(t) => t * 3600,
+                       None => 24 * 60 * 60,
+                   };
 
-                    let cookie = sha3_256_encode(random_string(8));
-                    redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
-                    redis_pool.hset(&cookie, "info", json!(data.into_user_info()).to_string());
-                    redis_pool.expire(&cookie, ttl);
-                    Ok(cookie)
-                } else {
-                    Err(String::from("用户或密码错误"))
-                }
-            }
-            Err(err) => Err(format!("{}", err)),
-        }
-    }
+//                   let cookie = sha3_256_encode(random_string(8));
+                   let token = Token::new();
+                   let cookie = token.into_inner();
+                   redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
+                   redis_pool.hset(&cookie, "info", json!(data.into_user_info()).to_string());
+                   redis_pool.expire(&cookie, ttl);
+                   Ok(token)
+               } else {
+                   Err(String::from("用户或密码错误"))
+               }
+           }
+           Err(err) => Err(format!("{}", err)),
+       }
+   }
 
-    pub fn get_remember(&self) -> bool {
-        self.remember
-    }
+   pub fn get_remember(&self) -> bool {
+       self.remember
+   }
 
-    pub fn sign_out(redis_pool: &Arc<RedisPool>, cookies: &str) -> bool {
-        redis_pool.del(cookies)
-    }
+   pub fn sign_out(redis_pool: &Arc<RedisPool>, cookies: &str) -> bool {
+       redis_pool.del(cookies)
+   }
 
-    pub fn login_with_github(
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        github: String,
-        nickname: String,
-        account: String,
-        token: &str,
-    ) -> Result<String, String> {
-        let ttl = 24 * 60 * 60;
-        match all_users
-            .filter(users::disabled.eq(0))
-            .filter(users::github.eq(&github))
-            .get_result::<Users>(conn)
-        {
-            // github already exists
-            Ok(data) => {
-                let cookie = sha3_256_encode(random_string(8));
-                redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
-                redis_pool.hset(&cookie, "info", json!(data.into_user_info()).to_string());
-                redis_pool.expire(&cookie, ttl);
-                Ok(cookie)
-            }
-            Err(_) => {
-                let email = match get_github_primary_email(token) {
-                    Ok(data) => data,
-                    Err(e) => return Err(e),
-                };
-
-                match all_users
-                    .filter(users::disabled.eq(0))
-                    .filter(users::email.eq(&email))
-                    .get_result::<Users>(conn)
-                {
-                    // Account already exists but not linked
-                    Ok(data) => {
-                        let res = diesel::update(all_users.filter(users::id.eq(data.id)))
-                            .set(users::github.eq(github))
-                            .get_result::<Users>(conn);
-                        match res {
-                            Ok(info) => {
-                                let cookie = sha3_256_encode(random_string(8));
-                                redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
-                                redis_pool.hset(
-                                    &cookie,
-                                    "info",
-                                    json!(info.into_user_info()).to_string(),
-                                );
-                                redis_pool.expire(&cookie, ttl);
-                                Ok(cookie)
-                            }
-                            Err(err) => Err(format!("{}", err)),
-                        }
-                    }
-                    // sign up
-                    Err(_) => NewUser::new_with_github(email, github, account, nickname)
-                        .insert(conn, redis_pool),
-                }
-            }
-        }
-    }
+//    pub fn login_with_github(
+//        conn: &PgConnection,
+//        redis_pool: &Arc<RedisPool>,
+//        github: String,
+//        nickname: String,
+//        account: String,
+//        token: &str,
+//    ) -> Result<String, String> {
+//        let ttl = 24 * 60 * 60;
+//        match all_users
+//            .filter(users::disabled.eq(0))
+//            .filter(users::github.eq(&github))
+//            .get_result::<Users>(conn)
+//        {
+//            // github already exists
+//            Ok(data) => {
+//                let cookie = sha3_256_encode(random_string(8));
+//                redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
+//                redis_pool.hset(&cookie, "info", json!(data.into_user_info()).to_string());
+//                redis_pool.expire(&cookie, ttl);
+//                Ok(cookie)
+//            }
+//            Err(_) => {
+//                let email = match get_github_primary_email(token) {
+//                    Ok(data) => data,
+//                    Err(e) => return Err(e),
+//                };
+//
+//                match all_users
+//                    .filter(users::disabled.eq(0))
+//                    .filter(users::email.eq(&email))
+//                    .get_result::<Users>(conn)
+//                {
+//                    // Account already exists but not linked
+//                    Ok(data) => {
+//                        let res = diesel::update(all_users.filter(users::id.eq(data.id)))
+//                            .set(users::github.eq(github))
+//                            .get_result::<Users>(conn);
+//                        match res {
+//                            Ok(info) => {
+//                                let cookie = sha3_256_encode(random_string(8));
+//                                redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
+//                                redis_pool.hset(
+//                                    &cookie,
+//                                    "info",
+//                                    json!(info.into_user_info()).to_string(),
+//                                );
+//                                redis_pool.expire(&cookie, ttl);
+//                                Ok(cookie)
+//                            }
+//                            Err(err) => Err(format!("{}", err)),
+//                        }
+//                    }
+//                    // sign up
+//                    Err(_) => NewUser::new_with_github(email, github, account, nickname)
+//                        .insert(conn, redis_pool),
+//                }
+//            }
+//        }
+//    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DisabledUser {
     id: Uuid,
     disabled: i16,
+}
+
+// DeleteUser
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DeleteUser {
+    pub id: Uuid,
+}
+
+// View user list
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ViewUserList {
+    pub limit: i64,
+    pub offset: i64,
+}
+
+impl ViewUserList {
+   pub fn new(query: Ref<HashMap<String, String>>) -> Option<ViewUserList> {
+       let limit = query
+           .get("limit")
+           .map_or(-1, |limit| limit.parse::<i64>().unwrap_or_else(|_| -1));
+       let offset = query
+           .get("offset")
+           .map_or(-1, |offset| offset.parse::<i64>().unwrap_or_else(|_| -1));
+       if limit == -1 || offset == -1 {
+           return None;
+       }
+       Some(ViewUserList {
+           limit,
+           offset,
+       })
+   }
 }
