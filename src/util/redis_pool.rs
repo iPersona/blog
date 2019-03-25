@@ -9,6 +9,7 @@ use redis;
 use sapper::Key;
 use std::fs::File;
 use std::io::Read;
+use actix::{Actor, SyncContext};
 
 pub struct RedisPool {
     pool: Pool<RedisConnectionManager>,
@@ -203,7 +204,7 @@ impl RedisPool {
     }
 }
 
-pub fn create_redis_pool(path: Option<&str>) -> RedisPool {
+fn create_redis_pool(path: Option<&str>) -> RedisPool {
     dotenv::dotenv().ok();
 
     let database_url = env::var("REDIS_URL").expect("DATABASE_URL must be set");
@@ -213,8 +214,14 @@ pub fn create_redis_pool(path: Option<&str>) -> RedisPool {
     }
 }
 
-pub struct Redis;
+pub struct Cache(pub RedisPool);
 
-impl Key for Redis {
-    type Value = Arc<RedisPool>;
+impl Actor for Cache {
+    type Context = SyncContext<Self>;
+}
+
+impl Cache {
+    pub fn new() -> Cache {
+        Cache(create_redis_pool(Some("lua/visitor_log.lua")))
+    }
 }

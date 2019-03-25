@@ -1,11 +1,13 @@
 pub mod github_information;
 pub mod postgresql_pool;
 pub mod redis_pool;
+pub mod env;
+pub mod cookies;
+pub mod context;
 
 pub use self::github_information::{get_github_account_nickname_address, get_github_primary_email,
                                    get_github_token};
-pub use self::postgresql_pool::{create_pg_pool, Postgresql};
-pub use self::redis_pool::{create_redis_pool, Redis, RedisPool};
+pub use self::redis_pool::RedisPool;
 
 use super::{UserInfo, UserNotify};
 use ammonia::clean;
@@ -13,14 +15,15 @@ use chrono::Utc;
 use comrak::{markdown_to_html, ComrakOptions};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use sapper::{Client, Error as SapperError, Key, Request};
-use sapper_std::{Context, SessionVal};
 use serde_json;
 use std::fmt::Write;
 use std::io::Read;
 use std::sync::Arc;
 use std::thread;
 use tiny_keccak::Keccak;
+use crate::util::context::Context;
+use actix_web::HttpRequest;
+use crate::AppState;
 
 /// Get random value
 #[inline]
@@ -73,18 +76,18 @@ pub fn get_password(raw: &str) -> String {
 /// Get visitor's permission and user info
 /// `0` means Admin
 /// `1` means User
-pub fn get_identity_and_web_context(req: &Request) -> (Option<i16>, Context) {
-    let mut web = Context::new();
-    let cookie = req.ext().get::<SessionVal>();
-    let redis_pool = req.ext().get::<Redis>().unwrap();
+pub fn get_identity_and_web_context(req: &HttpRequest<AppState>) -> (Option<i16>, Context) {
+    let mut web = Context::new(None, None);
+//    let cookie = req.ext().get::<SessionVal>();
+    let redis_pool = &req.state().cache;
     match cookie {
         Some(cookie) => {
             if redis_pool.exists(cookie) {
                 let info = serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info"))
                     .unwrap();
                 let notifys = UserNotify::get_notifys(info.id, redis_pool);
-                web.add("user", &info);
-                web.add("notifys", &notifys);
+                web.set_user(Some(info));
+                web.set_notifys(notifys);
                 (Some(info.groups), web)
             } else {
                 (None, web)
