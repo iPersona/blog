@@ -199,7 +199,7 @@ impl Visitor
         }
     }
 
-    fn configure(app: App<AppState>) -> App<AppState> {
+    pub fn configure(app: App<AppState>) -> App<AppState> {
         app.scope("/article", |scope| {
             scope
                 .resource("/view_all", |r| {
