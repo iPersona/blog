@@ -89,7 +89,7 @@ impl Middleware<AppState> for Preprocess {
 }
 
 fn main() {
-    ::std::env::set_var("RUST_LOG", "info");
+    ::std::env::set_var("RUST_LOG", "debug,actix_web=debug");
     // 获取环境变量
     dotenv().ok();
     // init logger
@@ -118,11 +118,11 @@ fn main() {
             db: DataBase::new(),
             cache: Cache::new(),
         });
+        app = Visitor::configure(app);
         app = AdminArticle::configure(app);
         app = Tag::configure(app);
         app = AdminUser::configure(app);
         app = User::configure(app);
-        app = Visitor::configure(app);
         app = app
             .middleware(SessionStorage::new(
                 CookieSessionBackend::signed(&[0; 32])

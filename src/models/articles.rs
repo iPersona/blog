@@ -25,6 +25,7 @@ use super::super::{markdown_render, RedisPool};
 use super::{RelationTag, Relations, UserNotify};
 use std::cell::Ref;
 use crate::models::InnerError;
+use log::info;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ArticlesWithTag {

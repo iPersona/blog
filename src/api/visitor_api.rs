@@ -18,7 +18,8 @@ impl Visitor
 //        info!("access login: {:?}", &params);
 //        api_resp_ok!()
 //    }
-    fn list_all_article(req: &HttpRequest<AppState>) -> JsonResponse {
+    pub fn list_all_article(req: &HttpRequest<AppState>) -> JsonResponse {
+        info!("list_all_article");
         QuerySlice::new(req.query()).map_or(
             api_resp_err!("'id' is not specified!"),
             |params| {

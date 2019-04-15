@@ -2,10 +2,9 @@ import Vue from 'vue';
 import Router from 'vue-router';
 // import ResultDiff from '@/components/ResultDiff';
 import NotFound from '@/components/NotFound';
-import Result from '@/components/Result';
-import CaseEditor from '@/components/CaseEditor';
 import Home from '@/components/Home';
-import Debug from '@/components/Debug';
+import Articles from '@/components/Articles';
+import About from '@/components/About';
 
 Vue.use(Router);
 
@@ -16,19 +15,14 @@ export default new Router({
       component: Home
     },
     {
-      path: '/result',
-      name: 'Result',
-      component: Result
+      path: '/articles',
+      name: 'Articles',
+      component: Articles
     },
     {
-      path: '/files',
-      name: "CaseEditor",
-      component: CaseEditor
-    },
-    {
-      path: '/debug',
-      name: 'Debug',
-      component: Debug
+      path: '/about',
+      name: 'About',
+      component: About
     },
     {
       path: '*',

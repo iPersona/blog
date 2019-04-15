@@ -19,6 +19,10 @@ Vue.use(TreeView)
 import LiquorTree from 'liquor-tree'
 Vue.use(LiquorTree)
 
+import ElementUI from 'element-ui'
+import 'element-ui/lib/theme-chalk/index.css'
+Vue.use(ElementUI)
+
 require('vue-ionicons/ionicons.css')
 
 Vue.config.productionTip = false
