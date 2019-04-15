@@ -1,112 +1,65 @@
-use sapper::{Error as SapperError, Request, Response, Result as SapperResult, SapperModule,
-             SapperRouter};
-use sapper_std::{JsonParams, PathParams, QueryParams};
-use serde_json;
-use uuid::Uuid;
-
-use super::super::{ChangePermission, DisabledUser, Permissions, Postgresql, Redis, UserInfo, Users};
+use crate::api::JsonResponse;
+use crate::models::user::{DeleteUser, ViewUserList};
+use crate::{AppState, ChangePermission, DisabledUser, UserInfo, Users};
+use actix_web::error::ErrorInternalServerError;
+use actix_web::http::Method;
+use actix_web::{App, AsyncResponder, Form, HttpRequest};
+use futures::future::Future;
 
 pub struct AdminUser;
 
 impl AdminUser {
-    fn delete_user(req: &mut Request) -> SapperResult<Response> {
-        let params = get_path_params!(req);
-        let user_id: Uuid = t_param!(params, "id").clone().parse().unwrap();
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let redis_pool = req.ext().get::<Redis>().unwrap();
-
-        let res = match Users::delete(&pg_pool, redis_pool, user_id) {
-            Ok(num_deleted) => json!({
-                    "status": true,
-                    "num_deleted": num_deleted
-                    }),
-            Err(err) => json!({
-                    "status": false,
-                    "error": err
-                    }),
-        };
-        res_json!(res)
-    }
-
-    fn view_user_list(req: &mut Request) -> SapperResult<Response> {
-        let params = get_query_params!(req);
-        let limit = t_param_parse!(params, "limit", i64);
-        let offset = t_param_parse!(params, "offset", i64);
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let res = match UserInfo::view_user_list(&pg_pool, limit, offset) {
-            Ok(data) => json!({
-                    "status": true,
-                    "data": data
-                }),
-            Err(err) => json!({
-                    "status": false,
-                    "error": err
-                }),
-        };
-        res_json!(res)
-    }
-
-    fn change_permission(req: &mut Request) -> SapperResult<Response> {
-        let body: ChangePermission = get_json_params!(req);
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let res = match Users::change_permission(&pg_pool, body) {
-            Ok(num_update) => json!({
-                    "status": true,
-                    "num_update": num_update
-                }),
-            Err(err) => json!({
-                    "status": false,
-                    "error": format!("{}", err)
-                }),
-        };
-        res_json!(res)
-    }
-
-    fn change_disabled(req: &mut Request) -> SapperResult<Response> {
-        let body: DisabledUser = get_json_params!(req);
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let res = match Users::disabled_user(&pg_pool, body) {
-            Ok(num_update) => json!({
-                    "status": true,
-                    "num_update": num_update
-                }),
-            Err(err) => json!({
-                    "status": false,
-                    "error": format!("{}", err)
-                }),
-        };
-        res_json!(res)
-    }
-}
-
-impl SapperModule for AdminUser {
-    fn before(&self, req: &mut Request) -> SapperResult<()> {
-        let permission = req.ext().get::<Permissions>().unwrap();
-        match *permission {
-            Some(0) => Ok(()),
-            _ => {
-                let res = json!({
-                    "status": false,
-                    "error": String::from("Verification error")
-                });
-                Err(SapperError::CustomJson(res.to_string()))
-            }
+    pub fn delete_user((req, params): (HttpRequest<AppState>, Form<DeleteUser>)) -> JsonResponse {
+        let res = Users::delete(&req.state(), params.into_inner().id);
+        match res {
+            Ok(v) => api_resp_data!(v),
+            Err(_) => api_resp_err!("delete_user failed!"),
         }
     }
 
-    fn router(&self, router: &mut SapperRouter) -> SapperResult<()> {
-        // http get /user/view_all limit==5 offset==0
-        router.get("/user/view_all", AdminUser::view_user_list);
+    pub fn view_user_list(req: &HttpRequest<AppState>) -> JsonResponse {
+        ViewUserList::new(req.query()).map_or(api_resp_err!("parse query string failed!"), |r| {
+            let res = UserInfo::view_user_list(&req.state(), r.limit, r.offset);
+            match res {
+                Ok(v) => api_resp_data!(v),
+                Err(e) => api_resp_err!("view_user_list failed!"),
+            }
+        })
+    }
 
-        // http post :8888/user/delete/uuid
-        router.post("/user/delete/:id", AdminUser::delete_user);
+    pub fn change_permission(
+        (req, params): (HttpRequest<AppState>, Form<ChangePermission>),
+    ) -> JsonResponse {
+        let res = Users::change_permission(&req.state(), params.into_inner());
+        match res {
+            Ok(v) => api_resp_data!(v),
+            Err(_) => api_resp_err!("change_permission failed!"),
+        }
+    }
 
-        // http post :8888/user/permission id:=uuid permission:=0
-        router.post("/user/permission", AdminUser::change_permission);
+    pub fn change_disabled(
+        (req, params): (HttpRequest<AppState>, Form<DisabledUser>),
+    ) -> JsonResponse {
+        let res = Users::disabled_user(&req.state(), params.into_inner());
+        match res {
+            Ok(v) => api_resp_data!(v),
+            Err(_) => api_resp_err!("change_disable failed!"),
+        }
+    }
 
-        // http post :8888/user/permission id:=uuid disabled:=1
-        router.post("/user/disable", AdminUser::change_disabled);
-
-        Ok(())
+    pub fn configure(app: App<AppState>) -> App<AppState> {
+        app.scope("/api/v1/user", |scope| {
+            scope
+                .resource("/user/view_all", |r| r.get().f(AdminUser::view_user_list))
+                .resource("/user/delete", |r| {
+                    r.method(Method::POST).with(AdminUser::delete_user)
+                })
+                .resource("/user/permission", |r| {
+                    r.method(Method::POST).with(AdminUser::change_permission)
+                })
+                .resource("/user/disable", |r| {
+                    r.method(Method::POST).with(AdminUser::change_disabled)
+                })
+        })
     }
 }

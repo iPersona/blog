@@ -1,5 +1,6 @@
 use super::super::RedisPool;
 
+use crate::util::redis_pool::Cache;
 use serde_json;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -34,7 +35,7 @@ impl UserNotify {
     }
 
     /// Get all the notifications about the user
-    pub fn get_notifys(user_id: Uuid, redis_pool: &Arc<RedisPool>) -> Option<Vec<UserNotify>> {
+    pub fn get_notifys(user_id: Uuid, redis_pool: &RedisPool) -> Option<Vec<UserNotify>> {
         let pattern = format!("notify:*:{}", user_id.hyphenated().to_string());
         let mut notify = Vec::new();
 
@@ -61,7 +62,7 @@ impl UserNotify {
     pub fn remove_notifys_with_article_and_user(
         user_id: Uuid,
         article_id: Uuid,
-        redis_pool: &Arc<RedisPool>,
+        redis_pool: &RedisPool,
     ) {
         let notify_key = format!(
             "notify:{}:{}",
@@ -74,11 +75,16 @@ impl UserNotify {
     /// Remove the notification of the specified article, e.g use on remove the specified article
     pub fn remove_with_article(article_id: Uuid, redis_pool: &Arc<RedisPool>) {
         let pattern = format!("notify:{}*", article_id.hyphenated().to_string());
-        redis_pool.del(redis_pool.keys(&pattern));
+        // redis_pool.del(redis_pool.keys(&pattern));
+        let keys = redis_pool.keys(&pattern);
+        if keys.len() == 0 {
+            return;
+        }
+        redis_pool.del(keys);
     }
 
     /// Remove the notification of the user, e.g use on remove the user
-    pub fn remove_with_user(user_id: Uuid, redis_pool: &Arc<RedisPool>) {
+    pub fn remove_with_user(user_id: Uuid, redis_pool: &RedisPool) {
         let pattern = format!("notify:*:{}", user_id.hyphenated().to_string());
         redis_pool.del(redis_pool.keys(&pattern));
     }

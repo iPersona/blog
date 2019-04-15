@@ -1,3 +1,4 @@
 pg/data
 redis/data
+nginx/log
 

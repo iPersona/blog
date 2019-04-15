@@ -1,14 +1,18 @@
-use std::env;
 use std::sync::Arc;
+use std::{env, io};
 
+use crate::{UserInfo, UserNotify};
+use actix::{Actor, Handler, Message, SyncContext};
 use dotenv;
 use r2d2;
 use r2d2::Pool;
 use r2d2_redis::RedisConnectionManager;
 use redis;
-use sapper::Key;
 use std::fs::File;
 use std::io::Read;
+use tera::Context;
+use crate::api::InnerContext;
+use crate::models::InnerError;
 
 pub struct RedisPool {
     pool: Pool<RedisConnectionManager>,
@@ -203,7 +207,7 @@ impl RedisPool {
     }
 }
 
-pub fn create_redis_pool(path: Option<&str>) -> RedisPool {
+fn create_redis_pool(path: Option<&str>) -> RedisPool {
     dotenv::dotenv().ok();
 
     let database_url = env::var("REDIS_URL").expect("DATABASE_URL must be set");
@@ -213,8 +217,18 @@ pub fn create_redis_pool(path: Option<&str>) -> RedisPool {
     }
 }
 
-pub struct Redis;
+pub struct Cache(pub Arc<RedisPool>);
 
-impl Key for Redis {
-    type Value = Arc<RedisPool>;
+// impl Actor for Cache {
+//     type Context = SyncContext<Self>;
+// }
+
+impl Cache {
+    pub fn new() -> Cache {
+        Cache(Arc::new(create_redis_pool(Some("lua/visitor_log.lua"))))
+    }
+
+    pub fn into_inner(&self) -> Arc<RedisPool> {
+        self.0.clone()
+    }
 }
