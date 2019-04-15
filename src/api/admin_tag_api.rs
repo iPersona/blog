@@ -1,104 +1,55 @@
-use sapper::{Error as SapperError, Request, Response, Result as SapperResult, SapperModule,
-             SapperRouter};
-use sapper_std::{JsonParams, PathParams, QueryParams};
-use serde_json;
-use uuid::Uuid;
-
-use super::super::{NewTag, Permissions, Postgresql, TagCount, Tags};
+use crate::api::JsonResponse;
+use crate::models::tag::{DeleteTag, ViewTag};
+use crate::{AppState, NewTag, TagCount, Tags};
+use actix_web::error::ErrorInternalServerError;
+use actix_web::http::Method;
+use actix_web::{App, AsyncResponder, Form, HttpRequest};
+use futures::future::Future;
 
 pub struct Tag;
 
 impl Tag {
-    fn create_tag(req: &mut Request) -> SapperResult<Response> {
-        let body: NewTag = get_json_params!(req);
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-
-        if body.insert(&pg_pool) {
-            res_json!(json!({"status": true}))
-        } else {
-            res_json!(json!({"status": false}))
+    pub fn create_tag((req, params): (HttpRequest<AppState>, Form<NewTag>)) -> JsonResponse {
+        let res = params.into_inner().insert(&req.state());
+        match res {
+            true => api_resp_ok!(),
+            false => api_resp_err!("create_tag failed!"),
         }
     }
 
-    fn delete_tag(req: &mut Request) -> SapperResult<Response> {
-        let params = get_path_params!(req);
-        let id: Uuid = t_param!(params, "id").clone().parse().unwrap();
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let res = match Tags::delete_tag(&pg_pool, id) {
-            Ok(num_deleted) => json!({
-                    "status": true,
-                    "num_deleted": num_deleted
-                    }),
-            Err(err) => json!({
-                    "status": false,
-                    "error": err
-                    }),
-        };
-        res_json!(res)
+    pub fn delete_tag((req, params): (HttpRequest<AppState>, Form<DeleteTag>)) -> JsonResponse {
+        let res = Tags::delete_tag(&req.state(), params.into_inner().id);
+        match res {
+            Ok(v) => api_resp_data!(v),
+            Err(_) => api_resp_err!("delete_tag failed!"),
+        }
     }
 
-    fn view_tag(req: &mut Request) -> SapperResult<Response> {
-        let params = get_query_params!(req);
-        let limit = t_param_parse!(params, "limit", i64);
-        let offset = t_param_parse!(params, "offset", i64);
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let res = match TagCount::view_all_tag_count(&pg_pool, limit, offset) {
-            Ok(data) => json!({
-                    "status": true,
-                    "data": data
-                }),
-            Err(err) => json!({
-                    "status": false,
-                    "error": err
-                }),
-        };
-        res_json!(res)
-    }
-
-    fn edit_tag(req: &mut Request) -> SapperResult<Response> {
-        let body: Tags = get_json_params!(req);
-        let pg_pool = req.ext().get::<Postgresql>().unwrap().get().unwrap();
-        let res = match body.edit_tag(&pg_pool) {
-            Ok(num_update) => json!({
-                    "status": true,
-                    "num_update": num_update
-                }),
-            Err(err) => json!({
-                    "status": false,
-                    "error": format!("{}", err)
-                }),
-        };
-        res_json!(res)
-    }
-}
-
-impl SapperModule for Tag {
-    fn before(&self, req: &mut Request) -> SapperResult<()> {
-        let permission = req.ext().get::<Permissions>().unwrap();
-        match *permission {
-            Some(0) => Ok(()),
-            _ => {
-                let res = json!({
-                    "status": false,
-                    "error": String::from("Verification error")
-                });
-                Err(SapperError::CustomJson(res.to_string()))
+    pub fn view_tag(req: &HttpRequest<AppState>) -> JsonResponse {
+        ViewTag::new(req.query()).map_or(api_resp_err!("parse query string failed!"), |params| {
+            let res = TagCount::view_all_tag_count(&req.state(), params.limit, params.offset);
+            match res {
+                Ok(v) => api_resp_data!(v),
+                Err(_) => api_resp_err!("delete_tag failed!"),
             }
+        })
+    }
+
+    pub fn edit_tag((req, params): (HttpRequest<AppState>, Form<Tags>)) -> JsonResponse {
+        let res = params.into_inner().edit_tag(&req.state());
+        match res {
+            Ok(v) => api_resp_data!(v),
+            Err(_) => api_resp_err!("edit_tag failed!"),
         }
     }
 
-    fn router(&self, router: &mut SapperRouter) -> SapperResult<()> {
-        // http get :8888/tag/view limit==5 offset==0
-        router.get("/tag/view", Tag::view_tag);
-
-        // http post :8888/tag/new tag="Rust"
-        router.post("/tag/new", Tag::create_tag);
-
-        // http post :8888/tag/delete/3
-        router.post("/tag/delete/:id", Tag::delete_tag);
-
-        // http post :8888/tag/edit id:=2 tag="Linux&&Rust"
-        router.post("/tag/edit", Tag::edit_tag);
-        Ok(())
+    pub fn configure(app: App<AppState>) -> App<AppState> {
+        app.scope("/api/v1/tag", |scope| {
+            scope
+                .resource("/new", |r| r.method(Method::POST).with(Tag::create_tag))
+                .resource("/view", |r| r.get().f(Tag::view_tag))
+                .resource("/delete", |r| r.method(Method::POST).with(Tag::delete_tag))
+                .resource("/edit", |r| r.method(Method::POST).with(Tag::edit_tag))
+        })
     }
 }

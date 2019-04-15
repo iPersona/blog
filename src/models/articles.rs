@@ -1,15 +1,30 @@
-use super::super::article_with_tag::dsl::article_with_tag as all_article_with_tag;
-use super::super::articles::dsl::articles as all_articles;
-use super::super::{markdown_render, RedisPool};
-use super::super::{article_with_tag, articles};
-use super::{RelationTag, Relations, UserNotify};
+use std::collections::HashMap;
+use std::error as StdError;
+use std::str::FromStr;
+use std::sync::Arc;
 
+use actix::{Handler, MailboxError, Message};
+use actix_web::error::{ErrorBadRequest, ErrorInternalServerError};
+use actix_web::{AsyncResponder, Error, FutureResponse, HttpRequest};
 use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Text};
-use std::sync::Arc;
+use futures::future::{err, ok, result, AndThen};
+use futures::Future;
 use uuid::Uuid;
+
+use crate::util::postgresql_pool::DataBase;
+use crate::util::redis_pool::Cache;
+use crate::{AppState, Comments};
+
+use super::super::article_with_tag::dsl::article_with_tag as all_article_with_tag;
+use super::super::articles::dsl::articles as all_articles;
+use super::super::{article_with_tag, articles};
+use super::super::{markdown_render, RedisPool};
+use super::{RelationTag, Relations, UserNotify};
+use std::cell::Ref;
+use crate::models::InnerError;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ArticlesWithTag {
@@ -23,12 +38,35 @@ pub struct ArticlesWithTag {
     pub modify_time: NaiveDateTime,
 }
 
+// DeleteArticleTagRelation
+struct DeleteArticleTagRelation {
+    id: Uuid,
+    method: String,
+}
+
+// DeleteAllArticles
+struct DeleteAllArticles {
+    id: Uuid,
+}
+
+// QueryWithoutArticle
+struct QueryWithoutArticle {
+    id: Uuid,
+    admin: bool,
+}
+
+// QueryRawArticle
+struct QueryRawArticle {
+    id: Uuid,
+}
+
 impl ArticlesWithTag {
     pub fn delete_with_id(
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
+        state: &AppState,
         id: Uuid,
     ) -> Result<usize, String> {
+        let conn = &state.db.into_inner().get().unwrap();
+        let redis_pool = &state.cache.into_inner();
         Relations::delete_all(conn, id, "article");
         let res = diesel::delete(all_articles.filter(articles::id.eq(&id))).execute(conn);
         match res {
@@ -55,17 +93,18 @@ impl ArticlesWithTag {
                 .filter(article_with_tag::published.eq(true))
                 .get_result::<RawArticlesWithTag>(conn)
         };
-
         match res {
             Ok(data) => Ok(data.into_html()),
             Err(err) => Err(format!("{}", err)),
         }
     }
+
     pub fn query_without_article(
-        conn: &PgConnection,
+        state: &AppState,
         id: Uuid,
         admin: bool,
     ) -> Result<ArticlesWithoutContent, String> {
+        let conn = &state.db.into_inner().get().unwrap();
         let res = if admin {
             all_article_with_tag
                 .filter(article_with_tag::id.eq(id))
@@ -82,7 +121,11 @@ impl ArticlesWithTag {
         }
     }
 
-    pub fn query_raw_article(conn: &PgConnection, id: Uuid) -> Result<ArticlesWithTag, String> {
+    pub fn query_raw_article(
+        state: &AppState,
+        id: Uuid,
+    ) -> Result<ArticlesWithTag, String> {
+        let conn = &state.db.into_inner().get().unwrap();
         let res = all_article_with_tag
             .filter(article_with_tag::id.eq(id))
             .get_result::<RawArticlesWithTag>(conn);
@@ -92,7 +135,11 @@ impl ArticlesWithTag {
         }
     }
 
-    pub fn publish_article(conn: &PgConnection, data: ModifyPublish) -> Result<usize, String> {
+    pub fn publish_article(
+        state: &AppState,
+        data: &ModifyPublish,
+    ) -> Result<usize, String> {
+        let conn = &state.db.into_inner().get().unwrap();
         let res = diesel::update(all_articles.filter(articles::id.eq(data.id)))
             .set(articles::published.eq(data.publish))
             .execute(conn);
@@ -115,11 +162,12 @@ pub struct ArticleList {
 
 impl ArticleList {
     pub fn query_list_article(
-        conn: &PgConnection,
+        state: &AppState,
         limit: i64,
         offset: i64,
         admin: bool,
     ) -> Result<Vec<ArticleList>, String> {
+        let conn = &state.db.into_inner().get().unwrap();
         let res = if admin {
             all_articles
                 .select((
@@ -225,21 +273,25 @@ pub struct EditArticle {
 }
 
 impl EditArticle {
-    pub fn edit_article(self, conn: &PgConnection) -> Result<usize, String> {
+    pub fn edit_article(
+        self,
+        state: &AppState,
+    ) -> Result<usize, String> {
+        let conn = state.db.into_inner().get().unwrap();
         let res = diesel::update(all_articles.filter(articles::id.eq(self.id)))
             .set((
                 articles::title.eq(self.title),
                 articles::content.eq(markdown_render(&self.raw_content)),
                 articles::raw_content.eq(self.raw_content),
             ))
-            .execute(conn);
+            .execute(&conn);
         if self.new_tags.is_some() || self.new_choice_already_exists_tags.is_some() {
             RelationTag::new(self.id, self.new_tags, self.new_choice_already_exists_tags)
-                .insert_all(conn);
+                .insert_all(&conn);
         }
         if self.deselect_tags.is_some() {
             for i in self.deselect_tags.unwrap() {
-                Relations::new(self.id, i).delete_relation(conn);
+                Relations::new(self.id, i).delete_relation(&conn);
             }
         }
         match res {
@@ -255,7 +307,7 @@ pub struct ModifyPublish {
     publish: bool,
 }
 
-#[derive(Queryable, Debug, Clone)]
+#[derive(Queryable, Debug, Clone, Serialize, Deserialize)]
 struct RawArticlesWithTag {
     pub id: Uuid,
     pub title: String,
@@ -350,4 +402,88 @@ pub struct ArticlesWithoutContent {
     pub tags: Vec<Option<String>>,
     pub create_time: NaiveDateTime,
     pub modify_time: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ArticleSlice {
+    pub limit: i64,
+    pub offset: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DeleteArticlesWithTags {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AdminViewRawArticle {
+    pub id: String,
+}
+
+impl AdminViewRawArticle {
+    pub fn new(query: Ref<HashMap<String, String>>) -> Option<AdminViewRawArticle> {
+        query
+            .get("id")
+            .map_or(None, |id| Some(AdminViewRawArticle { id: (*id).clone() }))
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct QuerySlice {
+    pub limit: i64,
+    pub offset: i64,
+}
+
+impl QuerySlice {
+    pub fn new(query: Ref<HashMap<String, String>>) -> Option<QuerySlice> {
+        let limit = query
+            .get("limit")
+            .map_or(-1, |limit| limit.parse::<i64>().unwrap_or_else(|_| -1));
+        let offset = query
+            .get("offset")
+            .map_or(-1, |offset| offset.parse::<i64>().unwrap_or_else(|_| -1));
+        if limit == -1 || offset == -1 {
+            return None;
+        }
+        Some(QuerySlice {
+            limit,
+            offset,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommentsResponse {
+    pub comments: Vec<Comments>,
+    pub admin: bool,
+    pub user: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ViewArticle {
+    pub id: Uuid,
+}
+
+impl ViewArticle {
+    pub fn new(query: Ref<HashMap<String, String>>) -> Option<ViewArticle> {
+        match query.get("id") {
+            Some(v) => {
+                match Uuid::from_str(v) {
+                    Ok(id) => Some(ViewArticle { id }),
+                    Err(err) => None,
+                }
+            }
+            None => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ListAllArticleFilterByTag {
+    pub tag_id: Uuid,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ListComments {
+    pub article_id: Uuid,
 }

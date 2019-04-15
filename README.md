@@ -34,8 +34,10 @@ $ yum install postgresql96-contrib
 
 #### init database
 ```
-$ diesel migration run
+$ ./init.sh # press 3 to init database
+$ diesel migration run # this will renew schema.rs without view created in create_tags/up.sql
 ```
+[Diesel.rs Trick: Treat View as Table](https://deterministic.space/diesel-view-table-trick.html)
 
 ### [Nginx](http://nginx.org/en/download.html)
 nginx has been used in the development of the time
@@ -62,6 +64,8 @@ server {
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         }
 ```
+Ref: 
+[Accessing host machine from within docker container Docker Desktop for Mac docker](https://forums.docker.com/t/accessing-host-machine-from-within-docker-container/14248/15)
 
 ### blog
 ```
