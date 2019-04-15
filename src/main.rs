@@ -26,7 +26,7 @@ use blog::models::token::Token;
 //use blog::util::get_identity_and_web_context;
 use blog::util::postgresql_pool::DataBase;
 use blog::util::redis_pool::Cache;
-use blog::{Admin, AdminArticle, AdminUser, AppState, ArticleWeb, Tag, Visitor};
+use blog::{Admin, AdminArticle, AdminUser, AppState, ArticleWeb, Tag, Visitor, User};
 use futures::future::{ok, Future};
 use futures::sink::Sink;
 use std::sync::Arc;
@@ -119,8 +119,10 @@ fn main() {
             cache: Cache::new(),
         });
         app = AdminArticle::configure(app);
-//        app = Tag::configure(app);
-//        app = AdminUser::configure(app);
+        app = Tag::configure(app);
+        app = AdminUser::configure(app);
+        app = User::configure(app);
+        app = Visitor::configure(app);
         app = app
             .middleware(SessionStorage::new(
                 CookieSessionBackend::signed(&[0; 32])
