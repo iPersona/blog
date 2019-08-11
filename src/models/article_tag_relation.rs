@@ -17,7 +17,7 @@ impl Relations {
     pub fn new(article_id: Uuid, tag_id: Uuid) -> Relations {
         Relations { tag_id, article_id }
     }
-//
+    //
     pub fn insert(&self, conn: &PgConnection) -> bool {
         diesel::insert_into(relation::table)
             .values(self)
@@ -42,8 +42,9 @@ impl Relations {
             all_relation
                 .filter(relation::article_id.eq(self.article_id))
                 .filter(relation::tag_id.eq(self.tag_id)),
-        ).execute(conn)
-            .is_ok()
+        )
+        .execute(conn)
+        .is_ok()
     }
 }
 

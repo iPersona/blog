@@ -1,6 +1,8 @@
 use std::sync::Arc;
 use std::{env, io};
 
+use crate::api::InnerContext;
+use crate::models::InnerError;
 use crate::{UserInfo, UserNotify};
 use actix::{Actor, Handler, Message, SyncContext};
 use dotenv;
@@ -11,8 +13,6 @@ use redis;
 use std::fs::File;
 use std::io::Read;
 use tera::Context;
-use crate::api::InnerContext;
-use crate::models::InnerError;
 
 pub struct RedisPool {
     pool: Pool<RedisConnectionManager>,

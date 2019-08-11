@@ -48,18 +48,15 @@ impl AdminUser {
     }
 
     pub fn configure(app: App<AppState>) -> App<AppState> {
-        app.scope("/api/v1/user", |scope| {
-            scope
-                .resource("/user/view_all", |r| r.get().f(AdminUser::view_user_list))
-                .resource("/user/delete", |r| {
-                    r.method(Method::POST).with(AdminUser::delete_user)
-                })
-                .resource("/user/permission", |r| {
-                    r.method(Method::POST).with(AdminUser::change_permission)
-                })
-                .resource("/user/disable", |r| {
-                    r.method(Method::POST).with(AdminUser::change_disabled)
-                })
-        })
+        app.resource("user/view_all", |r| r.get().f(AdminUser::view_user_list))
+            .resource("user/delete", |r| {
+                r.method(Method::POST).with(AdminUser::delete_user)
+            })
+            .resource("user/permission", |r| {
+                r.method(Method::POST).with(AdminUser::change_permission)
+            })
+            .resource("user/disable", |r| {
+                r.method(Method::POST).with(AdminUser::change_disabled)
+            })
     }
 }

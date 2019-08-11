@@ -23,7 +23,9 @@ pub type JsonResponse = Box<Future<Item = Json<ApiResult>, Error = Error>>;
 //#[macro_export]
 macro_rules! result_ok {
     () => {
-        Ok(actix_web::Json($crate::api::ApiResult::Success { status: $crate::api::Status::Ok }))
+        Ok(actix_web::Json($crate::api::ApiResult::Success {
+            status: $crate::api::Status::Ok,
+        }))
     };
 }
 
@@ -32,7 +34,7 @@ macro_rules! result_err {
     ($detail:expr) => {
         Ok(actix_web::Json($crate::api::ApiResult::Error {
             status: $crate::api::Status::Err,
-            detail: String::from($detail)
+            detail: String::from($detail),
         }))
     };
 }
@@ -41,11 +43,10 @@ macro_rules! result_err {
 macro_rules! result_data {
     ($data:expr) => {
         Ok(actix_web::Json($crate::api::ApiResult::Data {
-            data: serde_json::to_value($data).unwrap()
+            data: serde_json::to_value($data).unwrap(),
         }))
     };
 }
-
 
 /// API response macro
 //#[macro_export]
@@ -68,7 +69,9 @@ macro_rules! api_resp {
 //#[macro_export]
 macro_rules! api_resp_ok {
     () => {
-        api_resp!($crate::api::ApiResult::Success { status: $crate::api::Status::Ok })
+        api_resp!($crate::api::ApiResult::Success {
+            status: $crate::api::Status::Ok
+        })
     };
 }
 
@@ -90,7 +93,6 @@ macro_rules! api_resp_data {
         })
     };
 }
-
 
 pub mod user_api;
 pub mod visitor_api;

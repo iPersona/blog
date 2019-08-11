@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::api::JsonResponse;
 use crate::models::articles::{
-    QuerySlice, AdminViewRawArticle, DeleteArticlesWithTags, ModifyPublish,
+    AdminViewRawArticle, DeleteArticlesWithTags, ModifyPublish, QuerySlice,
 };
 use crate::util::postgresql_pool::DataBase;
 use crate::util::redis_pool::Cache;
@@ -87,21 +87,14 @@ impl AdminArticle {
 
     pub fn admin_list_all_article(req: &HttpRequest<AppState>) -> JsonResponse {
         info!("admin_list_all_article");
-        QuerySlice::new(req.query()).map_or(
-            api_resp_err!("'id' is not specified!"),
-            |params| {
-                let res = ArticleList::query_list_article(
-                    &req.state(),
-                    params.limit,
-                    params.offset,
-                    true,
-                );
-                match res {
-                    Ok(data) => api_resp_data!(data),
-                    Err(_) => api_resp_err!("admin_list_all_article failed!"),
-                }
-            },
-        )
+        QuerySlice::new(req.query()).map_or(api_resp_err!("'id' is not specified!"), |params| {
+            let res =
+                ArticleList::query_list_article(&req.state(), params.limit, params.offset, true);
+            match res {
+                Ok(data) => api_resp_data!(data),
+                Err(_) => api_resp_err!("admin_list_all_article failed!"),
+            }
+        })
     }
 
     pub fn edit_article((req, params): (HttpRequest<AppState>, Form<EditArticle>)) -> JsonResponse {
@@ -119,36 +112,32 @@ impl AdminArticle {
         info!("update_publish");
         let res = ArticlesWithTag::publish_article(&req.state(), &params);
         match res {
-                Ok(data) => api_resp_data!(data),
-                Err(_) => api_resp_err!("update_publish failed!"),
-            }
+            Ok(data) => api_resp_data!(data),
+            Err(_) => api_resp_err!("update_publish failed!"),
+        }
     }
 
     pub fn configure(app: App<AppState>) -> App<AppState> {
-        //        app.scope("/api/v1/article", |scope| {
-        app.scope("/article", |scope| {
-            scope
-                .resource("/new", |r| {
-                    r.method(Method::POST).with(AdminArticle::create_article)
-                })
-                .resource("/delete", |r| {
-                    r.method(Method::POST).with(AdminArticle::delete_article)
-                })
-                .resource("/admin/view", |r| {
-                    r.get().f(AdminArticle::admin_view_article)
-                })
-                .resource("/admin/view_raw", |r| {
-                    r.get().f(AdminArticle::admin_view_raw_article)
-                })
-                .resource("/admin/view_all", |r| {
-                    r.get().f(AdminArticle::admin_list_all_article)
-                })
-                .resource("/edit", |r| {
-                    r.method(Method::POST).with(AdminArticle::edit_article)
-                })
-                .resource("/publish", |r| {
-                    r.method(Method::POST).with(AdminArticle::update_publish)
-                })
+      app.resource("article/new", |r| {
+            r.method(Method::POST).with(AdminArticle::create_article)
+        })
+        .resource("article/delete", |r| {
+            r.method(Method::POST).with(AdminArticle::delete_article)
+        })
+        .resource("article/admin/view", |r| {
+            r.get().f(AdminArticle::admin_view_article)
+        })
+        .resource("article//admin/view_raw", |r| {
+            r.get().f(AdminArticle::admin_view_raw_article)
+        })
+        .resource("article/admin/view_all", |r| {
+            r.get().f(AdminArticle::admin_list_all_article)
+        })
+        .resource("article/edit", |r| {
+            r.method(Method::POST).with(AdminArticle::edit_article)
+        })
+        .resource("article/publish", |r| {
+            r.method(Method::POST).with(AdminArticle::update_publish)
         })
     }
 }

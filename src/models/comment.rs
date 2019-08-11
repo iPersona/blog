@@ -115,8 +115,9 @@ impl DeleteComment {
         match *permission {
             Some(0) => Comments::delete_with_comment_id(conn, self.comment_id),
             _ => {
-                let info = serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info"))
-                    .unwrap();
+                let info =
+                    serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info"))
+                        .unwrap();
                 if self.user_id == info.id {
                     Comments::delete_with_comment_id(conn, self.comment_id)
                 } else {

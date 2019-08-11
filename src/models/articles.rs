@@ -23,9 +23,9 @@ use super::super::articles::dsl::articles as all_articles;
 use super::super::{article_with_tag, articles};
 use super::super::{markdown_render, RedisPool};
 use super::{RelationTag, Relations, UserNotify};
-use std::cell::Ref;
 use crate::models::InnerError;
 use log::info;
+use std::cell::Ref;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ArticlesWithTag {
@@ -62,10 +62,7 @@ struct QueryRawArticle {
 }
 
 impl ArticlesWithTag {
-    pub fn delete_with_id(
-        state: &AppState,
-        id: Uuid,
-    ) -> Result<usize, String> {
+    pub fn delete_with_id(state: &AppState, id: Uuid) -> Result<usize, String> {
         let conn = &state.db.into_inner().get().unwrap();
         let redis_pool = &state.cache.into_inner();
         Relations::delete_all(conn, id, "article");
@@ -122,10 +119,7 @@ impl ArticlesWithTag {
         }
     }
 
-    pub fn query_raw_article(
-        state: &AppState,
-        id: Uuid,
-    ) -> Result<ArticlesWithTag, String> {
+    pub fn query_raw_article(state: &AppState, id: Uuid) -> Result<ArticlesWithTag, String> {
         let conn = &state.db.into_inner().get().unwrap();
         let res = all_article_with_tag
             .filter(article_with_tag::id.eq(id))
@@ -136,10 +130,7 @@ impl ArticlesWithTag {
         }
     }
 
-    pub fn publish_article(
-        state: &AppState,
-        data: &ModifyPublish,
-    ) -> Result<usize, String> {
+    pub fn publish_article(state: &AppState, data: &ModifyPublish) -> Result<usize, String> {
         let conn = &state.db.into_inner().get().unwrap();
         let res = diesel::update(all_articles.filter(articles::id.eq(data.id)))
             .set(articles::published.eq(data.publish))
@@ -200,7 +191,7 @@ impl ArticleList {
 
         match res {
             Ok(data) => Ok(data),
-            Err(err) => Err(format!("{}", err)),
+            Err(err) => Err(format!("{:?}", err)),
         }
     }
 
@@ -274,10 +265,7 @@ pub struct EditArticle {
 }
 
 impl EditArticle {
-    pub fn edit_article(
-        self,
-        state: &AppState,
-    ) -> Result<usize, String> {
+    pub fn edit_article(self, state: &AppState) -> Result<usize, String> {
         let conn = state.db.into_inner().get().unwrap();
         let res = diesel::update(all_articles.filter(articles::id.eq(self.id)))
             .set((
@@ -446,10 +434,7 @@ impl QuerySlice {
         if limit == -1 || offset == -1 {
             return None;
         }
-        Some(QuerySlice {
-            limit,
-            offset,
-        })
+        Some(QuerySlice { limit, offset })
     }
 }
 
@@ -468,12 +453,10 @@ pub struct ViewArticle {
 impl ViewArticle {
     pub fn new(query: Ref<HashMap<String, String>>) -> Option<ViewArticle> {
         match query.get("id") {
-            Some(v) => {
-                match Uuid::from_str(v) {
-                    Ok(id) => Some(ViewArticle { id }),
-                    Err(err) => None,
-                }
-            }
+            Some(v) => match Uuid::from_str(v) {
+                Ok(id) => Some(ViewArticle { id }),
+                Err(err) => None,
+            },
             None => None,
         }
     }

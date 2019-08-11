@@ -1,8 +1,10 @@
-use uuid::Uuid;
-use actix_web::HttpRequest;
-use actix_web::middleware::session::{CookieSessionBackend, RequestSession, SessionStorage, Session};
 use crate::AppState;
+use actix_web::middleware::session::{
+    CookieSessionBackend, RequestSession, Session, SessionStorage,
+};
+use actix_web::HttpRequest;
 use log::debug;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Token(String);
@@ -33,11 +35,11 @@ impl Token {
             Ok(None) => {
                 debug!("no token found in session!");
                 None
-            },
+            }
             Err(err) => {
-                debug!("get session token failed: {:?}",  err);
+                debug!("get session token failed: {:?}", err);
                 None
-            },
+            }
         }
     }
 }

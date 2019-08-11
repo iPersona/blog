@@ -24,14 +24,14 @@ use actix_web::middleware::{Finished, Middleware, Response, Started};
 use actix_web::{AsyncResponder, Error};
 use blog::models::token::Token;
 //use blog::util::get_identity_and_web_context;
+use blog::util::get_identity_and_web_context;
 use blog::util::postgresql_pool::DataBase;
 use blog::util::redis_pool::Cache;
-use blog::{Admin, AdminArticle, AdminUser, AppState, ArticleWeb, Tag, Visitor, User};
+use blog::{Admin, AdminArticle, AdminUser, AppState, ArticleWeb, Tag, User, Visitor};
 use futures::future::{ok, Future};
 use futures::sink::Sink;
 use std::sync::Arc;
 use tera::Context;
-use blog::util::get_identity_and_web_context;
 use time::Duration;
 
 pub struct Preprocess;
@@ -43,16 +43,15 @@ impl Middleware<AppState> for Preprocess {
             info!("SESSION value: {:?}", token);
             req.extensions_mut().insert(token);
         } /*else {
-            let t = Token::new();
-            req.session().set("token", t.clone());
-            t
-        };*/
+              let t = Token::new();
+              req.session().set("token", t.clone());
+              t
+          };*/
         info!("path: {:?}", req.path());
         info!("method: {:?}", req.method());
 
         let ctx = get_identity_and_web_context(req);
         req.extensions_mut().insert(ctx);
-
 
         //        else {
         //            info!("NO-SESSION");
@@ -89,7 +88,8 @@ impl Middleware<AppState> for Preprocess {
 }
 
 fn main() {
-    ::std::env::set_var("RUST_LOG", "debug,actix_web=debug");
+    // ::std::env::set_var("RUST_LOG", "debug,actix_web=debug");
+    ::std::env::set_var("RUST_LOG", "info");
     // 获取环境变量
     dotenv().ok();
     // init logger
@@ -106,15 +106,15 @@ fn main() {
     info!("static_file_dir: {}", static_file_dir);
 
     let sys = System::new("example");
-//    let cache_addr = SyncArbiter::start(num_cpus::get(), move || Cache::new());
-//    let db_addr = SyncArbiter::start(1 /*num_cpus::get()*/, move || DataBase::new());
-//    let cache_addr = Cache::new();
-//    let db_addr = DataBase::new();
+    //    let cache_addr = SyncArbiter::start(num_cpus::get(), move || Cache::new());
+    //    let db_addr = SyncArbiter::start(1 /*num_cpus::get()*/, move || DataBase::new());
+    //    let cache_addr = Cache::new();
+    //    let db_addr = DataBase::new();
 
     server::new(move || {
         let mut app = App::with_state(AppState {
-//            db: db_addr,
-//            cache: cache_addr,
+            //            db: db_addr,
+            //            cache: cache_addr,
             db: DataBase::new(),
             cache: Cache::new(),
         });
@@ -128,7 +128,9 @@ fn main() {
                 CookieSessionBackend::signed(&[0; 32])
                     .name("blog_session")
                     .secure(false)
-                    .max_age(Duration::from_std(std::time::Duration::from_secs(24 * 60 * 60)).unwrap())
+                    .max_age(
+                        Duration::from_std(std::time::Duration::from_secs(24 * 60 * 60)).unwrap(),
+                    ),
             ))
             .middleware(Preprocess);
         app = app.handler(
@@ -137,8 +139,8 @@ fn main() {
         );
         app
     })
-        .bind("0.0.0.0:8888")
-        .unwrap()
-        .start();
+    .bind("0.0.0.0:8888")
+    .unwrap()
+    .start();
     let _ = sys.run();
 }

@@ -44,12 +44,11 @@ impl Tag {
     }
 
     pub fn configure(app: App<AppState>) -> App<AppState> {
-        app.scope("/api/v1/tag", |scope| {
-            scope
-                .resource("/new", |r| r.method(Method::POST).with(Tag::create_tag))
-                .resource("/view", |r| r.get().f(Tag::view_tag))
-                .resource("/delete", |r| r.method(Method::POST).with(Tag::delete_tag))
-                .resource("/edit", |r| r.method(Method::POST).with(Tag::edit_tag))
-        })
+        app.resource("tag/new", |r| r.method(Method::POST).with(Tag::create_tag))
+            .resource("tag/view", |r| r.get().f(Tag::view_tag))
+            .resource("tag/delete", |r| {
+                r.method(Method::POST).with(Tag::delete_tag)
+            })
+            .resource("tag/edit", |r| r.method(Method::POST).with(Tag::edit_tag))
     }
 }

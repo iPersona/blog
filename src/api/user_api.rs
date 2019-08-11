@@ -1,12 +1,15 @@
-use crate::api::{ApiResult, JsonResponse, InnerContext};
+use crate::api::{ApiResult, InnerContext, JsonResponse};
 use crate::models::token::Token;
 use crate::models::user::DeleteUser;
 use crate::models::user::LoginUser;
-use crate::{AppState, ChangePassword, EditUser, UserInfo, NewComments, ArticlesWithTag, UserNotify, DeleteComment};
-use actix_web::middleware::session::RequestSession;
-use actix_web::{Error, Form, HttpRequest, Json, App};
-use futures::Future;
+use crate::{
+    AppState, ArticlesWithTag, ChangePassword, DeleteComment, EditUser, NewComments, UserInfo,
+    UserNotify,
+};
 use actix_web::http::Method;
+use actix_web::middleware::session::RequestSession;
+use actix_web::{App, Error, Form, HttpRequest, Json};
+use futures::Future;
 
 pub struct User;
 
@@ -30,7 +33,10 @@ impl User {
         let token = token.unwrap().into_inner();
         let redis_pool = &req.state().cache.into_inner();
         let pg_pool = &req.state().db.into_inner().get().unwrap();
-        match params.into_inner().change_password(pg_pool, redis_pool, &token) {
+        match params
+            .into_inner()
+            .change_password(pg_pool, redis_pool, &token)
+        {
             Ok(data) => api_resp_data!(data),
             Err(err) => api_resp_err!(&*err),
         }
@@ -79,7 +85,8 @@ impl User {
                 .unwrap();
         let admin = UserInfo::view_admin(pg_pool, redis_pool);
         let article =
-            ArticlesWithTag::query_without_article(&req.state(), params.article_id(), false).unwrap();
+            ArticlesWithTag::query_without_article(&req.state(), params.article_id(), false)
+                .unwrap();
         let reply_user_id = params.reply_user_id();
         match reply_user_id {
             // Reply comment
@@ -137,7 +144,9 @@ impl User {
         let permission = req.extensions().get::<InnerContext>().unwrap().permission;
         let pg_pool = &req.state().db.into_inner().get().unwrap();
         let redis_pool = &req.state().cache.into_inner();
-        let res = params.into_inner().delete(pg_pool, redis_pool, &token, &permission);
+        let res = params
+            .into_inner()
+            .delete(pg_pool, redis_pool, &token, &permission);
         if res {
             api_resp_ok!()
         } else {
@@ -146,26 +155,17 @@ impl User {
     }
 
     pub fn configure(app: App<AppState>) -> App<AppState> {
-        app.scope("/user", |scope| {
-            scope
-                .resource("/change_pwd", |r| {
-                    r.method(Method::POST).with(User::change_pwd)
-                })
-                .resource("/view", |r| {
-                    r.get().f(User::view_user)
-                })
-                .resource("/sign_out", |r| {
-                    r.get().f(User::sign_out)
-                })
-                .resource("/edit", |r| {
-                    r.method(Method::POST).with(User::edit)
-                })
-                .resource("/new", |r| {
-                    r.method(Method::POST).with(User::new_comment)
-                })
-                .resource("/delete", |r| {
-                    r.method(Method::POST).with(User::delete_comment)
-                })
+        app.resource("user/change_pwd", |r| {
+            r.method(Method::POST).with(User::change_pwd)
+        })
+        .resource("user/view", |r| r.get().f(User::view_user))
+        .resource("user/sign_out", |r| r.get().f(User::sign_out))
+        .resource("user/edit", |r| r.method(Method::POST).with(User::edit))
+        .resource("user/new", |r| {
+            r.method(Method::POST).with(User::new_comment)
+        })
+        .resource("user/delete", |r| {
+            r.method(Method::POST).with(User::delete_comment)
         })
     }
 }
