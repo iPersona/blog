@@ -40,6 +40,7 @@ case ${choice} in
         # 安装必须的包
         # pip install -U python-dotenv psycopg2-binary
         # [zlib problem](https://github.com/jiansoung/issues-list/issues/13)
+        ;;
     *)
         echo "invalid option";;
 esac

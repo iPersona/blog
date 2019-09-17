@@ -1,7 +1,12 @@
 <template>
-  <div id="app">
+  <div
+    id="app"
+    class="container"
+  >
     <nav-header></nav-header>
-    <router-view/>
+    <hr />
+    <router-view />
+    <hr />
     <nav-footer></nav-footer>
   </div>
 </template>
@@ -20,7 +25,9 @@ export default {
     return {
       tab: 1
     };
-  }
+  },
+  mounted() {
+  },
 };
 </script>
 
@@ -33,4 +40,6 @@ export default {
   color: #2c3e50;
   margin-top: 60px;
 }
+@import "https://cdn.materialdesignicons.com/2.5.94/css/materialdesignicons.min.css";
+@import "https://use.fontawesome.com/releases/v5.2.0/css/all.css";
 </style>

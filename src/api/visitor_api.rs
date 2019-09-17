@@ -1,18 +1,18 @@
-use crate::api::{ApiResult, InnerContext, JsonResponse};
-use crate::models::articles::{
-    ArticleSlice, CommentsResponse, ListAllArticleFilterByTag, ListComments, QuerySlice,
-    ViewArticle,
-};
+use crate::api::InnerContext;
+use crate::models::articles::{CommentsResponse, /*ListAllArticleFilterByTag,*/ QuerySlice};
 use crate::models::token::Token;
+use crate::models::user::CheckUser;
 use crate::{
     AppState, ArticleList, ArticlesWithTag, Comments, LoginUser, RegisteredUser, UserInfo,
 };
-use actix_web::middleware::session::RequestSession;
-use actix_web::{http::Method, FromRequest};
-use actix_web::{App, Error, Form, HttpRequest, HttpResponse, Json, Path};
+use actix_session::Session;
+use actix_web::web;
+use actix_web::web::Query;
+use actix_web::{Error, HttpRequest, HttpResponse};
 use futures::Future;
-use log::info;
+use log::{debug, info};
 use uuid::Uuid;
+use web::{Data, Form, Path};
 
 pub struct Visitor;
 
@@ -22,109 +22,113 @@ impl Visitor {
     //        info!("access login: {:?}", &params);
     //        api_resp_ok!()
     //    }
-    pub fn list_all_article(req: &HttpRequest<AppState>) -> JsonResponse {
+    pub fn list_all_article(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Query<QuerySlice>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("list_all_article");
-        QuerySlice::new(req.query()).map_or(api_resp_err!("'id' is not specified!"), |params| {
-            let res =
-                ArticleList::query_list_article(&req.state(), params.limit, params.offset, false);
-            match res {
-                Ok(data) => api_resp_data!(data),
-                Err(_) => api_resp_err!("list_all_article failed!"),
-            }
-        })
+        let res =
+            ArticleList::query_list_article(state.get_ref(), params.limit, params.offset, false);
+        match res {
+            Ok(data) => api_resp_data!(data),
+            Err(_) => api_resp_err!("list_all_article failed!"),
+        }
     }
 
-    fn list_all_article_filter_by_tag(req: &HttpRequest<AppState>) -> JsonResponse {
-        info!("list_all_article_filter_by_tag");
-        let path_params = Path::<ListAllArticleFilterByTag>::extract(req);
-        if path_params.is_err() {
-            return api_resp_err!("parse path param: tag_id failed!");
+    // TODO: 未使用的方法
+    // fn list_all_article_filter_by_tag(
+    //     state: Data<AppState>,
+    //     _req: HttpRequest,
+    //     params: Query<ListAllArticleFilterByTag>,
+    // ) -> impl Future<Item = HttpResponse, Error = Error> {
+    //     info!("list_all_article_filter_by_tag");
+    //     let conn = &state.get_ref().db.into_inner().get().unwrap();
+    //     match ArticleList::query_with_tag(conn, params.tag_id) {
+    //         Ok(data) => api_resp_data!(data),
+    //         Err(err) => api_resp_err!(&*err),
+    //     }
+    // }
+
+    fn list_comments(
+        state: Data<AppState>,
+        req: HttpRequest,
+        article_id: Path<Uuid>,
+        params: Query<QuerySlice>,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        info!("list_comments");
+        let permission = req.extensions().get::<InnerContext>().unwrap().permission;
+        let (user_id, admin) = match permission {
+            Some(0) => {
+                let info = UserInfo::from_session(&session);
+                match info {
+                    Ok(v) => match v {
+                        Some(v) => (Some(v.id), true),
+                        None => (None, true),
+                    },
+                    Err(_) => (None, true),
+                }
+            }
+            Some(_) => {
+                let info = UserInfo::from_session(&session);
+                match info {
+                    Ok(v) => match v {
+                        Some(v) => (Some(v.id), false),
+                        None => (None, false),
+                    },
+                    Err(_) => (None, false),
+                }
+            }
+            _ => (None, false),
+        };
+        let pg_pool = state.get_ref().db.into_inner().get().unwrap();
+        match Comments::query(
+            &pg_pool,
+            params.limit,
+            params.offset,
+            article_id.into_inner(),
+        ) {
+            Ok(data) => api_resp_data!(CommentsResponse {
+                comments: data,
+                admin: admin,
+                user: user_id,
+            }),
+            Err(err) => api_resp_err!(&*err),
         }
-        let path_params = path_params.unwrap();
-        let conn = &req.state().db.into_inner().get().unwrap();
-        match ArticleList::query_with_tag(conn, path_params.tag_id) {
+    }
+
+    fn view_article(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Path<Uuid>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        debug!("view_article: {:?}", &params);
+        let conn = state.db.into_inner().get().unwrap();
+        match ArticlesWithTag::query_article(&conn, params.into_inner(), false) {
             Ok(data) => api_resp_data!(data),
             Err(err) => api_resp_err!(&*err),
         }
     }
 
-    fn list_comments(req: &HttpRequest<AppState>) -> JsonResponse {
-        info!("list_comments");
-        let path_params = Path::<ListComments>::extract(req);
-        if path_params.is_err() {
-            return api_resp_err!("parse path param: article_id failed!");
-        }
-        let path_params = path_params.unwrap();
-        QuerySlice::new(req.query()).map_or(api_resp_err!("'id' is not specified!"), |params| {
-            let permission = req.extensions().get::<InnerContext>().unwrap().permission;
-            let (user_id, admin) = match permission {
-                Some(0) => {
-                    let redis_pool = req.state().cache.into_inner();
-                    let token = Token::get_token(&req.session());
-                    match token {
-                        Some(t) => {
-                            let info = serde_json::from_str::<UserInfo>(
-                                &UserInfo::view_user_with_cookie(&redis_pool, &t.into_inner()),
-                            )
-                            .unwrap();
-                            (Some(info.id), true)
-                        }
-                        None => (None, true),
-                    }
-                }
-                Some(_) => {
-                    let redis_pool = req.state().cache.into_inner();
-                    let token = Token::get_token(&req.session());
-                    match token {
-                        Some(t) => {
-                            let info = serde_json::from_str::<UserInfo>(
-                                &UserInfo::view_user_with_cookie(&redis_pool, &t.into_inner()),
-                            )
-                            .unwrap();
-                            (Some(info.id), false)
-                        }
-                        None => (None, false),
-                    }
-                }
-                _ => (None, false),
-            };
-            let pg_pool = req.state().db.into_inner().get().unwrap();
-            match Comments::query(
-                &pg_pool,
-                params.limit,
-                params.offset,
-                path_params.article_id,
-            ) {
-                Ok(data) => api_resp_data!(CommentsResponse {
-                    comments: data,
-                    admin: admin,
-                    user: user_id,
-                }),
-                Err(err) => api_resp_err!(&*err),
-            }
-        })
-    }
-
-    fn view_article(req: &HttpRequest<AppState>) -> JsonResponse {
-        ViewArticle::new(req.query()).map_or(api_resp_err!("'id' is not specified!"), |params| {
-            match ArticlesWithTag::query_without_article(&req.state(), params.id, false) {
-                Ok(data) => api_resp_data!(data),
-                Err(err) => api_resp_err!(&*err),
-            }
-        })
-    }
-
-    fn login((req, params): (HttpRequest<AppState>, Form<LoginUser>)) -> JsonResponse {
+    fn login(
+        state: Data<AppState>,
+        mut _req: HttpRequest,
+        params: Form<LoginUser>,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         let params = &params.into_inner();
         let is_remember = params.get_remember();
         let max_age: Option<i64> = if is_remember { Some(24 * 90) } else { None };
 
-        let pg_pool = req.state().db.into_inner().get().unwrap();
-        let redis_pool = req.state().cache.into_inner();
-        match params.verification(&pg_pool, &redis_pool, &max_age) {
-            Ok(token) => {
-                token.save_token(&req.session());
-                api_resp_ok!()
+        let pg_pool = state.db.into_inner().get().unwrap();
+        match params.verification(&pg_pool, &session, &max_age) {
+            Ok(user_info) => {
+                let token = Token::new(&user_info);
+                match token.encode() {
+                    Ok(v) => api_resp_data!(v),
+                    Err(e) => api_resp_err!(format!("{:?}", e)),
+                }
             }
             Err(err) => api_resp_err!(&*err),
         }
@@ -184,45 +188,61 @@ impl Visitor {
     //        Ok(response)
     //    }
 
-    fn create_user((req, params): (HttpRequest<AppState>, Form<RegisteredUser>)) -> JsonResponse {
-        let pg_pool = req.state().db.into_inner().get().unwrap();
-        let redis_pool = req.state().cache.into_inner();
-
-        match params.into_inner().insert(&pg_pool, &redis_pool) {
-            Ok(token) => {
-                token.save_token(&req.session());
-                api_resp_ok!()
-            }
+    fn create_user(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Form<RegisteredUser>,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let pg_pool = state.db.into_inner().get().unwrap();
+        match params.into_inner().insert(&pg_pool, &session) {
+            Ok(_) => api_resp_ok!(),
             Err(err) => api_resp_err!(&*err),
         }
     }
 
-    pub fn configure(app: App<AppState>) -> App<AppState> {
-        app
-            // article
-            .resource("article/view_all", |r| r.get().f(Visitor::list_all_article))
-            .resource("article/view_all/{tag_id}", |r| {
-                r.get().f(Visitor::list_all_article_filter_by_tag)
-            })
-            .resource("article/view_comment/{article_id}", |r| {
-                r.get().f(Visitor::list_comments)
-            })
-            .resource("article/view/{article_id}", |r| {
-                r.get().f(Visitor::view_article)
-            })
-            .resource("article/view/{article_id}", |r| {
-                r.get().f(Visitor::view_article)
-            })
-            // user
-            .resource("user/login", |r| {
-                r.method(Method::POST).with(Visitor::login)
-            })
-            .resource("user/new", |r| {
-                r.method(Method::POST).with(Visitor::create_user)
-            })
-        // TODO: 使用github登录
-        //        .resource("/login_with_github", |r| {
-        //            r.method(Method::Get).with(Visitor::login_with_github)
-        //        })
+    fn is_user_exist(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Form<CheckUser>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let pg_pool = state.db.into_inner().get().unwrap();
+        let exist = params.into_inner().is_user_exist(&pg_pool);
+        api_resp_data!(exist)
+    }
+
+    fn get_article_number(
+        state: Data<AppState>,
+        _req: HttpRequest,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let count = ArticleList::query_article_numbers(&state);
+        match count {
+            Ok(n) => {
+                debug!("article count: {:?}", n);
+                api_resp_data!(n)
+            }
+            Err(e) => api_resp_err!(format!("{:?}", e)),
+        }
+    }
+
+    pub fn configure(cfg: &mut web::ServiceConfig) {
+        cfg.service(
+            web::resource("articles").route(web::get().to_async(Visitor::list_all_article)),
+        )
+        .service(
+            web::resource("article/view_comment/{article_id}")
+                .route(web::get().to_async(Visitor::list_comments)),
+        )
+        .service(
+            web::resource("article/view/{article_id}")
+                .route(web::get().to_async(Visitor::view_article)),
+        )
+        .service(web::resource("user/login").route(web::post().to_async(Visitor::login)))
+        .service(web::resource("user/new").route(web::post().to_async(Visitor::create_user)))
+        .service(web::resource("user/exist").route(web::post().to_async(Visitor::is_user_exist)))
+        .service(
+            web::resource("article/count").route(web::get().to_async(Visitor::get_article_number)),
+        );
+        //            .service(web::resource("/login_with_github").route(web::get().to_async(Visitor::login_with_github)));
     }
 }

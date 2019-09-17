@@ -1,10 +1,6 @@
 use std::sync::Arc;
-use std::{env, io};
 
-use crate::api::InnerContext;
-use crate::models::InnerError;
-use crate::{UserInfo, UserNotify};
-use actix::{Actor, Handler, Message, SyncContext};
+use crate::util::env::Env;
 use dotenv;
 use r2d2;
 use r2d2::Pool;
@@ -12,7 +8,6 @@ use r2d2_redis::RedisConnectionManager;
 use redis;
 use std::fs::File;
 use std::io::Read;
-use tera::Context;
 
 pub struct RedisPool {
     pool: Pool<RedisConnectionManager>,
@@ -26,10 +21,7 @@ impl RedisPool {
     {
         let manager = RedisConnectionManager::new(address).unwrap();
         let pool = r2d2::Pool::new(manager).unwrap();
-        RedisPool {
-            pool: pool,
-            script: None,
-        }
+        RedisPool { pool, script: None }
     }
 
     pub fn new_with_script<T>(address: T, path: &str) -> Self
@@ -42,7 +34,7 @@ impl RedisPool {
         let mut lua = String::new();
         file.read_to_string(&mut lua).unwrap();
         RedisPool {
-            pool: pool,
+            pool,
             script: Some(redis::Script::new(&lua)),
         }
     }
@@ -210,7 +202,7 @@ impl RedisPool {
 fn create_redis_pool(path: Option<&str>) -> RedisPool {
     dotenv::dotenv().ok();
 
-    let database_url = env::var("REDIS_URL").expect("DATABASE_URL must be set");
+    let database_url = Env::get().redis_notify_url;
     match path {
         Some(path) => RedisPool::new_with_script(database_url.as_str(), path),
         None => RedisPool::new(database_url.as_str()),

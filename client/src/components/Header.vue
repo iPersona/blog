@@ -1,32 +1,54 @@
 <template>
-  <div>
-    <el-menu
-      :default-active="activeIndex"
-      router
-      class="el-menu-demo"
-      mode="horizontal"
-      @select="handleSelect"
-    >
-      <el-menu-item index="/">Home</el-menu-item>
-      <el-menu-item index="/articles">Blog List</el-menu-item>
-      <el-menu-item index="/about">About</el-menu-item>
-    </el-menu>
+  <!-- Visitor -->
+  <div v-if="!isLogin">
+    <visitor-header />
+  </div>
+
+  <!-- Admin -->
+  <div v-else-if="isAdmin">
+    <admin-header />
+  </div>
+
+  <!-- Register -->
+  <div v-else>
+    <login-header />
   </div>
 </template>
+
 <script>
+import { mapGetters } from 'vuex'
+import LoginForm from './Login'
+import SignupForm from './Signup'
+import LoginHeader from './LoginHeader'
+import VisitorHeader from './VisitorHeader'
+import AdminHeader from './AdminHeader'
+import { USER_NAME, TOKEN, IS_LOGIN, IS_ADMIN } from '@/store-types.js'
+
 export default {
   name: "Header",
-  components: {},
+  components: {
+    LoginForm,
+    SignupForm,
+    LoginHeader,
+    VisitorHeader,
+    AdminHeader,
+  },
   props: {},
   data() {
     return {
-      activeIndex: "/home"
     };
   },
+  computed: {
+    ...mapGetters({
+      userName: USER_NAME,
+      isLogin: IS_LOGIN,
+      isAdmin: IS_ADMIN,
+    }),
+  },
+  mounted() {
+  },
   methods: {
-    handleSelect(key, keyPath) {
-      console.log(key, keyPath);
-    }
+
   }
 };
 </script>

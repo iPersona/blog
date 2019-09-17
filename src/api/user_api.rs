@@ -1,69 +1,64 @@
-use crate::api::{ApiResult, InnerContext, JsonResponse};
-use crate::models::token::Token;
-use crate::models::user::DeleteUser;
+use crate::api::InnerContext;
 use crate::models::user::LoginUser;
 use crate::{
     AppState, ArticlesWithTag, ChangePassword, DeleteComment, EditUser, NewComments, UserInfo,
     UserNotify,
 };
-use actix_web::http::Method;
-use actix_web::middleware::session::RequestSession;
-use actix_web::{App, Error, Form, HttpRequest, Json};
+use actix_session::Session;
+use actix_web::web::{Data, Form};
+use actix_web::{web, Error, HttpRequest, HttpResponse};
 use futures::Future;
 
 pub struct User;
 
 impl User {
-    fn view_user(req: &HttpRequest<AppState>) -> JsonResponse {
-        let token = Token::from_request(req);
-        if token.is_none() {
-            return api_resp_ok!();
+    fn view_user(
+        _state: Data<AppState>,
+        _req: HttpRequest,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let user_info = UserInfo::view_user_with_cookie(&session);
+        match user_info {
+            Ok(v) => match v {
+                Some(v) => api_resp_data!(v),
+                None => api_resp_err!("can not get userinfo from session!"),
+            },
+            Err(e) => api_resp_err!(format!("can not get userinfo from session: {:?}", e)),
         }
-        let token = token.unwrap().into_inner();
-        let redis_pool = &req.state().cache.into_inner();
-        let user_info = UserInfo::view_user_with_cookie(redis_pool, token.as_str());
-        api_resp_data!(user_info.as_str())
     }
 
-    fn change_pwd((req, params): (HttpRequest<AppState>, Form<ChangePassword>)) -> JsonResponse {
-        let token = Token::from_request(&req);
-        if token.is_none() {
-            return api_resp_ok!();
-        }
-        let token = token.unwrap().into_inner();
-        let redis_pool = &req.state().cache.into_inner();
-        let pg_pool = &req.state().db.into_inner().get().unwrap();
-        match params
-            .into_inner()
-            .change_password(pg_pool, redis_pool, &token)
-        {
+    fn change_pwd(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Form<ChangePassword>,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let pg_pool = &state.db.into_inner().get().unwrap();
+        match params.into_inner().change_password(pg_pool, &session) {
             Ok(data) => api_resp_data!(data),
             Err(err) => api_resp_err!(&*err),
         }
     }
 
-    fn edit((req, params): (HttpRequest<AppState>, Form<EditUser>)) -> JsonResponse {
-        let token = Token::from_request(&req);
-        if token.is_none() {
-            return api_resp_ok!();
-        }
-        let token = token.unwrap().into_inner();
-        let redis_pool = &req.state().cache.into_inner();
-        let pg_pool = &req.state().db.into_inner().get().unwrap();
-        match params.into_inner().edit_user(pg_pool, redis_pool, &token) {
+    fn edit(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Form<EditUser>,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let pg_pool = &state.db.into_inner().get().unwrap();
+        match params.into_inner().edit_user(pg_pool, &session) {
             Ok(num_edit) => api_resp_data!(num_edit),
             Err(err) => api_resp_err!(&*err),
         }
     }
 
-    fn sign_out(req: &HttpRequest<AppState>) -> JsonResponse {
-        let token = Token::from_request(&req);
-        if token.is_none() {
-            return api_resp_ok!();
-        }
-        let token = token.unwrap().into_inner();
-        let redis_pool = &req.state().cache.into_inner();
-        let res = LoginUser::sign_out(redis_pool, &token);
+    fn sign_out(
+        _state: Data<AppState>,
+        _req: HttpRequest,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let res = LoginUser::sign_out(&session);
         if res {
             api_resp_ok!()
         } else {
@@ -71,22 +66,32 @@ impl User {
         }
     }
 
-    fn new_comment((req, params): (HttpRequest<AppState>, Form<NewComments>)) -> JsonResponse {
+    fn new_comment(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Form<NewComments>,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         let mut params = params.into_inner().clone();
-        let token = Token::from_request(&req);
-        if token.is_none() {
-            return api_resp_ok!();
+        let redis_pool = &state.cache.into_inner();
+        let pg_pool = &state.db.into_inner().get().unwrap();
+        let user_or = UserInfo::view_user_with_cookie(&session);
+        let user: UserInfo;
+        match user_or {
+            Ok(v) => match v {
+                Some(v) => user = v,
+                None => return api_resp_err!("failed to get userinfo from current session!"),
+            },
+            Err(e) => {
+                return api_resp_err!(format!(
+                    "failed to get userinfo from current session: {:?}",
+                    e
+                ))
+            }
         }
-        let token = token.unwrap().into_inner();
-        let redis_pool = &req.state().cache.into_inner();
-        let pg_pool = &req.state().db.into_inner().get().unwrap();
-        let user =
-            serde_json::from_str::<UserInfo>(&UserInfo::view_user_with_cookie(redis_pool, &token))
-                .unwrap();
         let admin = UserInfo::view_admin(pg_pool, redis_pool);
         let article =
-            ArticlesWithTag::query_without_article(&req.state(), params.article_id(), false)
-                .unwrap();
+            ArticlesWithTag::query_without_article(&state, params.article_id(), false).unwrap();
         let reply_user_id = params.reply_user_id();
         match reply_user_id {
             // Reply comment
@@ -128,25 +133,23 @@ impl User {
             }
         }
 
-        let res = params.insert(&pg_pool, redis_pool, &token);
+        let res = params.insert(&pg_pool, &session);
         if res {
             api_resp_ok!()
         } else {
             api_resp_err!("new_comment failed!")
         }
     }
-    fn delete_comment((req, params): (HttpRequest<AppState>, Form<DeleteComment>)) -> JsonResponse {
-        let token = Token::from_request(&req);
-        if token.is_none() {
-            return api_resp_ok!();
-        }
-        let token = token.unwrap().into_inner();
+
+    fn delete_comment(
+        state: Data<AppState>,
+        req: HttpRequest,
+        params: Form<DeleteComment>,
+        session: Session,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         let permission = req.extensions().get::<InnerContext>().unwrap().permission;
-        let pg_pool = &req.state().db.into_inner().get().unwrap();
-        let redis_pool = &req.state().cache.into_inner();
-        let res = params
-            .into_inner()
-            .delete(pg_pool, redis_pool, &token, &permission);
+        let pg_pool = &state.db.into_inner().get().unwrap();
+        let res = params.into_inner().delete(pg_pool, &session, &permission);
         if res {
             api_resp_ok!()
         } else {
@@ -154,18 +157,17 @@ impl User {
         }
     }
 
-    pub fn configure(app: App<AppState>) -> App<AppState> {
-        app.resource("user/change_pwd", |r| {
-            r.method(Method::POST).with(User::change_pwd)
-        })
-        .resource("user/view", |r| r.get().f(User::view_user))
-        .resource("user/sign_out", |r| r.get().f(User::sign_out))
-        .resource("user/edit", |r| r.method(Method::POST).with(User::edit))
-        .resource("user/new", |r| {
-            r.method(Method::POST).with(User::new_comment)
-        })
-        .resource("user/delete", |r| {
-            r.method(Method::POST).with(User::delete_comment)
-        })
+    pub fn configure(cfg: &mut web::ServiceConfig) {
+        cfg.service(web::resource("user/change_pwd").route(web::get().to_async(User::change_pwd)))
+            .service(web::resource("user/view").route(web::get().to_async(User::view_user)))
+            .service(web::resource("user/sign_out").route(web::get().to_async(User::sign_out)))
+            .service(web::resource("user/edit").route(web::post().to_async(User::edit)))
+            .service(
+                web::resource("user/new_comment").route(web::post().to_async(User::new_comment)),
+            )
+            .service(
+                web::resource("user/delete_comment")
+                    .route(web::post().to_async(User::delete_comment)),
+            );
     }
 }

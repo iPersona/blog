@@ -1,4 +1,8 @@
 pg/data
 redis/data
-nginx/log
+caddy/.caddy
+caddy/www
+redis_notify/data
+
+
 

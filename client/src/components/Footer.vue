@@ -1,5 +1,5 @@
 <template>
-  <div>Copyright © coimioc 2019-</div>
+  <footer class="footer">Copyright © coimioc 2019-</footer>
 </template>
 <script>
 export default {

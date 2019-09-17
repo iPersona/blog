@@ -1,32 +1,24 @@
-use std::sync::Arc;
-
-use actix::{Handler, Message};
-use actix_web::actix::Addr;
-use actix_web::error::ErrorInternalServerError;
-use actix_web::{App, AsyncResponder, Error, Form, HttpRequest};
+use actix_web::web::{Data, Form, Query};
+use actix_web::{Error, HttpRequest, HttpResponse};
 use futures::future::Future;
 use log::{debug, info};
 use uuid::Uuid;
 
-use crate::api::JsonResponse;
 use crate::models::articles::{
-    AdminViewRawArticle, DeleteArticlesWithTags, ModifyPublish, QuerySlice,
+    AdminViewRawArticle, DeleteArticlesWithTags, ModifyPublish, QuerySlice, ViewArticle,
 };
-use crate::util::postgresql_pool::DataBase;
-use crate::util::redis_pool::Cache;
-use crate::{AppState, ArticleList, ArticlesWithTag, EditArticle, NewArticle, UserNotify};
-use actix_web::http::Method;
-use actix_web::middleware::session::{RequestSession, Session};
-use diesel::pg::PgConnection;
+use crate::{AppState, ArticleList, ArticlesWithTag, EditArticle, NewArticle};
+use actix_web::web;
 
 pub struct AdminArticle;
 
 impl AdminArticle {
     pub fn create_article(
-        (req, params): (HttpRequest<AppState>, Form<NewArticle>),
-    ) -> JsonResponse {
+        state: Data<AppState>,
+        params: Form<NewArticle>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("create article");
-        let conn = &req.state().db.into_inner().get().unwrap();
+        let conn = &state.db.into_inner().get().unwrap();
         let r = params.into_inner().insert(conn);
         if r {
             api_resp_ok!()
@@ -36,11 +28,12 @@ impl AdminArticle {
     }
 
     pub fn delete_article(
-        (req, params): (HttpRequest<AppState>, Form<DeleteArticlesWithTags>),
-    ) -> JsonResponse {
+        state: Data<AppState>,
+        params: Form<DeleteArticlesWithTags>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("delete article");
         let res = ArticlesWithTag::delete_with_id(
-            &req.state(),
+            state.get_ref(),
             Uuid::parse_str(params.id.as_str()).unwrap(),
         );
         match res {
@@ -49,57 +42,57 @@ impl AdminArticle {
         }
     }
 
-    pub fn admin_view_article(req: &HttpRequest<AppState>) -> JsonResponse {
+    pub fn admin_view_article(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        query: Query<ViewArticle>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("admin_view_article");
-        req.query()
-            .get("id")
-            .map_or(api_resp_err!("'id' is not specified!"), |id| {
-                debug!("id={:?}", id);
-                let res = ArticlesWithTag::query_without_article(
-                    &req.state(),
-                    Uuid::parse_str(id).unwrap(),
-                    true,
-                );
-                match res {
-                    Ok(data) => api_resp_data!(data),
-                    Err(e) => api_resp_err!("query_without_article failed!"),
-                }
-            })
+        debug!("id={:?}", query.id);
+        let res = ArticlesWithTag::query_without_article(state.get_ref(), query.id, true);
+        match res {
+            Ok(data) => api_resp_data!(data),
+            Err(e) => api_resp_err!(format!("query_without_article failed: {:?}", e)),
+        }
     }
 
-    pub fn admin_view_raw_article(req: &HttpRequest<AppState>) -> JsonResponse {
+    pub fn admin_view_raw_article(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        query: Query<AdminViewRawArticle>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("admin_view_raw_article");
-        AdminViewRawArticle::new(req.query()).map_or(
-            api_resp_err!("'id' is not specified!"),
-            |params| {
-                info!("params:{:?}", params.id.as_str());
-                let res = ArticlesWithTag::query_raw_article(
-                    &req.state(),
-                    Uuid::parse_str(params.id.as_str()).unwrap(),
-                );
-                match res {
-                    Ok(data) => api_resp_data!(data),
-                    Err(e) => api_resp_err!("query_raw_article failed!"),
-                }
-            },
-        )
+        info!("params:{:?}", query.id.as_str());
+        let res = ArticlesWithTag::query_raw_article(
+            state.get_ref(),
+            Uuid::parse_str(query.id.as_str()).unwrap(),
+        );
+        match res {
+            Ok(data) => api_resp_data!(data),
+            Err(e) => api_resp_err!(format!("query_raw_article failed: {:?}", e)),
+        }
     }
 
-    pub fn admin_list_all_article(req: &HttpRequest<AppState>) -> JsonResponse {
+    pub fn admin_list_all_article(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        query: Query<QuerySlice>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("admin_list_all_article");
-        QuerySlice::new(req.query()).map_or(api_resp_err!("'id' is not specified!"), |params| {
-            let res =
-                ArticleList::query_list_article(&req.state(), params.limit, params.offset, true);
-            match res {
-                Ok(data) => api_resp_data!(data),
-                Err(_) => api_resp_err!("admin_list_all_article failed!"),
-            }
-        })
+        let res = ArticleList::query_list_article(&state, query.limit, query.offset, true);
+        match res {
+            Ok(data) => api_resp_data!(data),
+            Err(_) => api_resp_err!("admin_list_all_article failed!"),
+        }
     }
 
-    pub fn edit_article((req, params): (HttpRequest<AppState>, Form<EditArticle>)) -> JsonResponse {
+    pub fn edit_article(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Form<EditArticle>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("edit_article");
-        let res = params.into_inner().edit_article(&req.state());
+        let res = params.into_inner().edit_article(state.get_ref());
         match res {
             Ok(data) => api_resp_data!(data),
             Err(_) => api_resp_err!("edit_article failed!"),
@@ -107,37 +100,45 @@ impl AdminArticle {
     }
 
     pub fn update_publish(
-        (req, params): (HttpRequest<AppState>, Form<ModifyPublish>),
-    ) -> JsonResponse {
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Form<ModifyPublish>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("update_publish");
-        let res = ArticlesWithTag::publish_article(&req.state(), &params);
+        let res = ArticlesWithTag::publish_article(state.get_ref(), &params);
         match res {
             Ok(data) => api_resp_data!(data),
             Err(_) => api_resp_err!("update_publish failed!"),
         }
     }
 
-    pub fn configure(app: App<AppState>) -> App<AppState> {
-      app.resource("article/new", |r| {
-            r.method(Method::POST).with(AdminArticle::create_article)
-        })
-        .resource("article/delete", |r| {
-            r.method(Method::POST).with(AdminArticle::delete_article)
-        })
-        .resource("article/admin/view", |r| {
-            r.get().f(AdminArticle::admin_view_article)
-        })
-        .resource("article//admin/view_raw", |r| {
-            r.get().f(AdminArticle::admin_view_raw_article)
-        })
-        .resource("article/admin/view_all", |r| {
-            r.get().f(AdminArticle::admin_list_all_article)
-        })
-        .resource("article/edit", |r| {
-            r.method(Method::POST).with(AdminArticle::edit_article)
-        })
-        .resource("article/publish", |r| {
-            r.method(Method::POST).with(AdminArticle::update_publish)
-        })
+    pub fn configure(cfg: &mut web::ServiceConfig) {
+        cfg.service(
+            web::resource("article/new").route(web::post().to_async(AdminArticle::create_article)),
+        )
+        .service(
+            web::resource("article/delete")
+                .route(web::delete().to_async(AdminArticle::delete_article)),
+        )
+        .service(
+            web::resource("article/admin/view")
+                .route(web::get().to_async(AdminArticle::admin_view_article)),
+        )
+        // user
+        .service(
+            web::resource("article/admin/view_raw")
+                .route(web::post().to_async(AdminArticle::admin_view_raw_article)),
+        )
+        .service(
+            web::resource("article/admin/view_all")
+                .route(web::get().to_async(AdminArticle::admin_list_all_article)),
+        )
+        .service(
+            web::resource("article/edit").route(web::get().to_async(AdminArticle::edit_article)),
+        )
+        .service(
+            web::resource("article/publish")
+                .route(web::get().to_async(AdminArticle::update_publish)),
+        );
     }
 }

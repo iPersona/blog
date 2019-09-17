@@ -1,5 +1,7 @@
 #![macro_use]
 
+use crate::util::errors::ErrorCode;
+
 #[derive(Debug, Serialize)]
 pub enum Status {
     Ok,
@@ -9,60 +11,70 @@ pub enum Status {
 #[derive(Debug, Serialize)]
 #[serde(untagged)] // remove 'ApiResult' level tag, e.g. 'Success', see https://serde.rs/enum-representations.html
 pub enum ApiResult {
-    Success { status: Status },
-    Error { status: Status, detail: String },
-    Data { data: Value },
+    Success {
+        status: Status,
+    },
+    Error {
+        status: Status,
+        code: ErrorCode,
+        detail: String,
+    },
+    Data {
+        data: Value,
+    },
 }
 
-use actix_web::{Error, Json};
-use futures::Future;
+// use actix_web::Error;
+// use futures::Future;
 
-pub type JsonResponse = Box<Future<Item = Json<ApiResult>, Error = Error>>;
+// pub type JsonResponse = Box<Future<Item = actix_web::web::Json<ApiResult>, Error = Error>>;
+pub type JsonApiResult = actix_web::web::Json<ApiResult>;
 
 /// result macro
-//#[macro_export]
-macro_rules! result_ok {
-    () => {
-        Ok(actix_web::Json($crate::api::ApiResult::Success {
-            status: $crate::api::Status::Ok,
-        }))
-    };
-}
+// //#[macro_export]
+// macro_rules! result_ok {
+//     () => {
+//         Ok(actix_web::Json($crate::api::ApiResult::Success {
+//             status: $crate::api::Status::Ok,
+//         }))
+//     };
+// }
 
-//#[macro_export]
-macro_rules! result_err {
-    ($detail:expr) => {
-        Ok(actix_web::Json($crate::api::ApiResult::Error {
-            status: $crate::api::Status::Err,
-            detail: String::from($detail),
-        }))
-    };
-}
+// //#[macro_export]
+// macro_rules! result_err {
+//     ($detail:expr) => {
+//         Ok(actix_web::Json($crate::api::ApiResult::Error {
+//             status: $crate::api::Status::Err,
+//             detail: String::from($detail),
+//         }))
+//     };
+// }
 
-//#[macro_export]
-macro_rules! result_data {
-    ($data:expr) => {
-        Ok(actix_web::Json($crate::api::ApiResult::Data {
-            data: serde_json::to_value($data).unwrap(),
-        }))
-    };
-}
+// //#[macro_export]
+// macro_rules! result_data {
+//     ($data:expr) => {
+//         Ok(actix_web::Json($crate::api::ApiResult::Data {
+//             data: serde_json::to_value($data).unwrap(),
+//         }))
+//     };
+// }
 
 /// API response macro
-//#[macro_export]
-macro_rules! api_resp_err {
-    ($detail:expr) => {
-        api_resp!($crate::api::ApiResult::Error {
-            status: $crate::api::Status::Err,
-            detail: String::from($detail)
-        })
-    };
-}
+// //#[macro_export]
+// macro_rules! api_resp_err {
+//     ($detail:expr) => {
+//         api_resp!($crate::api::ApiResult::Error {
+//             status: $crate::api::Status::Err,
+//             detail: String::from($detail)
+//         })
+//     };
+// }
 
 //#[macro_export]
 macro_rules! api_resp {
     ($api_ret:expr) => {
-        Box::new(futures::future::ok(actix_web::Json($api_ret)))
+        // Box::new(futures::future::ok(actix_web::web::Json($api_ret)))
+        futures::future::ok(actix_web::HttpResponse::Ok().json($api_ret))
     };
 }
 
@@ -80,10 +92,22 @@ macro_rules! api_resp_err {
     ($detail:expr) => {
         api_resp!($crate::api::ApiResult::Error {
             status: $crate::api::Status::Err,
+            code: $crate::util::errors::ErrorCode::Unknown,
             detail: String::from($detail)
         })
     };
 }
+
+//#[macro_export]
+// macro_rules! api_resp_err_with_code {
+//     ($code:expr, $detail:expr) => {
+//         api_resp!($crate::api::ApiResult::Error {
+//             status: $crate::api::Status::Err,
+//             code: $code,
+//             detail: String::from($detail)
+//         })
+//     };
+// }
 
 //#[macro_export]
 macro_rules! api_resp_data {

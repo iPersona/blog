@@ -1,0 +1,16 @@
+{
+  "name": "demo_data",
+  "version": "1.0.0",
+  "description": "A demo data generator for blog.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "coimioc",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^7.0.0",
+    "pg": "^7.12.1",
+    "pg-format": "^1.0.4"
+  }
+}

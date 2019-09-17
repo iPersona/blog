@@ -1,13 +1,13 @@
 use super::super::comments;
 use super::super::comments::dsl::comments as all_comments;
 
-use super::super::{RedisPool, UserInfo};
+use super::super::UserInfo;
+use actix_session::Session;
 use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::Text;
-use serde_json;
-use std::sync::Arc;
+use log::error;
 use uuid::Uuid;
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
@@ -83,10 +83,18 @@ impl NewComments {
         }
     }
 
-    pub fn insert(&self, conn: &PgConnection, redis_pool: &Arc<RedisPool>, cookie: &str) -> bool {
-        let info =
-            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info")).unwrap();
-        self.into_insert_comments(info.id).insert(conn)
+    pub fn insert(&self, conn: &PgConnection, session: &Session) -> bool {
+        let info = UserInfo::from_session(session);
+        match info {
+            Ok(v) => match v {
+                Some(v) => self.into_insert_comments(v.id).insert(conn),
+                None => false,
+            },
+            Err(e) => {
+                error!("Fail to parse UserInfo: {:?}", e);
+                false
+            }
+        }
     }
 
     pub fn reply_user_id(&mut self) -> Option<Uuid> {
@@ -105,20 +113,29 @@ pub struct DeleteComment {
 }
 
 impl DeleteComment {
-    pub fn delete(
-        self,
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        cookie: &str,
-        permission: &Option<i16>,
-    ) -> bool {
+    pub fn delete(self, conn: &PgConnection, session: &Session, permission: &Option<i16>) -> bool {
         match *permission {
             Some(0) => Comments::delete_with_comment_id(conn, self.comment_id),
             _ => {
-                let info =
-                    serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info"))
-                        .unwrap();
-                if self.user_id == info.id {
+                let user_or = UserInfo::view_user_with_cookie(&session);
+                let user: UserInfo;
+                match user_or {
+                    Ok(v) => match v {
+                        Some(v) => user = v,
+                        None => {
+                            error!("failed to get userinfo from current session!");
+                            return false;
+                        }
+                    },
+                    Err(e) => {
+                        error!(
+                            "{}",
+                            format!("failed to get userinfo from current session: {:?}", e)
+                        );
+                        return false;
+                    }
+                }
+                if self.user_id == user.id {
                     Comments::delete_with_comment_id(conn, self.comment_id)
                 } else {
                     false

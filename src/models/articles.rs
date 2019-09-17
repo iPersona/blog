@@ -1,30 +1,19 @@
 use std::collections::HashMap;
-use std::error as StdError;
 use std::str::FromStr;
-use std::sync::Arc;
 
-use actix::{Handler, MailboxError, Message};
-use actix_web::error::{ErrorBadRequest, ErrorInternalServerError};
-use actix_web::{AsyncResponder, Error, FutureResponse, HttpRequest};
 use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Text};
-use futures::future::{err, ok, result, AndThen};
-use futures::Future;
 use uuid::Uuid;
 
-use crate::util::postgresql_pool::DataBase;
-use crate::util::redis_pool::Cache;
 use crate::{AppState, Comments};
 
 use super::super::article_with_tag::dsl::article_with_tag as all_article_with_tag;
 use super::super::articles::dsl::articles as all_articles;
+use super::super::markdown_render;
 use super::super::{article_with_tag, articles};
-use super::super::{markdown_render, RedisPool};
 use super::{RelationTag, Relations, UserNotify};
-use crate::models::InnerError;
-use log::info;
 use std::cell::Ref;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -39,27 +28,28 @@ pub struct ArticlesWithTag {
     pub modify_time: NaiveDateTime,
 }
 
+// TODO: 未使用的结构体（以下4个）
 // DeleteArticleTagRelation
-struct DeleteArticleTagRelation {
-    id: Uuid,
-    method: String,
-}
+// struct DeleteArticleTagRelation {
+//     id: Uuid,
+//     method: String,
+// }
 
 // DeleteAllArticles
-struct DeleteAllArticles {
-    id: Uuid,
-}
+// struct DeleteAllArticles {
+//     id: Uuid,
+// }
 
 // QueryWithoutArticle
-struct QueryWithoutArticle {
-    id: Uuid,
-    admin: bool,
-}
+// struct QueryWithoutArticle {
+//     id: Uuid,
+//     admin: bool,
+// }
 
 // QueryRawArticle
-struct QueryRawArticle {
-    id: Uuid,
-}
+// struct QueryRawArticle {
+//     id: Uuid,
+// }
 
 impl ArticlesWithTag {
     pub fn delete_with_id(state: &AppState, id: Uuid) -> Result<usize, String> {
@@ -92,7 +82,7 @@ impl ArticlesWithTag {
                 .get_result::<RawArticlesWithTag>(conn)
         };
         match res {
-            Ok(data) => Ok(data.into_html()),
+            Ok(data) => Ok(data.into_markdown()),
             Err(err) => Err(format!("{}", err)),
         }
     }
@@ -203,6 +193,18 @@ impl ArticleList {
             Err(err) => Err(format!("{}", err)),
         }
     }
+
+    pub fn query_article_numbers(state: &AppState) -> Result<i64, String> {
+        let conn = &state.db.into_inner().get().unwrap();
+        let res = all_articles
+            .select(diesel::dsl::count(articles::id))
+            .filter(articles::published.eq(true))
+            .first(conn);
+        match res {
+            Ok(n) => Ok(n),
+            Err(e) => Err(format!("{}", e)),
+        }
+    }
 }
 
 #[derive(Insertable, Debug, Clone)]
@@ -211,15 +213,17 @@ struct InsertArticle {
     title: String,
     raw_content: String,
     content: String,
+    published: bool,
 }
 
 impl InsertArticle {
-    fn new(title: String, raw_content: String) -> Self {
+    fn new(title: String, raw_content: String, published: bool) -> Self {
         let content = markdown_render(&raw_content);
         InsertArticle {
             title,
             raw_content,
             content,
+            published
         }
     }
 
@@ -237,6 +241,7 @@ pub struct NewArticle {
     pub raw_content: String,
     pub exist_tags: Option<Vec<Uuid>>,
     pub new_tags: Option<Vec<String>>,
+    pub publish: bool,
 }
 
 impl NewArticle {
@@ -250,7 +255,7 @@ impl NewArticle {
     }
 
     fn convert_insert_article(&self) -> InsertArticle {
-        InsertArticle::new(self.title.to_owned(), self.raw_content.to_owned())
+        InsertArticle::new(self.title.to_owned(), self.raw_content.to_owned(), self.publish)
     }
 }
 
@@ -323,18 +328,18 @@ impl RawArticlesWithTag {
         }
     }
 
-    fn into_html(self) -> ArticlesWithTag {
-        ArticlesWithTag {
-            id: self.id,
-            title: self.title,
-            content: self.content,
-            published: self.published,
-            tags_id: self.tags_id,
-            tags: self.tags,
-            create_time: self.create_time,
-            modify_time: self.modify_time,
-        }
-    }
+    // fn into_html(self) -> ArticlesWithTag {
+    //     ArticlesWithTag {
+    //         id: self.id,
+    //         title: self.title,
+    //         content: self.content,
+    //         published: self.published,
+    //         tags_id: self.tags_id,
+    //         tags: self.tags,
+    //         create_time: self.create_time,
+    //         modify_time: self.modify_time,
+    //     }
+    // }
 
     fn into_without_content(self) -> ArticlesWithoutContent {
         ArticlesWithoutContent {
@@ -455,7 +460,7 @@ impl ViewArticle {
         match query.get("id") {
             Some(v) => match Uuid::from_str(v) {
                 Ok(id) => Some(ViewArticle { id }),
-                Err(err) => None,
+                Err(_) => None,
             },
             None => None,
         }

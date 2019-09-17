@@ -1,33 +1,51 @@
-import Vue from 'vue'
-import App from './App.vue'
+import Vue from 'vue';
+import App from './App.vue';
 
-import BootstrapVue from 'bootstrap-vue'
-Vue.use(BootstrapVue)
 
-import 'bootstrap/dist/css/bootstrap.css'
-import 'bootstrap/scss/bootstrap.scss'
+import axios from 'axios';
+import VueAxios from 'vue-axios';
+Vue.use(VueAxios, axios);
 
-import axios from 'axios'
-import VueAxios from 'vue-axios'
-Vue.use(VueAxios, axios)
+import router from './routes';
 
-import router from './routes'
+// buefy UI framework
+import Buefy from 'buefy';
+import 'buefy/dist/buefy.css';
+Vue.use(Buefy)
 
-import TreeView from "vue-json-tree-view"
-Vue.use(TreeView)
+// code highlight
+import HighLight from './components/utils/highlight';
+Vue.use(HighLight);
 
-import LiquorTree from 'liquor-tree'
-Vue.use(LiquorTree)
+// permission control
+// import abilitiesPlugin from '@casl/vue';
+// import ability from './components/utils/ability';
+// Vue.use(abilitiesPlugin, ability);
 
-import ElementUI from 'element-ui'
-import 'element-ui/lib/theme-chalk/index.css'
-Vue.use(ElementUI)
+// localstorage
+import VueLocalStorage from 'vue-localstorage';
+Vue.use(VueLocalStorage);
 
-require('vue-ionicons/ionicons.css')
+import VueLogger from 'vuejs-logger';
+const isProduction = process.env.NODE_ENV === 'production';
+const options = {
+  isEnabled: true,
+  logLevel: isProduction ? 'error' : 'debug',
+  stringifyArguments: false,
+  showLogLevel: true,
+  showMethodName: true,
+  separator: '|',
+  showConsoleColors: true
+};
+Vue.use(VueLogger, options);
 
 Vue.config.productionTip = false
+
+// vuex
+import store from './store'
 
 new Vue({
   router,
   render: h => h(App),
+  store,
 }).$mount('#app')

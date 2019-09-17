@@ -2,33 +2,36 @@ use super::super::tags;
 use super::super::tags::dsl::tags as all_tags;
 use super::Relations;
 
-use crate::models::InnerError;
-use crate::util::postgresql_pool::DataBase;
 use crate::AppState;
-use actix::{Handler, Message};
-use actix_diesel::Database;
 use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Text, Uuid as sql_uuid};
-use futures::Future;
 use std::cell::Ref;
 use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize)]
 pub struct Tags {
-    id: Uuid,
-    tag: String,
+    pub id: Uuid,
+    pub tag: String,
 }
 
 impl Tags {
-    pub fn view_list_tag(conn: &PgConnection) -> Result<Vec<Tags>, String> {
-        let res = all_tags.load::<Tags>(conn);
+    pub fn view_list_tag(state: &AppState) -> Result<Vec<Tags>, String> {
+        let res = all_tags.load::<Tags>(&state.db.connection());
         match res {
             Ok(data) => Ok(data),
             Err(err) => Err(format!("{}", err)),
         }
     }
+
+    // pub fn get_all(state: &AppState) -> Result<Vec<String>, String> {
+    //     let tags = Self::view_list_tag(&state.db.connection());
+    //     match tags {
+    //         Ok(t) => Ok(t.iter().map(|v| v.tag.clone()).collect()),
+    //         Err(e) => Err(e),
+    //     }
+    // }
 
     pub fn delete_tag(state: &AppState, id: Uuid) -> Result<usize, String> {
         let conn = &state.db.into_inner().get().unwrap();

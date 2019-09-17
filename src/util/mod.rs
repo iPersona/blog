@@ -1,6 +1,8 @@
-pub mod cookies;
+pub mod debug_middleware;
 pub mod env;
+pub mod errors;
 pub mod github_information;
+pub mod path;
 pub mod postgresql_pool;
 pub mod redis_pool;
 
@@ -8,25 +10,13 @@ pub mod redis_pool;
 //                                   get_github_token};
 pub use self::redis_pool::RedisPool;
 
-use super::{UserInfo, UserNotify};
 use crate::api::InnerContext;
-use crate::models::token::Token;
-use crate::models::InnerError;
-use crate::AppState;
-use actix::fut::{err, ok};
-use actix_web::middleware::session::RequestSession;
-use actix_web::{AsyncResponder, Error, HttpRequest, HttpResponse};
+use actix_web::dev::ServiceRequest;
 use ammonia::clean;
-use chrono::Utc;
 use comrak::{markdown_to_html, ComrakOptions};
-use futures::Future;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use serde_json;
 use std::fmt::Write;
-use std::sync::Arc;
-use std::thread;
-use std::{io, io::Read};
 use tera::Context;
 use tiny_keccak::Keccak;
 
@@ -82,35 +72,41 @@ pub fn get_password(raw: &str) -> String {
 // `0` means Admin
 // `1` means User
 
-pub fn get_identity_and_web_context(req: &HttpRequest<AppState>) -> InnerContext {
-    let mut web = Context::new();
-    let redis_pool = req.state().cache.into_inner();
-    let token = Token::from_request(req);
-    if token.is_none() {
-        return InnerContext {
-            permission: None,
-            context: web,
-        };
+pub fn get_identity_and_web_context(_req: &mut ServiceRequest) -> InnerContext {
+    // TODO: 需要重写
+    InnerContext {
+        permission: None,
+        context: Context::new(),
     }
-    let token = token.unwrap().into_inner();
-    if redis_pool.exists(token.as_str()) {
-        let info =
-            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(token.as_str(), "info"))
-                .unwrap();
-        let group = (&info).groups;
-        let notifys = UserNotify::get_notifys(info.id, &redis_pool);
-        web.insert("user", &info);
-        web.insert("notifys", &notifys);
-        InnerContext {
-            permission: Some(group),
-            context: web,
-        }
-    } else {
-        InnerContext {
-            permission: None,
-            context: web,
-        }
-    }
+    //    let mut web = Context::new();
+    //    let state = req.app_data::<AppState>().unwrap();
+    //    let redis_pool = state.get_ref().cache.into_inner();
+    //    let token = Token::from_session(&req.get_session());
+    //    if token.is_none() {
+    //        return InnerContext {
+    //            permission: None,
+    //            context: web,
+    //        };
+    //    }
+    //    let token = token.unwrap().into_inner();
+    //    if redis_pool.exists(token.as_str()) {
+    //        let info =
+    //            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(token.as_str(), "info"))
+    //                .unwrap();
+    //        let group = (&info).groups;
+    //        let notifys = UserNotify::get_notifys(info.id, &redis_pool);
+    //        web.insert("user", &info);
+    //        web.insert("notifys", &notifys);
+    //        InnerContext {
+    //            permission: Some(group),
+    //            context: web,
+    //        }
+    //    } else {
+    //        InnerContext {
+    //            permission: None,
+    //            context: web,
+    //        }
+    //    }
 }
 
 // Get visitor ip information and access time, and then push it to redis key `visitor_log`

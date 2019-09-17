@@ -75,3 +75,8 @@ $ cargo run --bin blog_api // listen on 127.0.0.1:8888
 ```
 
 if you want to login admin, the account is `admin`, password is `admin`
+
+
+## TODO
+- 使用 [argon2](https://crates.io/crates/rust-argon2) 来重写密码加密部分
+- 使用 [chrono](https://crates.io/crates/chrono) 来重写日期部分的方法

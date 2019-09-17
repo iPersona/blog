@@ -12,17 +12,10 @@ use uuid::Uuid;
 use super::super::{
     /*get_github_primary_email, */ get_password, random_string, sha3_256_encode, RedisPool,
 };
-use crate::models::token::Token;
-use crate::models::InnerError;
-use crate::util::postgresql_pool::DataBase;
-use crate::util::redis_pool::Cache;
 use crate::AppState;
-use actix::{Handler, Message};
-use chrono::format::Item;
-use futures::{
-    future::{err, ok},
-    Future,
-};
+use actix_session::Session;
+use actix_web::Error;
+use log::{debug, error};
 use std::cell::Ref;
 use std::collections::HashMap;
 
@@ -89,6 +82,14 @@ impl Users {
             Err(err) => Err(format!("{}", err)),
         }
     }
+
+    pub fn is_user_exist(conn: &PgConnection, email: &str) -> bool {
+        let res = all_users
+            .filter(users::email.eq(email.to_string()))
+            .load::<Users>(conn)
+            .expect("Error loading users");
+        res.len() > 0
+    }
 }
 
 #[derive(Insertable, Debug, Clone, Deserialize, Serialize)]
@@ -118,36 +119,41 @@ impl NewUser {
         }
     }
 
-    fn new_with_github(email: String, github: String, account: String, nickname: String) -> Self {
-        NewUser {
-            account: account,
-            password: sha3_256_encode(random_string(8)),
-            salt: random_string(6),
-            email: email,
-            say: None,
-            nickname: nickname,
-            github: Some(github),
-        }
-    }
+    // TODO: github注册接口
+    // fn new_with_github(email: String, github: String, account: String, nickname: String) -> Self {
+    //     NewUser {
+    //         account,
+    //         password: sha3_256_encode(random_string(8)),
+    //         salt: random_string(6),
+    //         email,
+    //         say: None,
+    //         nickname,
+    //         github: Some(github),
+    //     }
+    // }
 
-    fn insert(&self, conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Result<Token, String> {
+    fn insert(&self, conn: &PgConnection, session: &Session) -> Result<(), String> {
         match diesel::insert_into(users::table)
             .values(self)
             .get_result::<Users>(conn)
         {
-            Ok(info) => self.set_cookies(redis_pool, info.into_user_info()),
-            Err(err) => Err(format!("{}", err)),
+            Ok(info) => Ok(self.set_cookies(session, info.into_user_info())),
+            Err(err) => Err(format!("{}", err).to_string()),
         }
     }
 
-    fn set_cookies(&self, redis_pool: &Arc<RedisPool>, info: UserInfo) -> Result<Token, String> {
-        //       let cookie = sha3_256_encode(random_string(8));
-        let token = Token::new();
-        let cookie = token.into_inner();
-        redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
-        redis_pool.hset(&cookie, "info", json!(info).to_string());
-        redis_pool.expire(&cookie, 24 * 3600);
-        Ok(token)
+    fn set_cookies(&self, session: &Session, info: UserInfo) {
+        let result = session.set("login_time", Local::now().timestamp());
+        if result.is_err() {
+            error!("set session value 'login_time' failed!");
+        }
+        let result = session.set("info", info);
+        if result.is_err() {
+            error!("set session value 'info' failed!");
+        }
+
+        // TODO: 设置超时时间
+        // redis_pool.expire(&cookie, 24 * 3600);
     }
 }
 
@@ -161,8 +167,8 @@ pub struct RegisteredUser {
 }
 
 impl RegisteredUser {
-    pub fn insert(self, conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Result<Token, String> {
-        NewUser::new(self).insert(conn, redis_pool)
+    pub fn insert(self, conn: &PgConnection, session: &Session) -> Result<(), String> {
+        NewUser::new(self).insert(conn, session)
     }
 }
 
@@ -179,6 +185,25 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
+    pub fn from_session(session: &Session) -> Result<Option<UserInfo>, Error> {
+        session.get::<UserInfo>("info")
+    }
+
+    pub fn is_admin(&self) -> bool {
+        if self.groups == 0 {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn save_to_session(&self, session: &Session) {
+        let result = session.set("info", self.clone());
+        if result.is_err() {
+            error!("set session value 'info' failed!");
+        }
+    }
+
     pub fn view_user(conn: &PgConnection, id: Uuid) -> Result<Self, String> {
         let res = all_users
             .select((
@@ -199,8 +224,8 @@ impl UserInfo {
         }
     }
 
-    pub fn view_user_with_cookie(redis_pool: &Arc<RedisPool>, cookie: &str) -> String {
-        redis_pool.hget::<String>(cookie, "info")
+    pub fn view_user_with_cookie(session: &Session) -> Result<Option<UserInfo>, Error> {
+        session.get::<UserInfo>("info")
     }
 
     pub fn view_user_list(state: &AppState, limit: i64, offset: i64) -> Result<Vec<Self>, String> {
@@ -259,22 +284,28 @@ pub struct ChangePassword {
 }
 
 impl ChangePassword {
-    pub fn change_password(
-        &self,
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        cookie: &str,
-    ) -> Result<usize, String> {
-        let info =
-            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info")).unwrap();
+    pub fn change_password(&self, conn: &PgConnection, session: &Session) -> Result<usize, String> {
+        let user_or = UserInfo::view_user_with_cookie(&session);
+        let user: UserInfo;
+        match user_or {
+            Ok(v) => match v {
+                Some(v) => user = v,
+                None => return Err("failed to get userinfo from current session!".to_string()),
+            },
+            Err(e) => {
+                return Err(
+                    format!("failed to get userinfo from current session: {:?}", e).to_string(),
+                )
+            }
+        }
 
-        if !self.verification(conn, &info.id) {
+        if !self.verification(conn, &user.id) {
             return Err("Verification error".to_string());
         }
 
         let salt = random_string(6);
         let password = sha3_256_encode(get_password(&self.new_password) + &salt);
-        let res = diesel::update(all_users.filter(users::id.eq(info.id)))
+        let res = diesel::update(all_users.filter(users::id.eq(user.id)))
             .set((users::password.eq(&password), users::salt.eq(&salt)))
             .execute(conn);
         match res {
@@ -302,15 +333,22 @@ pub struct EditUser {
 }
 
 impl EditUser {
-    pub fn edit_user(
-        self,
-        conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        cookie: &str,
-    ) -> Result<usize, String> {
-        let info =
-            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(cookie, "info")).unwrap();
-        let res = diesel::update(all_users.filter(users::id.eq(info.id)))
+    pub fn edit_user(self, conn: &PgConnection, session: &Session) -> Result<usize, String> {
+        let user_or = UserInfo::from_session(&session);
+        let user: UserInfo;
+        match user_or {
+            Ok(v) => match v {
+                Some(v) => user = v,
+                None => return Err("failed to get userinfo from current session!".to_string()),
+            },
+            Err(e) => {
+                return Err(
+                    format!("failed to get userinfo from current session: {:?}", e).to_string(),
+                )
+            }
+        }
+
+        let res = diesel::update(all_users.filter(users::id.eq(user.id)))
             .set((
                 users::nickname.eq(self.nickname),
                 users::say.eq(self.say),
@@ -319,7 +357,7 @@ impl EditUser {
             .get_result::<Users>(conn);
         match res {
             Ok(data) => {
-                redis_pool.hset(cookie, "info", json!(data.into_user_info()).to_string());
+                data.into_user_info().save_to_session(session);
                 Ok(1)
             }
             Err(err) => Err(format!("{}", err)),
@@ -344,28 +382,36 @@ impl LoginUser {
     pub fn verification(
         &self,
         conn: &PgConnection,
-        redis_pool: &Arc<RedisPool>,
-        max_age: &Option<i64>,
-    ) -> Result<Token, String> {
+        session: &Session,
+        _max_age: &Option<i64>,
+    ) -> Result<UserInfo, String> {
         let res = all_users
             .filter(users::disabled.eq(0))
             .filter(users::account.eq(self.account.to_owned()))
             .get_result::<Users>(conn);
         match res {
             Ok(data) => {
+                let pwd = get_password(&self.password);
+                debug!("pwd: {:?}", pwd);
+                let curpwd = sha3_256_encode(get_password(&self.password) + &data.salt);
+                debug!("curpwd: {:?}", curpwd);
                 if data.password == sha3_256_encode(get_password(&self.password) + &data.salt) {
-                    let ttl = match *max_age {
-                        Some(t) => t * 3600,
-                        None => 24 * 60 * 60,
-                    };
-
-                    //                   let cookie = sha3_256_encode(random_string(8));
-                    let token = Token::new();
-                    let cookie = token.into_inner();
-                    redis_pool.hset(&cookie, "login_time", Local::now().timestamp());
-                    redis_pool.hset(&cookie, "info", json!(data.into_user_info()).to_string());
-                    redis_pool.expire(&cookie, ttl);
-                    Ok(token)
+                    // TODO: 优化 session 保存时间
+                    //                    let ttl = match *max_age {
+                    //                        Some(t) => t * 3600,    // 90 days
+                    //                        None => 24 * 60 * 60,       // 1 day
+                    //                    };
+                    let user_info = data.into_user_info();
+                    let r = session.set("login_time", Local::now().timestamp());
+                    if r.is_err() {
+                        error!("set session value 'login_time' failed!");
+                    }
+                    let r = session.set("info", json!(user_info).to_string());
+                    if r.is_err() {
+                        error!("set session value 'login_time' failed!");
+                    }
+                    //                    redis_pool.expire(&cookie, ttl);
+                    Ok(user_info)
                 } else {
                     Err(String::from("用户或密码错误"))
                 }
@@ -378,8 +424,9 @@ impl LoginUser {
         self.remember
     }
 
-    pub fn sign_out(redis_pool: &Arc<RedisPool>, cookies: &str) -> bool {
-        redis_pool.del(cookies)
+    pub fn sign_out(session: &Session) -> bool {
+        session.purge();
+        true
     }
 
     //    pub fn login_with_github(
@@ -475,5 +522,16 @@ impl ViewUserList {
             return None;
         }
         Some(ViewUserList { limit, offset })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CheckUser {
+    pub email: String,
+}
+
+impl CheckUser {
+    pub fn is_user_exist(self, conn: &PgConnection) -> bool {
+        Users::is_user_exist(conn, self.email.as_str())
     }
 }
