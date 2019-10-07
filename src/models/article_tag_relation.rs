@@ -51,8 +51,8 @@ impl Relations {
 #[derive(Deserialize, Serialize)]
 pub struct RelationTag {
     article_id: Uuid,
-    tag_id: Option<Vec<Uuid>>,
-    tag: Option<Vec<String>>,
+    tag_id: Option<Vec<Uuid>>, // existed tags
+    tag: Option<Vec<String>>,  // new tags
 }
 
 impl RelationTag {
@@ -65,6 +65,7 @@ impl RelationTag {
     }
 
     pub fn insert_all(&self, conn: &PgConnection) -> bool {
+        // TODO: check if tag already exist, if tag exists, DO NOT insert into the table to avoid duplicate tag
         // If `tag` exist, insert all the new tags into the table all at once,
         // and return the ID of the newly added tag
         let mut tags_id = if self.tag.is_some() {

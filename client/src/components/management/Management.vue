@@ -2,13 +2,16 @@
   <div class="container">
     <div class="tile is-ancestor">
       <div class="tile is-vertical is-2">
-        <action-menu align="left" />
+        <div class="tile">
+          <action-menu align="left" />
+        </div>
       </div>
       <div class="tile is-vertical">
-        <router-view></router-view>
+        <router-view class="router-view"></router-view>
       </div>
     </div>
   </div>
+
 </template>
 
 <script>
@@ -27,3 +30,9 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.router-view {
+  margin-left: 20px;
+}
+</style>

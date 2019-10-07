@@ -92,6 +92,15 @@
       </template>
 
     </b-navbar>
+
+    <b-modal
+      :active.sync="isEditArticle"
+      has-modal-card
+      full-screen
+      :can-cancel="false"
+    >
+      <article-editor :isCreateNew="true" />
+    </b-modal>
   </div>
 
 </template>
@@ -102,15 +111,17 @@ import { mapMutations } from 'vuex'
 import { USER_NAME, TOKEN } from '@/store-types.js'
 import { LOGOUT } from '@/mutation-types.js'
 import Api from '@/api.js'
+import ArticleEditor from './ArticleEditor'
 
 export default {
   name: 'AdminHeader',
   components: {
-
+    ArticleEditor,
   },
   data() {
     return {
-      item: ''
+      item: '',
+      isEditArticle: false,
     }
   },
   computed: {
@@ -123,8 +134,9 @@ export default {
       logout: LOGOUT,
     }),
     newPost() {
-      this.$router.push({ name: 'new_post' })
-    }
+      // this.$router.push({ name: 'new_post' })
+      this.isEditArticle = true
+    },
   },
 }
 </script>

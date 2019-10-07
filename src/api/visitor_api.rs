@@ -1,6 +1,8 @@
 use crate::api::InnerContext;
-use crate::models::articles::{CommentsResponse, /*ListAllArticleFilterByTag,*/ QuerySlice};
-use crate::models::token::Token;
+use crate::models::articles::{
+    ArticleSummary, CommentsResponse, /*ListAllArticleFilterByTag,*/ QuerySlice,
+};
+use crate::models::token::{SimpleToken, Token};
 use crate::models::user::CheckUser;
 use crate::{
     AppState, ArticleList, ArticlesWithTag, Comments, LoginUser, RegisteredUser, UserInfo,
@@ -17,19 +19,16 @@ use web::{Data, Form, Path};
 pub struct Visitor;
 
 impl Visitor {
-    // 使用request参数的demo：https://github.com/actix/examples/blob/master/form/src/main.rs
-    //    pub fn login((req, params): (HttpRequest<AppState>, Form<LoginUser>)) -> JsonResponse {
-    //        info!("access login: {:?}", &params);
-    //        api_resp_ok!()
-    //    }
     pub fn list_all_article(
         state: Data<AppState>,
         _req: HttpRequest,
         params: Query<QuerySlice>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("list_all_article");
-        let res =
-            ArticleList::query_list_article(state.get_ref(), params.limit, params.offset, false);
+        // let res =
+        //     ArticleList::query_list_article(state.get_ref(), params.limit, params.offset, false);
+        let conn = &state.db.connection();
+        let res = ArticleSummary::list_articles(conn, params.limit, params.offset, false);
         match res {
             Ok(data) => api_resp_data!(data),
             Err(_) => api_resp_err!("list_all_article failed!"),
@@ -104,7 +103,7 @@ impl Visitor {
         params: Path<Uuid>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         debug!("view_article: {:?}", &params);
-        let conn = state.db.into_inner().get().unwrap();
+        let conn = state.db.connection();
         match ArticlesWithTag::query_article(&conn, params.into_inner(), false) {
             Ok(data) => api_resp_data!(data),
             Err(err) => api_resp_err!(&*err),
@@ -213,9 +212,10 @@ impl Visitor {
 
     fn get_article_number(
         state: Data<AppState>,
-        _req: HttpRequest,
+        req: HttpRequest,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let count = ArticleList::query_article_numbers(&state);
+        let is_admin = req.extensions().get::<SimpleToken>().unwrap().is_admin;
+        let count = ArticleList::query_article_numbers(&state, is_admin);
         match count {
             Ok(n) => {
                 debug!("article count: {:?}", n);

@@ -1,8 +1,9 @@
-use crate::models::tag::{DeleteTag};
+use crate::models::tag::{DeleteTag, TagsData};
 use crate::{AppState, NewTag, TagCount, Tags};
-use actix_web::web::{Data};
+use actix_web::web::Data;
 use actix_web::{web, web::Form, Error, HttpRequest, HttpResponse};
-use futures::future::Future;
+use futures::{Future, Stream};
+use serde_qs::Config;
 
 pub struct Tag;
 
@@ -63,11 +64,40 @@ impl Tag {
         }
     }
 
+    pub fn update_tags(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        // params: Form<TagsData>,
+        // params: Json<TagsData>,
+        body: web::Payload,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        body.map_err(actix_web::Error::from)
+            .fold(web::BytesMut::new(), move |mut body, chunk| {
+                body.extend_from_slice(&chunk);
+                Ok::<_, Error>(body)
+            })
+            .and_then(move |body| {
+                let config = Config::new(10, false);
+                let data: TagsData = config.deserialize_bytes(&body).unwrap();
+                let res = data.update(&state);
+                match res {
+                    Ok(_) => api_resp_ok!(),
+                    Err(e) => api_resp_err!(e),
+                }
+            })
+    }
+
     pub fn configure(cfg: &mut web::ServiceConfig) {
         cfg.service(web::resource("/tag/new").route(web::post().to_async(Tag::create_tag)))
-            .service(web::resource("/tag/view/count").route(web::get().to_async(Tag::get_tag_with_count)))
-            .service(web::resource("/tag/view").route(web::get().to_async(Tag::get_tag_without_count)))
+            .service(
+                web::resource("/tag/view/count")
+                    .route(web::get().to_async(Tag::get_tag_with_count)),
+            )
+            .service(
+                web::resource("/tag/view").route(web::get().to_async(Tag::get_tag_without_count)),
+            )
             .service(web::resource("/tag/delete").route(web::delete().to_async(Tag::delete_tag)))
+            .service(web::resource("/tag/update").route(web::post().to_async(Tag::update_tags)))
             .service(web::resource("/tag/edit").route(web::post().to_async(Tag::edit_tag)));
     }
 }

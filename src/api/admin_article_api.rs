@@ -1,6 +1,7 @@
 use actix_web::web::{Data, Form, Query};
 use actix_web::{Error, HttpRequest, HttpResponse};
 use futures::future::Future;
+use futures::stream::Stream;
 use log::{debug, info};
 use uuid::Uuid;
 
@@ -15,16 +16,19 @@ pub struct AdminArticle;
 impl AdminArticle {
     pub fn create_article(
         state: Data<AppState>,
-        params: Form<NewArticle>,
+        // params: Form<NewArticle>,
+        body: web::Payload,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("create article");
-        let conn = &state.db.into_inner().get().unwrap();
-        let r = params.into_inner().insert(conn);
-        if r {
-            api_resp_ok!()
-        } else {
-            api_resp_err!("create article failed!")
-        }
+        extract_form_data!(NewArticle, body, &state)
+
+        // let conn = &state.db.connection();
+        // let r = params.into_inner().insert(conn);
+        // if r {
+        //     api_resp_ok!()
+        // } else {
+        //     api_resp_err!("create article failed!")
+        // }
     }
 
     pub fn delete_article(
@@ -89,14 +93,11 @@ impl AdminArticle {
     pub fn edit_article(
         state: Data<AppState>,
         _req: HttpRequest,
-        params: Form<EditArticle>,
+        // params: Form<EditArticle>,
+        body: web::Payload
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("edit_article");
-        let res = params.into_inner().edit_article(state.get_ref());
-        match res {
-            Ok(data) => api_resp_data!(data),
-            Err(_) => api_resp_err!("edit_article failed!"),
-        }
+        extract_form_data!(EditArticle, body, &state) 
     }
 
     pub fn update_publish(
@@ -134,7 +135,7 @@ impl AdminArticle {
                 .route(web::get().to_async(AdminArticle::admin_list_all_article)),
         )
         .service(
-            web::resource("article/edit").route(web::get().to_async(AdminArticle::edit_article)),
+            web::resource("article/edit").route(web::post().to_async(AdminArticle::edit_article)),
         )
         .service(
             web::resource("article/publish")

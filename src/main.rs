@@ -7,6 +7,8 @@ extern crate blog;
 extern crate dotenv;
 extern crate jsonwebtoken;
 extern crate num_cpus;
+extern crate strip_markdown;
+extern crate typename;
 
 use actix_files as fs;
 use actix_redis::RedisSession;
@@ -25,7 +27,7 @@ use time::Duration;
 
 fn main() -> std::io::Result<()> {
     // ::std::env::set_var("RUST_LOG", "debug,actix_web=debug");
-    ::std::env::set_var("RUST_LOG", "blog=debug");
+    ::std::env::set_var("RUST_LOG", "debug");
     // 获取环境变量
     dotenv().ok();
     // init logger

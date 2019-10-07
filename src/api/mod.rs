@@ -118,6 +118,34 @@ macro_rules! api_resp_data {
     };
 }
 
+macro_rules! extract_form_data {
+    ($data_type:ty, $body:expr, $state: expr) => {
+        $body
+            .map_err(actix_web::Error::from)
+            .fold(web::BytesMut::new(), move |mut body, chunk| {
+                body.extend_from_slice(&chunk);
+                Ok::<_, actix_http::Error>(body)
+            })
+            .and_then(move |body| {
+                use $crate::models::FormDataExtractor;
+                let config = serde_qs::Config::new(10, false);
+                let data: $data_type = config.deserialize_bytes(&body).unwrap();
+                let res = data.execute(&$state);
+                match res {
+                    Ok(data) => {
+                        use typename::TypeName;
+                        if data.type_name_of() == "()" {
+                            api_resp_ok!()
+                        } else {
+                            api_resp_data!(data)
+                        }
+                    }
+                    Err(e) => api_resp_err!(e.as_str()),
+                }
+            })
+    };
+}
+
 pub mod user_api;
 pub mod visitor_api;
 

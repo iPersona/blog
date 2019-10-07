@@ -24,7 +24,7 @@ impl DataBase {
     }
 
     pub fn connection(&self) -> PooledConnection<PgConnectionManager> {
-        self.0.clone().get().unwrap()
+        self.into_inner().get().unwrap()
     }
 }
 

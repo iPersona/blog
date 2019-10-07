@@ -5,6 +5,7 @@ use super::Relations;
 use crate::AppState;
 use diesel;
 use diesel::prelude::*;
+use diesel::result::Error;
 use diesel::sql_types::{BigInt, Text, Uuid as sql_uuid};
 use std::cell::Ref;
 use std::collections::HashMap;
@@ -17,6 +18,13 @@ pub struct Tags {
 }
 
 impl Tags {
+    pub fn new(id: Uuid) -> Self {
+        Tags {
+            id,
+            tag: "".to_string(),
+        }
+    }
+
     pub fn view_list_tag(state: &AppState) -> Result<Vec<Tags>, String> {
         let res = all_tags.load::<Tags>(&state.db.connection());
         match res {
@@ -56,6 +64,18 @@ impl Tags {
             Ok(data) => Ok(data),
             Err(err) => Err(format!("{}", err)),
         }
+    }
+
+    pub fn edit_tags(tags: &Vec<Tags>, state: &AppState) -> Result<usize, String> {
+        let mut num = 0;
+        for tag in tags.iter() {
+            let res = tag.edit_tag(state);
+            if let Err(e) = res {
+                return Err(e);
+            }
+            num = num + res.unwrap();
+        }
+        Ok(num)
     }
 }
 
@@ -109,7 +129,7 @@ impl NewTag {
     }
 
     pub fn insert(&self, state: &AppState) -> bool {
-        let conn = state.db.into_inner().get().unwrap();
+        let conn = state.db.connection();
         diesel::insert_into(tags::table)
             .values(self)
             .execute(&conn)
@@ -155,5 +175,51 @@ impl ViewTag {
             return None;
         }
         Some(ViewTag { limit, offset })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TagsData {
+    pub modified_tags: Option<Vec<Tags>>,
+    pub added_tags: Option<Vec<String>>,
+    pub deleted_tags: Option<Vec<Uuid>>,
+}
+
+impl TagsData {
+    pub fn update(&self, state: &AppState) -> Result<(), String> {
+        let conn: &PgConnection = &state.db.connection();
+        let result = conn.transaction(|| {
+            if let Some(tags) = &self.modified_tags {
+                let res = Tags::edit_tags(&tags, state);
+                if let Err(_) = res {
+                    return Err(Error::RollbackTransaction);
+                }
+            }
+
+            if let Some(tag_name_array) = &self.added_tags {
+                let tags = tag_name_array
+                    .iter()
+                    .map(|t| NewTag::new(t.as_str()))
+                    .collect::<Vec<NewTag>>();
+                let _ = NewTag::insert_all(tags, &conn);
+            }
+
+            if let Some(tag_id_array) = &self.deleted_tags {
+                let tags = tag_id_array.iter().map(|v| Tags::new(v.clone()));
+                for t in tags.into_iter() {
+                    let res = Tags::delete_tag(state, t.id);
+                    if let Err(_) = res {
+                        return Err(Error::RollbackTransaction);
+                    }
+                }
+            }
+
+            Ok(())
+        });
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(_) => Err("update tags failed!".to_string()),
+        }
     }
 }

@@ -42,6 +42,7 @@ export default class Api {
             addTags: `${this.host}/tag/new`,
             delTag: `${this.host}/tag/delete`,
             editTag: `${this.host}/tag/edit`,
+            updateTags: `${this.host}/tag/update`,
         });
         // request拦截器
         this.axios.interceptors.request.use(req => {
@@ -61,6 +62,21 @@ export default class Api {
             console.log(error) // for debug
             Promise.reject(error)
         });
+    }
+
+    async updateTags(modifiedTags, addedTags, deletedTags) {
+        let args = {}
+        if (modifiedTags !== undefined) {
+            args.modified_tags = modifiedTags
+        }
+        if (addedTags !== undefined) {
+            args.added_tags = addedTags
+        }
+        if (deletedTags !== undefined) {
+            args.deleted_tags = deletedTags
+        }
+        console.log(`updateTags: ${JSON.stringify(args)}`)
+        return this.post(this.url.updateTags, args)
     }
 
     async editTag(tagObj) {
@@ -275,6 +291,7 @@ export default class Api {
                 if (args === undefined) {
                     res = await this.axios.post(url);
                 } else {
+                    console.log(`post-args: ${qs.stringify(args)}`)
                     res = await this.axios.post(url, qs.stringify(args));
                 }
             } else if (method === 'delete') {

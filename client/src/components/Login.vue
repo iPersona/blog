@@ -93,6 +93,9 @@ export default {
       let token = rsp.data;
       this.log.debug(`token: ${token}`)
       this.updateToken(token)
+
+      // refresh page to make other components loading data
+      window.location.reload()
     }
   },
 }

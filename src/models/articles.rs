@@ -5,6 +5,7 @@ use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Text};
+use strip_markdown::strip_markdown;
 use uuid::Uuid;
 
 use crate::{AppState, Comments};
@@ -13,6 +14,7 @@ use super::super::article_with_tag::dsl::article_with_tag as all_article_with_ta
 use super::super::articles::dsl::articles as all_articles;
 use super::super::markdown_render;
 use super::super::{article_with_tag, articles};
+use super::FormDataExtractor;
 use super::{RelationTag, Relations, UserNotify};
 use std::cell::Ref;
 
@@ -132,6 +134,87 @@ impl ArticlesWithTag {
     }
 }
 
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize)]
+pub struct ArticleSummary {
+    pub id: Uuid,
+    pub title: String,
+    pub summary: String,
+    pub published: bool,
+    pub tags: Vec<Option<String>>,
+    pub create_time: NaiveDateTime,
+    pub modify_time: NaiveDateTime,
+}
+
+impl ArticleSummary {
+    /// list all articles with tags and summary in a range
+    pub fn list_articles(
+        conn: &PgConnection,
+        limit: i64,
+        offset: i64,
+        admin: bool,
+    ) -> Result<Vec<Self>, String> {
+        let res = if admin {
+            all_article_with_tag
+                .select((
+                    article_with_tag::id,
+                    article_with_tag::title,
+                    article_with_tag::raw_content,
+                    article_with_tag::published,
+                    article_with_tag::tags,
+                    article_with_tag::create_time,
+                    article_with_tag::modify_time,
+                ))
+                .order(article_with_tag::create_time.desc())
+                .limit(limit)
+                .offset(offset)
+                .load::<Self>(conn)
+        } else {
+            all_article_with_tag
+                .select((
+                    article_with_tag::id,
+                    article_with_tag::title,
+                    article_with_tag::raw_content,
+                    article_with_tag::published,
+                    article_with_tag::tags,
+                    article_with_tag::create_time,
+                    article_with_tag::modify_time,
+                ))
+                .filter(article_with_tag::published.eq(true))
+                .order(article_with_tag::create_time.desc())
+                .limit(limit)
+                .offset(offset)
+                .load::<Self>(conn)
+        };
+        match res {
+            Ok(mut data) => {
+                for d in &mut data {
+                    d.summary();
+                    d.trim_tags();
+                }
+                Ok(data)
+            }
+            Err(err) => Err(format!("{}", err)),
+        }
+    }
+
+    fn summary(&mut self) {
+        let summary: String = strip_markdown(self.summary.as_str())
+            .as_str()
+            .replace("\n", "") // remove newline
+            .to_string()
+            .chars()
+            .take(5) // limit summary length
+            .collect();
+        self.summary = [summary.as_str(), "..."].concat()
+    }
+
+    fn trim_tags(&mut self) {
+        if self.tags.len() == 1 && self.tags[0].is_none() {
+            self.tags.clear();
+        }
+    }
+}
+
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
 #[table_name = "articles"]
 pub struct ArticleList {
@@ -194,12 +277,18 @@ impl ArticleList {
         }
     }
 
-    pub fn query_article_numbers(state: &AppState) -> Result<i64, String> {
+    pub fn query_article_numbers(state: &AppState, admin: bool) -> Result<i64, String> {
         let conn = &state.db.into_inner().get().unwrap();
-        let res = all_articles
-            .select(diesel::dsl::count(articles::id))
-            .filter(articles::published.eq(true))
-            .first(conn);
+        let res = if admin {
+            all_articles
+                .select(diesel::dsl::count(articles::id))
+                .filter(articles::published.eq(true))
+                .first(conn)
+        } else {
+            all_articles
+                .select(diesel::dsl::count(articles::id))
+                .first(conn)
+        };
         match res {
             Ok(n) => Ok(n),
             Err(e) => Err(format!("{}", e)),
@@ -223,7 +312,7 @@ impl InsertArticle {
             title,
             raw_content,
             content,
-            published
+            published,
         }
     }
 
@@ -245,17 +334,43 @@ pub struct NewArticle {
 }
 
 impl NewArticle {
-    pub fn insert(self, conn: &PgConnection) -> bool {
+    pub fn insert(&self, conn: &PgConnection) -> bool {
         let article = self.convert_insert_article().insert(conn);
-        if self.new_tags.is_some() || self.exist_tags.is_some() {
-            RelationTag::new(article.id, self.new_tags, self.exist_tags).insert_all(conn)
+        let new_tags = match &self.new_tags {
+            Some(t) => Some(t.clone()),
+            None => None,
+        };
+        let exist_tags = match &self.exist_tags {
+            Some(t) => Some(t.clone()),
+            None => None,
+        };
+        if new_tags.is_some() || exist_tags.is_some() {
+            RelationTag::new(article.id, new_tags, exist_tags).insert_all(conn)
         } else {
             true
         }
     }
 
     fn convert_insert_article(&self) -> InsertArticle {
-        InsertArticle::new(self.title.to_owned(), self.raw_content.to_owned(), self.publish)
+        InsertArticle::new(
+            self.title.to_owned(),
+            self.raw_content.to_owned(),
+            self.publish,
+        )
+    }
+}
+
+impl FormDataExtractor for NewArticle {
+    type Data = ();
+
+    fn execute(&self, state: &AppState) -> Result<Self::Data, String> {
+        let conn = &state.db.connection();
+        let r = self.insert(conn);
+        if r {
+            Ok(())
+        } else {
+            Err("create article failed!".to_string())
+        }
     }
 }
 
@@ -270,27 +385,39 @@ pub struct EditArticle {
 }
 
 impl EditArticle {
-    pub fn edit_article(self, state: &AppState) -> Result<usize, String> {
+    pub fn edit_article(&self, state: &AppState) -> Result<usize, String> {
         let conn = state.db.into_inner().get().unwrap();
         let res = diesel::update(all_articles.filter(articles::id.eq(self.id)))
             .set((
-                articles::title.eq(self.title),
-                articles::content.eq(markdown_render(&self.raw_content)),
-                articles::raw_content.eq(self.raw_content),
+                articles::title.eq(self.title.clone()),
+                articles::content.eq(markdown_render(&self.raw_content.clone())),
+                articles::raw_content.eq(self.raw_content.clone()),
             ))
             .execute(&conn);
         if self.new_tags.is_some() || self.new_choice_already_exists_tags.is_some() {
-            RelationTag::new(self.id, self.new_tags, self.new_choice_already_exists_tags)
+            RelationTag::new(self.id, self.new_tags.clone(), self.new_choice_already_exists_tags.clone())
                 .insert_all(&conn);
         }
         if self.deselect_tags.is_some() {
-            for i in self.deselect_tags.unwrap() {
+            for i in self.deselect_tags.clone().unwrap() {
                 Relations::new(self.id, i).delete_relation(&conn);
             }
         }
         match res {
             Ok(data) => Ok(data),
             Err(err) => Err(format!("{}", err)),
+        }
+    }
+}
+
+impl FormDataExtractor for EditArticle {
+    type Data = ();
+
+    fn execute(&self, state: &AppState) -> Result<Self::Data, String> {
+        let res = self.edit_article(state);
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("edit_article failed: {:?}", e).to_string()),
         }
     }
 }
@@ -319,7 +446,7 @@ impl RawArticlesWithTag {
         ArticlesWithTag {
             id: self.id,
             title: self.title,
-            content: self.raw_content,
+            content: self.raw_content, // rander on client browser
             published: self.published,
             tags_id: self.tags_id,
             tags: self.tags,

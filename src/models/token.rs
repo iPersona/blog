@@ -16,6 +16,7 @@ use crate::util::env::Env;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, errors::Result, Algorithm, Header, Validation};
 
+use actix_http::httpmessage::HttpMessage;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpResponse;
 use futures::future::{ok, Either, FutureResult};
@@ -97,6 +98,10 @@ impl Token {
     // pub fn to_base64(encoded: &str) -> String {
     //     base64::encode(encoded.as_bytes())
     // }
+
+    pub fn is_admin(&self) -> bool {
+        self.is_admin
+    }
 }
 
 pub struct PermissionControl;
@@ -154,8 +159,12 @@ where
         match token {
             Some(t) => {
                 let t = Token::decode(t.to_str().unwrap());
+                let mut is_admin = false;
                 let result = match t {
-                    Ok(t) => Permission::new(path, Some(&t)).check(Some(&t)),
+                    Ok(t) => {
+                        is_admin = t.is_admin();
+                        Permission::new(path, Some(&t)).check(Some(&t))
+                    }
                     Err(e) => match e.kind() {
                         jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
                             // 重新登录
@@ -167,6 +176,10 @@ where
                 match result {
                     Ok(is_ok) => {
                         if is_ok {
+                            // Save token info
+                            req.extensions_mut()
+                                .insert(SimpleToken { is_admin: is_admin });
+
                             Either::A(self.service.call(req))
                         } else {
                             Either::B(token_check_error!(req))
@@ -187,6 +200,9 @@ where
                 match result {
                     Ok(is_ok) => {
                         if is_ok {
+                            // Save token info
+                            req.extensions_mut().insert(SimpleToken { is_admin: false });
+
                             Either::A(self.service.call(req))
                         } else {
                             Either::B(token_check_error!(req))
@@ -196,17 +212,6 @@ where
                 }
             }
         }
-        //
-        //        let ctx = get_identity_and_web_context(&mut req);
-        //        req.extensions_mut().insert(ctx);
-        //
-        //        // info!("middleware-finish");
-        //        // if let Ok(Some(result)) = req.get_session().get::<String>("token") {
-        //        //     info!("session value new: {:?}", result);
-        //        // } else {
-        //        //     info!("get session value new failed");
-        //        // }
-        //        Box::new(self.service.call(req).map(move |res| res))
     }
 }
 
@@ -228,7 +233,7 @@ impl UserUrl {
             "/user/edit" => Some(Self::Edit),
             "/user/new_comment" => Some(Self::NewComment),
             "/user/delete_comment" => Some(Self::DeleteComment),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -264,7 +269,7 @@ impl VisitorUrl {
 
 pub enum Url {
     UserUrl(UserUrl),
-    VisitorUrl(VisitorUrl)
+    VisitorUrl(VisitorUrl),
 }
 
 impl Url {
@@ -353,7 +358,6 @@ impl Permission {
         let visitor_url = VisitorUrl::from_str(&p.as_str());
         visitor_url.is_some()
 
-
         // let visitor_resources = [
         //     "/articles",
         //     "/article/view_comment",
@@ -372,4 +376,8 @@ pub enum PermissionType {
     Admin,
     Registered,
     Visitor,
+}
+
+pub struct SimpleToken {
+    pub is_admin: bool,
 }
