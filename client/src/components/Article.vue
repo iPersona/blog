@@ -20,6 +20,7 @@
         <h1 class="title">{{article.title}}</h1>
       </div>
     </section>
+    <!-- article content -->
     <section
       class="container"
       align="left"

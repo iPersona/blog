@@ -198,28 +198,35 @@ export default {
     classifyTags() {
       return {
         newTags: this.tags.filter(t => {
+          // if a tag is string typed, it must be a new tag
           return typeof (t) === 'string'
         }),
         newChoiceAlreadyExistTags: this.tags.filter(t => {
+          // exist tags is an object
           if (typeof (t) === 'string') {
             return false
           }
 
+          // oldTags is empty, every current tags(object typed) is exist tags
           if (this.oldTags.length === 0) {
             return true
           }
 
-          return this.oldTags.some(ot => {
-            return ot.id !== t.id
+          // oldTags NOT contains any current tags
+          return !this.oldTags.some(ot => {
+            return ot.id === t.id
           })
         }).map(t => {
+          // convert uuid array
           return t.id
         }),
         deselectedTags: this.deselectedTags.map(t => {
+          // convert uuid array
           return t.id
         }),
       }
     },
+    // generate tag object from tags and tags_id arrays
     genTagObjectArray(tags, tagsId) {
       var tagObjects = []
       if (tags.length !== tagsId.length) {
@@ -240,17 +247,25 @@ export default {
     },
     deselectTag(value) {
       if (typeof (value) === 'string') {
+        // if the tag is string typed, it must be a new tag
         return
       }
-      this.deselectedTags.push(value)
+      // avoid adding exist tag object to deselect tag array
+      if (this.deselectedTags.filter(t => {
+        return t.id === value.id
+      }).length <= 0) {
+        this.deselectedTags.push(value)
+      }
     },
     addNewTag(value) {
+      let isStringVal = (typeof (value) === 'string')
+      let lowerCaseVal = isStringVal ? value.toLowerCase() : value.tag.toLowerCase()
       if (this.availableTags.some(t => {
-        return t.tag.toLowerCase() === value.toLowerCase()
+        return t.tag.toLowerCase() === lowerCaseVal
       })) {
         this.tags = this.tags.filter(t => {
-          if (typeof (t) === 'string') {
-            return t.toLowerCase() !== value.toLowerCase()
+          if (isStringVal) {
+            return t.toLowerCase() !== lowerCaseVal
           }
           return true
         })

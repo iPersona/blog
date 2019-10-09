@@ -47,14 +47,14 @@ export default class Api {
         // request拦截器
         this.axios.interceptors.request.use(req => {
             // Do something before request is sent
-            console.log(`store: ${store}`)
-            console.log(`STORE_KEY: ${STORE_KEY}`)
+            // console.log(`store: ${store}`)
+            // console.log(`STORE_KEY: ${STORE_KEY}`)
             if (localStorage[STORE_KEY] !== undefined) {
                 // req.headers['X-Token'] =
                 //     localStorage // 让每个请求携带token--['X-Token']为自定义key
                 // 请根据实际情况自行修改
                 req.headers['Authorization'] = store.getters[TOKEN];
-                console.log(`token: ${store.getters[TOKEN]}`)
+                // console.log(`token: ${store.getters[TOKEN]}`)
             }
             return req
         }, error => {
@@ -75,7 +75,6 @@ export default class Api {
         if (deletedTags !== undefined) {
             args.deleted_tags = deletedTags
         }
-        console.log(`updateTags: ${JSON.stringify(args)}`)
         return this.post(this.url.updateTags, args)
     }
 

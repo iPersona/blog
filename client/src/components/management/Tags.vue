@@ -16,6 +16,7 @@
             icon="search"
             @input="serchTag"
           />
+
           <b-button
             type="is-primary"
             outlined
@@ -51,6 +52,10 @@
               {{tag.tag}}
             </b-tag>
           </b-taglist>
+          <span
+            align="right"
+            class="tags-number"
+          >{{filteredTags.length}}</span>
 
           <!-- tag edit panel -->
           <b-modal
@@ -63,6 +68,18 @@
               v-on:updateTag="updateTag"
             />
           </b-modal>
+        </b-field>
+        <b-field align="left">
+          <span class="tips-head">TIPS:</span>
+        </b-field>
+        <b-field>
+          <ul
+            align="left"
+            class="tips-item"
+          >
+            <li>double click to edit tags</li>
+            <li>click delete button to delete tag</li>
+          </ul>
         </b-field>
         <br />
 
@@ -86,6 +103,10 @@
               {{tag.tag}}
             </b-tag>
           </b-taglist>
+          <span
+            align="right"
+            class="tags-number"
+          >{{modified_tags.length}}</span>
         </b-field>
 
         <!-- added tags -->
@@ -108,6 +129,10 @@
               {{tag.tag}}
             </b-tag>
           </b-taglist>
+          <span
+            align="right"
+            class="tags-number"
+          >{{added_tags.length}}</span>
         </b-field>
 
         <!-- deleted tags -->
@@ -130,6 +155,10 @@
               {{tag.tag}}
             </b-tag>
           </b-taglist>
+          <span
+            align="right"
+            class="tags-number"
+          >{{deleted_tags.length}}</span>
         </b-field>
 
         <b-field grouped>
@@ -193,10 +222,16 @@ export default {
     }
   },
   async mounted() {
-    this.tags = await this.getTags()
-    this.filteredTags = this.tags
+    await this.reloadTags()
   },
   methods: {
+    async reloadTags() {
+      this.tags = await this.getTags()
+      this.filteredTags = this.tags
+      this.deleted_tags = []
+      this.added_tags = []
+      this.modified_tags = []
+    },
     async getTags() {
       let api = new Api()
       let rsp = await api.getTags();
@@ -330,6 +365,14 @@ export default {
       let api = new Api()
       let rsp = await api.updateTags(modified_tags, added_tags, deleted_tags)
       console.log(`data: ${JSON.stringify(rsp)}`)
+      if (Api.isSuccessResponse(rsp)) {
+        this.ui.toastSuccess('tags are successfully updated!')
+      } else {
+        this.ui.toastFail(`update tags failed(${rsp.code}): ${rsp.detail}`)
+      }
+
+      // reload tags
+      this.reloadTags()
     }
   },
 }
@@ -344,7 +387,26 @@ h1.label {
 
 .taglist {
   border-radius: 6px;
-  border: 1px solid gray;
+  border: 1px solid gainsboro;
   padding: 15px;
+  position: relative;
+}
+
+.tags-number {
+  position: absolute;
+  bottom: 5px;
+  right: 10px;
+  font-size: smaller;
+  color: lightgray;
+}
+
+.tips-head {
+  font-size: small;
+  color: silver;
+}
+
+.tips-item {
+  font-size: smaller;
+  color: silver;
 }
 </style>
