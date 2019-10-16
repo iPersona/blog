@@ -3,20 +3,24 @@
     id="app"
     class="container"
   >
-    <nav-header></nav-header>
-    <hr />
-    <router-view />
-    <hr />
-    <nav-footer></nav-footer>
+    <NavHeader />
+    <hr>
+    <RouterView />
+    <hr>
+    <NavFooter />
   </div>
 </template>
 
 <script>
+import { mapMutations } from 'vuex'
+import { LOAD_USER, LOAD_TAG } from '@/store/modules/mutation-types'
+import { USER, TAG } from '@/store/modules/module-names'
+
 import NavHeader from "@/components/Header";
 import NavFooter from "@/components/Footer";
 
 export default {
-  name: "app",
+  name: "App",
   components: {
     NavHeader,
     NavFooter
@@ -27,6 +31,20 @@ export default {
     };
   },
   mounted() {
+    console.log(`App mounted`)
+    this.loadAppData()
+  },
+  methods: {
+    ...mapMutations(USER, {
+      loadUser: LOAD_USER
+    }),
+    ...mapMutations(TAG, {
+      loadTag: LOAD_TAG
+    }),
+    loadAppData() {
+      this.loadUser()
+      this.loadTag()
+    }
   },
 };
 </script>

@@ -1,6 +1,6 @@
 use crate::api::InnerContext;
 use crate::models::articles::{
-    ArticleSummary, CommentsResponse, /*ListAllArticleFilterByTag,*/ QuerySlice,
+    ArticleNumWithTag, ArticleSummary, CommentsResponse, ListAllArticleFilterByTag, QuerySlice,
 };
 use crate::models::token::{SimpleToken, Token};
 use crate::models::user::CheckUser;
@@ -35,19 +35,41 @@ impl Visitor {
         }
     }
 
-    // TODO: 未使用的方法
-    // fn list_all_article_filter_by_tag(
-    //     state: Data<AppState>,
-    //     _req: HttpRequest,
-    //     params: Query<ListAllArticleFilterByTag>,
-    // ) -> impl Future<Item = HttpResponse, Error = Error> {
-    //     info!("list_all_article_filter_by_tag");
-    //     let conn = &state.get_ref().db.into_inner().get().unwrap();
-    //     match ArticleList::query_with_tag(conn, params.tag_id) {
-    //         Ok(data) => api_resp_data!(data),
-    //         Err(err) => api_resp_err!(&*err),
-    //     }
-    // }
+    fn list_all_article_filter_by_tag(
+        state: Data<AppState>,
+        req: HttpRequest,
+        params: Query<ListAllArticleFilterByTag>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        info!("list_all_article_filter_by_tag");
+        let is_admin = req.extensions().get::<SimpleToken>().unwrap().is_admin;
+        let conn = &state.get_ref().db.connection();
+        match ArticleSummary::list_articles_with_tag(
+            conn,
+            params.tag_id,
+            params.limit,
+            params.offset,
+            is_admin,
+        ) {
+            Ok(data) => api_resp_data!(data),
+            Err(err) => api_resp_err!(&*err),
+        }
+    }
+
+    fn get_article_number_filter_by_tag(
+        state: Data<AppState>,
+        req: HttpRequest,
+        params: Query<ArticleNumWithTag>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let is_admin = req.extensions().get::<SimpleToken>().unwrap().is_admin;
+        let count = ArticleSummary::query_article_numbers_with_tag(&state, params.tag_id, is_admin);
+        match count {
+            Ok(n) => {
+                debug!("article count: {:?}", n);
+                api_resp_data!(n)
+            }
+            Err(e) => api_resp_err!(format!("{:?}", e)),
+        }
+    }
 
     fn list_comments(
         state: Data<AppState>,
@@ -242,6 +264,14 @@ impl Visitor {
         .service(web::resource("user/exist").route(web::post().to_async(Visitor::is_user_exist)))
         .service(
             web::resource("article/count").route(web::get().to_async(Visitor::get_article_number)),
+        )
+        .service(
+            web::resource("article/tag")
+                .route(web::get().to_async(Visitor::list_all_article_filter_by_tag)),
+        )
+        .service(
+            web::resource("article/tag/count")
+                .route(web::get().to_async(Visitor::get_article_number_filter_by_tag)),
         );
         //            .service(web::resource("/login_with_github").route(web::get().to_async(Visitor::login_with_github)));
     }

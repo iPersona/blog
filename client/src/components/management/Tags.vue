@@ -14,7 +14,7 @@
             expanded
             icon-pack="fas"
             icon="search"
-            @input="serchTag"
+            @input="searchTag"
           />
 
           <b-button
@@ -177,13 +177,14 @@
 
 <script>
 import { mapGetters } from 'vuex'
-import { IS_LOGIN, IS_ADMIN } from '@/store-types.js'
+import { IS_LOGIN, IS_ADMIN } from '@/store/modules/store-types.js'
 import Api from '@/api'
 import Ui from '@/components/utils/ui'
 import Log from '@/components/utils/log'
 import TagEditor from './TagEditor'
 import AddTagPanel from './AddTagPanel'
 import { NOT_CHANGED, MODIFIED, ADDED } from './tag-status'
+import { USER } from '@/store/modules/module-names'
 
 export default {
   name: 'Tags',
@@ -208,14 +209,14 @@ export default {
     AddTagPanel
   },
   computed: {
-    ...mapGetters({
+    ...mapGetters(USER, {
       isLogin: IS_LOGIN,
       isAdmin: IS_ADMIN,
     }),
 
   },
   watch: {
-    searchKey(oldVal, newVal) {
+    searchKey(newVal, oldVal) {
       if (newVal === '') {
         this.filteredTags = this.tags;
       }
@@ -302,7 +303,7 @@ export default {
       this.added_tags = this.added_tags.concat(tags)
       console.log(`added_tags: ${JSON.stringify(this.added_tags)}`)
     },
-    serchTag() {
+    searchTag() {
       if (this.searchKey === '') {
         this.filteredTags = this.tags.filter(item => {
           return this.modified_tags.filter(t => {

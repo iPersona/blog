@@ -1,5 +1,14 @@
 import Vue from 'vue'
 import Router from 'vue-router'
+import store from '@/store/index'
+import {
+    TAG_ID,
+    TAG_NAME
+} from '@/store/modules/store-types'
+import {
+    TAG
+} from '@/store/modules/module-names'
+
 // import ResultDiff from '@/components/ResultDiff'
 import NotFound from '@/components/NotFound'
 import Home from '@/components/Home'
@@ -14,6 +23,7 @@ import Management from '@/components/management/Management'
 import Statistic from '@/components/management/Statistic'
 import ArticlesManagement from '@/components/management/Articles'
 import TagsManagement from '@/components/management/Tags'
+import ArticleListByTag from '@/components/ArticleListByTag'
 
 Vue.use(Router)
 
@@ -27,6 +37,12 @@ export default new Router({
             path: '/articles',
             name: 'articles',
             component: Articles,
+        },
+        {
+            path: '/articles/tag',
+            name: 'articles_with_tag',
+            component: ArticleListByTag,
+            props: true,
         },
         {
             path: '/tags',

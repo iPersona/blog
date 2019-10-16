@@ -9,6 +9,7 @@ export const STORE_KEY = 'coimioc-state'
 import {
   LOGOUT,
   LOGIN,
+  LOAD_USER
 } from './mutation-types'
 
 import {
@@ -19,6 +20,7 @@ import {
 } from './store-types'
 
 function saveState(s) {
+  console.log(`saveState...`)
   let data = btoa(JSON.stringify(s))
   localStorage.setItem(STORE_KEY, data)
 }
@@ -82,35 +84,39 @@ const mutations = {
     state[USER_NAME] = decoded.payload.user_name
     state[IS_ADMIN] = decoded.payload.is_admin
     saveState(state)
+  },
+  [LOAD_USER](state) {
+    loadState(state)
   }
 }
 
 const getters = {
   [USER_NAME]: (state) => {
-    loadState(state)
+    // loadState(state)
     return state[USER_NAME]
   },
   [IS_LOGIN]: (state) => {
-    loadState(state)
+    // loadState(state)
     return state[IS_LOGIN]
   },
   [IS_ADMIN]: (state) => {
-    loadState(state)
+    // loadState(state)
     return state[IS_ADMIN]
   },
   [TOKEN]: (state) => {
-    loadState(state)
+    // loadState(state)
     return state[TOKEN]
   }
 }
 
 const actions = {}
 
-const store = new Vuex.Store({
+const store = {
+  namespaced: true,
   state,
   mutations,
   getters,
   actions,
-})
+}
 
 export default store

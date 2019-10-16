@@ -1,34 +1,31 @@
 <template>
   <!-- Visitor -->
   <div v-if="!isLogin">
-    <visitor-header />
+    <VisitorHeader />
   </div>
 
   <!-- Admin -->
   <div v-else-if="isAdmin">
-    <admin-header />
+    <AdminHeader />
   </div>
 
   <!-- Register -->
   <div v-else>
-    <login-header />
+    <LoginHeader />
   </div>
 </template>
 
 <script>
 import { mapGetters } from 'vuex'
-import LoginForm from './Login'
-import SignupForm from './Signup'
 import LoginHeader from './LoginHeader'
 import VisitorHeader from './VisitorHeader'
 import AdminHeader from './AdminHeader'
-import { USER_NAME, TOKEN, IS_LOGIN, IS_ADMIN } from '@/store-types.js'
+import { USER_NAME, TOKEN, IS_LOGIN, IS_ADMIN } from '@/store/modules/store-types.js'
+import { USER } from '@/store/modules/module-names'
 
 export default {
   name: "Header",
   components: {
-    LoginForm,
-    SignupForm,
     LoginHeader,
     VisitorHeader,
     AdminHeader,
@@ -39,7 +36,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters({
+    ...mapGetters(USER, {
       userName: USER_NAME,
       isLogin: IS_LOGIN,
       isAdmin: IS_ADMIN,

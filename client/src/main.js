@@ -42,7 +42,7 @@ Vue.use(VueLogger, options);
 Vue.config.productionTip = false
 
 // vuex
-import store from './store'
+import store from '@/store/index.js'
 
 new Vue({
   router,

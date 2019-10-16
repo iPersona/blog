@@ -1,25 +1,27 @@
 <template>
   <div>
     <div
-      class="article-list"
       v-for="article in articles"
-      v-bind:key="article.id"
+      :key="article.id"
+      class="article-list"
     >
-      <router-link :to="`/article/${article.id}`">
+      <RouterLink :to="`/article/${article.id}`">
         <!-- title -->
         <div
           align="left"
           class="article-title"
-        >{{article.title}}</div>
+        >
+          {{ article.title }}
+        </div>
 
         <!-- summary -->
         <div
           align="left"
           class="article-summary"
         >
-          {{article.summary}}
+          {{ article.raw_content }}
         </div>
-      </router-link>
+      </RouterLink>
 
       <!-- bottom -->
       <section class="article-bottom columns">
@@ -28,70 +30,140 @@
           class="column is-1"
         >
           <span class="article-time ">
-            {{formatDate(article.modify_time)}}
+            {{ formatDate(article.modify_time) }}
           </span>
         </div>
         <div
+          v-if="article.tags.length > 0"
           align="left"
           class="column is-4"
-          v-if="article.tags.length > 0"
         >
-          <b-taglist
-            class="article-tags"
+          <BTaglist
             v-for="t in article.tags"
-            v-bind:key="t"
+            :key="t"
+            class="article-tags"
           >
-            <b-tag
-              class="article-tag"
+            <BTag
               v-if="article.tags.length > 0"
-            >{{t}}</b-tag>
-          </b-taglist>
+              class="article-tag"
+            >
+              {{ t }}
+            </BTag>
+          </BTaglist>
         </div>
       </section>
-      <hr class="short" />
+      <hr class="short">
 
-      <br /><br />
-
+      <br><br>
     </div>
     <!-- pagination -->
-    <b-pagination
+    <BPagination
       :total="articleCount"
       :current.sync="currentPage"
-      range-before=3
-      range-after=1
+      range-before="3"
+      range-after="1"
       order="is-centered"
-      :rounded=true
+      :rounded="true"
       :per-page="pageSize"
       aria-next-label="Next page"
       aria-previous-label="Previous page"
       aria-page-label="Page"
       aria-current-label="Current page"
-    >
-    </b-pagination>
-    <br />
+    />
+    <br>
   </div>
 </template>
 <script>
 import Api from "@/api.js"
+import Ui from "./utils/ui"
+
+import { EventBus, EVENT_RELOAD_ARTICLE_LIST } from '@/event-bus'
+
+import { mapGetters } from 'vuex'
+import { TAG } from '@/store/modules/module-names'
+import { TAG_ID, TAG_NAME } from '@/store/modules/store-types'
+
 let dateFormat = require('dateformat')
 
 export default {
   name: "ArticleList",
   components: {},
-  props: {},
+  props: {
+    // tagId: {
+    //   type: String,
+    //   default: ''
+    // },
+    isFilteredByTag: {
+      type: Boolean,
+      default: false
+    },
+  },
   data() {
     return {
       articleCount: 0,
       articles: [],
       currentPage: 1,
       pageSize: 10,
+      ui: new Ui(this),
     };
   },
+  computed: {
+    ...mapGetters(TAG, {
+      tagId: TAG_ID,
+      tagName: TAG_NAME,
+    })
+  },
   async mounted() {
-    await this.getArticleNumber();
-    await this.getArticles();
+    console.debug(`ArticleList mounted!`)
+    await this.listenEventBus()
+    await this.reloadArticle()
   },
   methods: {
+    listenEventBus() {
+      const self = this;
+      EventBus.$on(EVENT_RELOAD_ARTICLE_LIST, async function () {
+        console.log(`event-bus: ${EVENT_RELOAD_ARTICLE_LIST}`)
+        await self.reloadArticle()
+      })
+    },
+    async reloadArticle() {
+      this.$log.debug(`reloadArticle...`)
+      this.$log.debug(`isFilteredByTag: ${this.isFilteredByTag}, tagId: ${this.tagId}`)
+      if (this.isFilteredByTag) {
+        if (this.tagId !== undefined) {
+          await this.getArticleNumberByTag()
+          await this.getArticlesByTag()
+        }
+      } else {
+        await this.getArticleNumber()
+        await this.getArticles()
+      }
+    },
+    async getArticlesByTag() {
+      let api = new Api();
+      let rsp = await api.getArticlesByTag(this.tagId, this.pageSize, (this.currentPage - 1) * this.pageSize);
+      if (!Api.isSuccessResponse(rsp)) {
+        this.$log.error(`failed to get articles by tag-${this.tagId}: ${rsp.detail}`);
+        return;
+      }
+      this.articles = rsp.data;
+      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`);
+    },
+    async getArticleNumberByTag() {
+      let api = new Api();
+      let rsp = await api.getArticleNumberByTag(this.tagId);
+      if (!Api.isSuccessResponse(rsp)) {
+        this.$log.error(`failed to get article number by tag-${this.tagId}: ${rsp.detail}`);
+        return;
+      }
+      if (!Api.isSuccessResponse(rsp)) {
+        this.ui.toastFail(`failed to load article list: ${rsp.detail}`)
+        return
+      }
+      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`)
+      this.articleCount = rsp.data;
+      this.$log.debug(`article count: ${this.articleCount}`);
+    },
     async getArticles() {
       let api = new Api();
       let rsp = await api.visitorViewAll(this.pageSize, (this.currentPage - 1) * this.pageSize);
@@ -175,61 +247,4 @@ hr.short {
   font-size: small;
   height: 15px;
 }
-
-/* .tags {
-  list-style: none;
-  margin: 0;
-  overflow: hidden;
-  padding: 0;
-}
-
-.tags li {
-  float: left;
-}
-
-.tag {
-  background: #eee;
-  border-radius: 3px 0 0 3px;
-  color: #999;
-  display: inline-block;
-  height: 26px;
-  line-height: 26px;
-  padding: 0 20px 0 23px;
-  position: relative;
-  margin: 0 10px 10px 0;
-  text-decoration: none;
-  -webkit-transition: color 0.2s;
-}
-
-.tag::before {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: inset 0 1px rgba(0, 0, 0, 0.25);
-  content: "";
-  height: 6px;
-  left: 10px;
-  position: absolute;
-  width: 6px;
-  top: 10px;
-}
-
-.tag::after {
-  background: #fff;
-  border-bottom: 13px solid transparent;
-  border-left: 10px solid #eee;
-  border-top: 13px solid transparent;
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 0;
-}
-
-.tag:hover {
-  background-color: crimson;
-  color: white;
-}
-
-.tag:hover::after {
-  border-left-color: crimson;
-} */
 </style>

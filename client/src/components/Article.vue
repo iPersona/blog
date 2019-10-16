@@ -6,18 +6,20 @@
       class="container"
     >
       <div>
-        <b-button
+        <BButton
           icon-pack="fas"
           icon-left="edit"
           @click="editArticle"
         >
           Edit
-        </b-button>
+        </BButton>
       </div>
     </section>
     <section class="container">
       <div class="container">
-        <h1 class="title">{{article.title}}</h1>
+        <h1 class="title">
+          {{ article.title }}
+        </h1>
       </div>
     </section>
     <!-- article content -->
@@ -25,40 +27,42 @@
       class="container"
       align="left"
     >
-      <div
-        v-highlight
-        v-html="compiledMarkdown"
-      ></div>
+      <div v-highlight>
+        <!-- v-html="compiledMarkdown" -->
+        {{ compiledMarkdown }}
+      </div>
     </section>
-    <br /><br />
+    <br><br>
     <section
       class="container"
       align="left"
     >
       <b>Tags: </b>
-      <b-taglist
-        class="article-tags"
+      <BTaglist
         v-for="t in article.tags"
-        v-bind:key="t"
+        :key="t"
+        class="article-tags"
       >
-        <b-tag
-          class="article-tag"
+        <BTag
           v-if="hasTags()"
-        >{{t}}</b-tag>
-      </b-taglist>
+          class="article-tag"
+        >
+          {{ t }}
+        </BTag>
+      </BTaglist>
     </section>
 
-    <b-modal
+    <BModal
       :active.sync="isEditArticle"
       has-modal-card
       full-screen
       :can-cancel="false"
     >
-      <article-editor
-        :articleId="this.$route.params.id"
-        :isCreateNew="false"
+      <ArticleEditor
+        :article-id="this.$route.params.id"
+        :is-create-new="false"
       />
-    </b-modal>
+    </BModal>
   </div>
 </template>
 
@@ -70,9 +74,10 @@ import marked from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/monokai-sublime.css'
 import { mapGetters } from 'vuex'
-import { IS_ADMIN } from '@/store-types.js'
+import { IS_ADMIN } from '@/store/modules/store-types.js'
+import { USER } from '@/store/modules/module-names'
 import ArticleEditor from './ArticleEditor'
-import { EventBus } from '@/event-bus.js'
+import { EventBus, EVENT_RELOAD_ARTICLE } from '@/event-bus.js'
 
 export default {
   name: "Article",
@@ -80,18 +85,6 @@ export default {
     ArticleEditor,
   },
   props: {},
-  computed: {
-    compiledMarkdown: function () {
-      this.log.debug(`compiledMarkdown: ${this.article.content}`);
-      if (this.article.content === undefined) {
-        return marked('')
-      }
-      return marked(this.article.content);
-    },
-    ...mapGetters({
-      isAdmin: IS_ADMIN,
-    }),
-  },
   data() {
     return {
       ui: new Ui(this),
@@ -100,6 +93,18 @@ export default {
       isEditArticle: false,
     };
   },
+  computed: {
+    compiledMarkdown: function () {
+      this.log.debug(`compiledMarkdown: ${this.article.content}`);
+      if (this.article.content === undefined) {
+        return marked('')
+      }
+      return marked(this.article.content);
+    },
+    ...mapGetters(USER, {
+      isAdmin: IS_ADMIN,
+    }),
+  },
   async mounted() {
     await this.getArticle()
     await this.listenEventBus()
@@ -107,7 +112,7 @@ export default {
   methods: {
     listenEventBus() {
       const self = this;
-      EventBus.$on('reload-data', async function () {
+      EventBus.$on(EVENT_RELOAD_ARTICLE, async function () {
         console.log(`event-bus: reload-data`)
         await self.getArticle()
       })

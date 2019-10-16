@@ -134,11 +134,12 @@ impl ArticlesWithTag {
     }
 }
 
-#[derive(Queryable, Debug, Clone, Deserialize, Serialize)]
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
+#[table_name = "article_with_tag"]
 pub struct ArticleSummary {
     pub id: Uuid,
     pub title: String,
-    pub summary: String,
+    pub raw_content: String,
     pub published: bool,
     pub tags: Vec<Option<String>>,
     pub create_time: NaiveDateTime,
@@ -198,19 +199,64 @@ impl ArticleSummary {
     }
 
     fn summary(&mut self) {
-        let summary: String = strip_markdown(self.summary.as_str())
+        let summary: String = strip_markdown(self.raw_content.as_str())
             .as_str()
             .replace("\n", "") // remove newline
             .to_string()
             .chars()
-            .take(5) // limit summary length
+            .take(50) // TODO: limit summary length
             .collect();
-        self.summary = [summary.as_str(), "..."].concat()
+        self.raw_content = [summary.as_str(), "..."].concat()
     }
 
     fn trim_tags(&mut self) {
         if self.tags.len() == 1 && self.tags[0].is_none() {
             self.tags.clear();
+        }
+    }
+
+    pub fn list_articles_with_tag(
+        conn: &PgConnection,
+        tag_id: Uuid,
+        limit: i64,
+        offset: i64,
+        admin: bool,
+    ) -> Result<Vec<Self>, String> {
+        let raw_sql = format!("select id, title, raw_content, published, tags, create_time, modify_time from article_with_tag where ('{}' = any(tags_id)) {} order by create_time desc limit {} offset {}", tag_id, if admin {""} else {"and published = true"}, limit, offset);
+        let res = diesel::sql_query(raw_sql).load::<Self>(conn);
+        match res {
+            Ok(mut data) => {
+                for d in &mut data {
+                    d.summary(); // brief content to summary
+                    d.trim_tags(); // remove null item
+                }
+                Ok(data)
+            }
+            Err(err) => Err(format!("{}", err)),
+        }
+    }
+
+    pub fn query_article_numbers_with_tag(
+        state: &AppState,
+        tag_id: Uuid,
+        admin: bool,
+    ) -> Result<i64, String> {
+        #[derive(QueryableByName)]
+        struct Count {
+            #[sql_type = "BigInt"]
+            count: i64,
+        }
+
+        let raw_sql = format!(
+            "select count(*) from article_with_tag where ('{}' = any(tags_id)) {}",
+            tag_id,
+            if admin { "" } else { "and published = true" }
+        );
+        let conn = &state.db.into_inner().get().unwrap();
+        let res = diesel::sql_query(raw_sql).load::<Count>(conn);
+        match res {
+            Ok(n) => Ok(n[0].count),
+            Err(err) => Err(format!("{}", err)),
         }
     }
 }
@@ -265,15 +311,6 @@ impl ArticleList {
         match res {
             Ok(data) => Ok(data),
             Err(err) => Err(format!("{:?}", err)),
-        }
-    }
-
-    pub fn query_with_tag(conn: &PgConnection, tag_id: Uuid) -> Result<Vec<ArticleList>, String> {
-        let raw_sql = format!("select id, title, published, create_time, modify_time from article_with_tag where ('{}' = any(tags_id)) and published = true order by create_time desc", tag_id);
-        let res = diesel::sql_query(raw_sql).load::<Self>(conn);
-        match res {
-            Ok(data) => Ok(data),
-            Err(err) => Err(format!("{}", err)),
         }
     }
 
@@ -395,8 +432,12 @@ impl EditArticle {
             ))
             .execute(&conn);
         if self.new_tags.is_some() || self.new_choice_already_exists_tags.is_some() {
-            RelationTag::new(self.id, self.new_tags.clone(), self.new_choice_already_exists_tags.clone())
-                .insert_all(&conn);
+            RelationTag::new(
+                self.id,
+                self.new_tags.clone(),
+                self.new_choice_already_exists_tags.clone(),
+            )
+            .insert_all(&conn);
         }
         if self.deselect_tags.is_some() {
             for i in self.deselect_tags.clone().unwrap() {
@@ -596,6 +637,13 @@ impl ViewArticle {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ListAllArticleFilterByTag {
+    pub tag_id: Uuid,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ArticleNumWithTag {
     pub tag_id: Uuid,
 }
 

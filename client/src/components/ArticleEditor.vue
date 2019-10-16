@@ -4,28 +4,30 @@
     style="width: auto"
   >
     <header class="modal-card-head">
-      <p class="modal-card-title">Article Editor</p>
+      <p class="modal-card-title">
+        Article Editor
+      </p>
     </header>
     <section class="modal-card-body">
-      <b-field
+      <BField
         horizontal
         label="Title"
       >
-        <b-input
+        <BInput
+          v-model="title"
           name="title"
           expanded
-          v-model="title"
           required
           validation-message="Title can not be empty"
           pattern="[^\s]*"
-        ></b-input>
-      </b-field>
+        />
+      </BField>
 
-      <b-field
+      <BField
         horizontal
         label="Tags"
       >
-        <b-taginput
+        <BTaginput
           v-model="tags"
           :data="filteredTags"
           autocomplete
@@ -36,40 +38,43 @@
           @typing="getFilteredTags"
           @remove="deselectTag"
           @add="addNewTag"
-        >
-        </b-taginput>
-      </b-field>
+        />
+      </BField>
 
-      <b-field
+      <BField
         horizontal
         label="Content"
       >
-        <editor
-          align="left"
+        <Editor
           v-model="content"
-          :previewStyle="previewStyle"
+          align="left"
+          :preview-style="previewStyle"
         />
-      </b-field>
-      <b-field
+      </BField>
+      <BField
         horizontal
         label="Publish"
       >
         <p class="control">
-          <b-switch :value="publish" />
+          <BSwitch :value="publish" />
         </p>
-      </b-field>
+      </BField>
     </section>
     <footer class="modal-card-foot">
       <!-- <b-field horizontal> -->
       <p class="buttons">
-        <b-button
+        <BButton
           type="is-danger"
           @click="cancel"
-        >Cancel</b-button>
-        <b-button
+        >
+          Cancel
+        </BButton>
+        <BButton
           type="is-primary"
           @click="publishArticle"
-        >Publish</b-button>
+        >
+          Publish
+        </BButton>
       </p>
       <!-- </b-field> -->
     </footer>
@@ -86,12 +91,22 @@ import Api from '@/api.js'
 import Log from './utils/log.js'
 import Ui from './utils/ui.js'
 
-import { EventBus } from '@/event-bus.js';
+import { EventBus, EVENT_RELOAD_ARTICLE } from '@/event-bus.js';
 
 // import Editor from '@toast-ui/vue-editor'
 
 export default {
   name: 'ArticleEditor',
+  components: {
+    'editor': Editor
+  },
+  props: {
+    articleId: {
+      type: String,
+      default: ''
+    },
+    isCreateNew: Boolean,
+  },
   data() {
     return {
       title: '',
@@ -106,13 +121,6 @@ export default {
       log: new Log(this),
       ui: new Ui(this),
     };
-  },
-  props: {
-    articleId: String,
-    isCreateNew: Boolean,
-  },
-  components: {
-    'editor': Editor
   },
   async mounted() {
     await this.getArticle()
@@ -186,7 +194,7 @@ export default {
       this.ui.toastSuccess('Article is successfully published!')
 
       // reload article to update
-      EventBus.$emit('reload-data')
+      EventBus.$emit(EVENT_RELOAD_ARTICLE)
 
       // // go back to previous view
       // this.$router.go(-1)

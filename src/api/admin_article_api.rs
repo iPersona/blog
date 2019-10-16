@@ -94,10 +94,10 @@ impl AdminArticle {
         state: Data<AppState>,
         _req: HttpRequest,
         // params: Form<EditArticle>,
-        body: web::Payload
+        body: web::Payload,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("edit_article");
-        extract_form_data!(EditArticle, body, &state) 
+        extract_form_data!(EditArticle, body, &state)
     }
 
     pub fn update_publish(

@@ -108,8 +108,9 @@
 <script>
 import { mapGetters } from 'vuex'
 import { mapMutations } from 'vuex'
-import { USER_NAME, TOKEN } from '@/store-types.js'
-import { LOGOUT } from '@/mutation-types.js'
+import { USER_NAME, TOKEN } from '@/store/modules/store-types.js'
+import { LOGOUT } from '@/store/modules/mutation-types.js'
+import { USER } from '@/store/modules/module-names'
 import Api from '@/api.js'
 import ArticleEditor from './ArticleEditor'
 
@@ -125,12 +126,12 @@ export default {
     }
   },
   computed: {
-    ...mapGetters({
+    ...mapGetters(USER, {
       userName: [USER_NAME]
     }),
   },
   methods: {
-    ...mapMutations({
+    ...mapMutations(USER, {
       logout: LOGOUT,
     }),
     newPost() {

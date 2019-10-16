@@ -51,7 +51,8 @@ import Api from "@/api.js"
 import Log from "./utils/log"
 import Ui from './utils/ui'
 import Util from '@/utils.js'
-import { LOGIN } from "@/mutation-types.js"
+import { LOGIN } from "@/store/modules/mutation-types.js"
+import { USER } from '@/store/modules/module-names'
 
 export default {
   name: "Login",
@@ -75,7 +76,7 @@ export default {
     // this.login(token);
   },
   methods: {
-    ...mapMutations({
+    ...mapMutations(USER, {
       updateToken: LOGIN
     }),
     async login() {

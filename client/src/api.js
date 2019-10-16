@@ -1,15 +1,18 @@
 import qs from 'qs';
 import Vue from 'vue';
-import store from './store'
+import store from '@/store/index'
 import {
     STORE_KEY
-} from './store'
+} from '@/store/modules/user'
 import {
     TOKEN
-} from './store-types'
+} from '@/store/modules/store-types'
 import {
     LOGOUT
-} from './mutation-types'
+} from '@/store/modules/mutation-types'
+import {
+    USER
+} from '@/store/modules/module-names'
 
 export default class Api {
     constructor(vue) {
@@ -35,10 +38,13 @@ export default class Api {
             publishArticle: `${this.host}/article/publish`, // 发布文章
             visitorViewAll: `${this.host}/articles`, // 游客：访问文章列表
             visitorViewArticle: `${this.host}/article/view`, // 游客：访问文章列表
-            araticleNumber: `${this.host}/article/count`, // 访客：文章数量
+            articleNumber: `${this.host}/article/count`, // 访客：文章数量
+            articleNumberByTag: `${this.host}/article/tag/count`,
+            articleByTag: `${this.host}/article/tag`,
             signup: `${this.host}/user/new`, // 游客：用户注册
             userExist: `${this.host}/user/exist`, // 游客：检查用户是否存在
             getTags: `${this.host}/tag/view`,
+            getTagsWithCount: `${this.host}/tag/view/count`,
             addTags: `${this.host}/tag/new`,
             delTag: `${this.host}/tag/delete`,
             editTag: `${this.host}/tag/edit`,
@@ -53,7 +59,7 @@ export default class Api {
                 // req.headers['X-Token'] =
                 //     localStorage // 让每个请求携带token--['X-Token']为自定义key
                 // 请根据实际情况自行修改
-                req.headers['Authorization'] = store.getters[TOKEN];
+                req.headers['Authorization'] = store.getters[`user/${TOKEN}`];
                 // console.log(`token: ${store.getters[TOKEN]}`)
             }
             return req
@@ -62,6 +68,24 @@ export default class Api {
             console.log(error) // for debug
             Promise.reject(error)
         });
+    }
+
+    async getArticleNumberByTag(tagId) {
+        return this.get(this.url.articleNumberByTag, {
+            tag_id: tagId
+        })
+    }
+
+    async getArticlesByTag(tagId, limit, offset) {
+        return this.get(this.url.articleByTag, {
+            tag_id: tagId,
+            limit: limit,
+            offset: offset,
+        })
+    }
+
+    async getTagsWithCount() {
+        return this.get(this.url.getTagsWithCount)
     }
 
     async updateTags(modifiedTags, addedTags, deletedTags) {
@@ -204,7 +228,7 @@ export default class Api {
     }
 
     async getArticleNumber() {
-        return this.get(this.url.araticleNumber);
+        return this.get(this.url.articleNumber);
     }
 
     async getResults() {
@@ -319,7 +343,7 @@ export default class Api {
             console.error(`server error: ${error}`);
             if (error.response.status === 410) {
                 // need to login again
-                store.commit(LOGOUT)
+                store.commit(`${USER}/${LOGOUT}`)
             }
 
             if (error.response) {

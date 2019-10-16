@@ -89,3 +89,4 @@ $ cargo build
 ## TODO
 - 使用 [argon2](https://crates.io/crates/rust-argon2) 来重写密码加密部分
 - 使用 [chrono](https://crates.io/crates/chrono) 来重写日期部分的方法
+- 使用 reCAPTCHA(https://www.google.com/recaptcha/intro/v3.html) 来实现验证码
