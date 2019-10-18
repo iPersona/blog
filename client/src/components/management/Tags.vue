@@ -1,15 +1,15 @@
 <template>
   <div
-    class="container"
     v-if="isLogin && isAdmin"
+    class="container"
   >
     <form>
       <section>
         <!-- search key -->
-        <b-field grouped>
-          <b-input
-            type="search"
+        <BField grouped>
+          <BInput
             v-model="searchKey"
+            type="search"
             placeholder="Search..."
             expanded
             icon-pack="fas"
@@ -17,62 +17,70 @@
             @input="searchTag"
           />
 
-          <b-button
+          <BButton
             type="is-primary"
             outlined
             @click="openAddTagPanel"
-          >Add tags</b-button>
+          >
+            Add tags
+          </BButton>
           <!-- tag edit panel -->
-          <b-modal
+          <BModal
             :active.sync="isAddTagPanelOpen"
             has-modal-card
           >
-            <add-tag-panel v-on:addNewTags="addNewTags" />
-          </b-modal>
-        </b-field>
+            <AddTagPanel @addNewTags="addNewTags" />
+          </BModal>
+        </BField>
 
         <!-- exist tags -->
-        <h1 class="label">Exist Tags</h1>
-        <b-field
+        <h1 class="label">
+          Exist Tags
+        </h1>
+        <BField
           grouped
           class="taglist"
         >
-          <b-taglist>
-            <b-tag
+          <BTaglist>
+            <!-- v-if="tag.isActive" -->
+            <BTag
+              v-for="tag in filteredTags"
+              :key="tag.uuid"
               type="is-primary"
               size="is-medium"
               closable
               aria-close-label="Close tag"
-              v-for="tag in filteredTags"
-              v-bind:key="tag.uuid"
-              v-if="tag.isActive"
               @close="deleteTag(tag)"
               @dblclick.native="openTagEditor(tag)"
             >
-              {{tag.tag}}
-            </b-tag>
-          </b-taglist>
+              {{ tag.tag }}
+            </BTag>
+          </BTaglist>
           <span
             align="right"
             class="tags-number"
-          >{{filteredTags.length}}</span>
+          >
+            {{ filteredTags.length }}
+          </span>
 
           <!-- tag edit panel -->
-          <b-modal
+          <BModal
             :active.sync="isEditPanelOpen"
             has-modal-card
           >
-            <tag-editor
-              :tagId="tagId"
-              :tagName="tagName"
-              v-on:updateTag="updateTag"
+            <TagEditor
+              :tag-id="tagId"
+              :tag-name="tagName"
+              @updateTag="updateTag"
             />
-          </b-modal>
-        </b-field>
-        <b-field align="left">
-          <span class="tips-head">TIPS:</span>
-        </b-field>
-        <b-field>
+          </BModal>
+        </BField>
+        <BField align="left">
+          <span class="tips-head">
+            TIPS:
+          </span>
+        </BField>
+        <BField>
           <ul
             align="left"
             class="tips-item"
@@ -80,99 +88,111 @@
             <li>double click to edit tags</li>
             <li>click delete button to delete tag</li>
           </ul>
-        </b-field>
-        <br />
+        </BField>
+        <br>
 
         <!-- modified tags -->
-        <h1 class="label">Modified Tags</h1>
-        <b-field
+        <h1 class="label">
+          Modified Tags
+        </h1>
+        <BField
           grouped
           class="taglist"
         >
-          <b-taglist>
-            <b-tag
+          <BTaglist>
+            <!-- v-if="tag.isActive" -->
+            <BTag
+              v-for="tag in modified_tags"
+              :key="tag.uuid"
               type="is-warning"
               size="is-medium"
               closable
               aria-close-label="Close tag"
-              v-for="tag in modified_tags"
-              v-bind:key="tag.uuid"
-              v-if="tag.isActive"
               @close="deleteModifiedTag(tag)"
             >
-              {{tag.tag}}
-            </b-tag>
-          </b-taglist>
+              {{ tag.tag }}
+            </BTag>
+          </BTaglist>
           <span
             align="right"
             class="tags-number"
-          >{{modified_tags.length}}</span>
-        </b-field>
+          >
+            {{ modified_tags.length }}
+          </span>
+        </BField>
 
         <!-- added tags -->
-        <h1 class="label">Added Tags</h1>
-        <b-field
+        <h1 class="label">
+          Added Tags
+        </h1>
+        <BField
           grouped
           class="taglist"
         >
-          <b-taglist>
-            <b-tag
+          <BTaglist>
+            <!-- v-if="tag.isActive" -->
+            <BTag
+              v-for="tag in added_tags"
+              :key="tag.uuid"
               type="is-success"
               size="is-medium"
               closable
               aria-close-label="Close tag"
-              v-for="tag in added_tags"
-              v-bind:key="tag.uuid"
-              v-if="tag.isActive"
               @close="deleteAddedTag(tag)"
             >
-              {{tag.tag}}
-            </b-tag>
-          </b-taglist>
+              {{ tag.tag }}
+            </BTag>
+          </BTaglist>
           <span
             align="right"
             class="tags-number"
-          >{{added_tags.length}}</span>
-        </b-field>
+          >
+            {{ added_tags.length }}
+          </span>
+        </BField>
 
         <!-- deleted tags -->
-        <h1 class="label">Deleted Tags</h1>
-        <b-field
+        <h1 class="label">
+          Deleted Tags
+        </h1>
+        <BField
           grouped
           class="taglist"
         >
-          <b-taglist>
-            <b-tag
+          <BTaglist>
+            <!-- v-if="tag.isActive" -->
+            <BTag
+              v-for="tag in deleted_tags"
+              :key="tag.uuid"
               type="is-danger"
               size="is-medium"
               closable
               aria-close-label="Close tag"
-              v-for="tag in deleted_tags"
-              v-bind:key="tag.uuid"
-              v-if="tag.isActive"
               @close="deleteDeletedTag(tag)"
             >
-              {{tag.tag}}
-            </b-tag>
-          </b-taglist>
+              {{ tag.tag }}
+            </BTag>
+          </BTaglist>
           <span
             align="right"
             class="tags-number"
-          >{{deleted_tags.length}}</span>
-        </b-field>
+          >
+            {{ deleted_tags.length }}
+          </span>
+        </BField>
 
-        <b-field grouped>
-          <b-button
+        <BField grouped>
+          <BButton
             type="is-primary"
             @click="submit"
-          >Submit</b-button>
-        </b-field>
+          >
+            Submit
+          </BButton>
+        </BField>
       </section>
     </form>
   </div>
-  <div v-else>
-
-  </div>
+  <div v-else />
 </template>
 
 <script>
@@ -188,6 +208,10 @@ import { USER } from '@/store/modules/module-names'
 
 export default {
   name: 'Tags',
+  components: {
+    TagEditor,
+    AddTagPanel
+  },
   data() {
     return {
       tags: [],
@@ -203,10 +227,6 @@ export default {
       tagName: '',
       searchKey: '',
     }
-  },
-  components: {
-    TagEditor,
-    AddTagPanel
   },
   computed: {
     ...mapGetters(USER, {
@@ -283,6 +303,7 @@ export default {
       let tag = this.tags.filter(item => {
         return item.id === id
       }).map(item => {
+        item.origin = item.tag
         item.tag = name
         return item
       })[0];
@@ -333,6 +354,7 @@ export default {
         return item.id !== tag.id
       })
 
+      tag.tag = tag.origin  // recover original name
       this.filteredTags.push(tag)
     },
     deleteAddedTag(tag) {
