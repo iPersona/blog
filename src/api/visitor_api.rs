@@ -1,3 +1,4 @@
+use crate::api::recaptcha_api::verify_recaptcha;
 use crate::api::InnerContext;
 use crate::models::articles::{
     ArticleNumWithTag, ArticleSummary, CommentsResponse, ListAllArticleFilterByTag, QuerySlice,
@@ -139,6 +140,13 @@ impl Visitor {
         session: Session,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         let params = &params.into_inner();
+
+        // verify reCAPTCHA
+        let is_ok = verify_recaptcha(params.token().as_str());
+        if !is_ok {
+            return api_resp_err!("robot detected!");
+        }
+
         let is_remember = params.get_remember();
         let max_age: Option<i64> = if is_remember { Some(24 * 90) } else { None };
 

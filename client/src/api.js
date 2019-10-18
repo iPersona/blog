@@ -59,7 +59,7 @@ export default class Api {
                 // req.headers['X-Token'] =
                 //     localStorage // 让每个请求携带token--['X-Token']为自定义key
                 // 请根据实际情况自行修改
-                req.headers['Authorization'] = store.getters[`user/${TOKEN}`];
+                req.headers.Authorization = store.getters[`user/${TOKEN}`];
                 // console.log(`token: ${store.getters[TOKEN]}`)
             }
             return req
@@ -133,12 +133,13 @@ export default class Api {
         });
     }
 
-    async login(account, password, remember) {
+    async login(account, password, remember, token) {
         return this.post(
             this.url.login, {
                 account: account,
                 password: password,
-                remember: remember
+                remember: remember,
+                token: token,
             });
     }
 

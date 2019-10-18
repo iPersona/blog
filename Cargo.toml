@@ -43,6 +43,10 @@ strip_markdown = "0.1.0"
 actix-http = "0.2.10"
 typename = "0.1.1"
 
+# support socks proxy
+[dependencies.reqwest]
+features = ["socks"]
+version = "0.9.22"
 
 # to support uuid v0.7.0, the `uuidv07` feature should be enabled
 [dependencies.diesel]

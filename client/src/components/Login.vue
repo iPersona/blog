@@ -5,41 +5,47 @@
       style="width: auto"
     >
       <header class="modal-card-head">
-        <p class="modal-card-title">Login</p>
+        <p class="modal-card-title">
+          Login
+        </p>
       </header>
       <section class="modal-card-body">
-        <b-field label="Username">
-          <b-input
+        <BField label="Username">
+          <BInput
             :value="username"
             placeholder="Your username"
             required
-          >
-          </b-input>
-        </b-field>
+          />
+        </BField>
 
-        <b-field label="Password">
-          <b-input
+        <BField label="Password">
+          <BInput
             type="password"
             :value="password"
             password-reveal
             placeholder="Your password"
             required
-          >
-          </b-input>
-        </b-field>
+          />
+        </BField>
 
-        <b-checkbox :v-model="remember">Remember me</b-checkbox>
+        <BCheckbox :v-model="remember">
+          Remember me
+        </BCheckbox>
       </section>
       <footer class="modal-card-foot">
         <button
           class="button"
           type="button"
           @click="$parent.close()"
-        >Close</button>
+        >
+          Close
+        </button>
         <button
           class="button is-primary"
           @click="login"
-        >Login</button>
+        >
+          Login
+        </button>
       </footer>
     </div>
   </form>
@@ -80,9 +86,13 @@ export default {
       updateToken: LOGIN
     }),
     async login() {
+      // reCHAPTCHA verification
+      let rechaptchaToken = await this.recaptcha()
+      console.log(`rechaptchaToken: ${rechaptchaToken}`)
+
       let api = new Api();
       // let rsp = await api.login(this.username, Util.password(this.password), this.remember);
-      let rsp = await api.login("admin", Util.password("admin"), true);
+      let rsp = await api.login("admin", Util.password("admin"), true, rechaptchaToken);
       // let rsp = await api.login("user-1", Util.password("123456"), true);
       this.log.debug("rsp: " + JSON.stringify(rsp));
       if (!Api.isSuccessResponse(rsp)) {
@@ -97,6 +107,12 @@ export default {
 
       // refresh page to make other components loading data
       window.location.reload()
+    },
+    async recaptcha() {
+      return await this.$recaptcha('login').then((token) => {
+        console.log(token) // Will print the token
+        return token
+      })
     }
   },
 }

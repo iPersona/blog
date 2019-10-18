@@ -376,6 +376,7 @@ pub struct LoginUser {
     account: String,
     password: String,
     remember: bool,
+    token: String, // reCAPTCHA token
 }
 
 impl LoginUser {
@@ -418,6 +419,10 @@ impl LoginUser {
             }
             Err(err) => Err(format!("{}", err)),
         }
+    }
+
+    pub fn token(&self) -> String {
+        self.token.clone()
     }
 
     pub fn get_remember(&self) -> bool {

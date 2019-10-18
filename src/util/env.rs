@@ -6,6 +6,7 @@ pub struct Env {
     pub redis_url: String,
     pub redis_notify_url: String,
     pub token_secret: String,
+    pub recaptcha_secret: String,
 }
 
 impl Env {
@@ -15,6 +16,7 @@ impl Env {
             redis_url: env::var("REDIS_URL").expect("REDIS_URL must be set"),
             redis_notify_url: env::var("REDIS_NOTIFY_URL").expect("REDIS_NOTIFY_URL must be set"),
             token_secret: env::var("TOKEN_SECRET").expect("TOKEN_SECRET must be set"),
+            recaptcha_secret: env::var("RECAPTCHA_SECRET").expect("RECAPTCHA_SECRET must be set"),
         }
     }
 

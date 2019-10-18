@@ -44,6 +44,20 @@ Vue.config.productionTip = false
 // vuex
 import store from '@/store/index.js'
 
+// reCHAPTCHA-v3
+import {
+  VueReCaptcha
+} from 'vue-recaptcha-v3'
+
+// For more options see below
+Vue.use(VueReCaptcha, {
+  siteKey: '6LeU270UAAAAACZmn-pYBAgNt1hDTwaNmj8K8mVc',
+  loaderOptions: {
+    autoHideBadge: true,
+  }
+
+})
+
 new Vue({
   router,
   render: h => h(App),

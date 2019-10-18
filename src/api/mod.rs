@@ -146,6 +146,7 @@ macro_rules! extract_form_data {
     };
 }
 
+pub mod recaptcha_api;
 pub mod user_api;
 pub mod visitor_api;
 
