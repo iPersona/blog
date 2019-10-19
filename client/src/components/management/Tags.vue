@@ -34,53 +34,23 @@
         </BField>
 
         <!-- exist tags -->
-        <h1 class="label">
-          Exist Tags
-        </h1>
-        <BField
-          grouped
-          class="taglist"
-        >
-          <BTaglist>
-            <!-- v-if="tag.isActive" -->
-            <BTag
-              v-for="tag in filteredTags"
-              :key="tag.uuid"
-              type="is-primary"
-              size="is-medium"
-              closable
-              aria-close-label="Close tag"
-              @close="deleteTag(tag)"
-              @dblclick.native="openTagEditor(tag)"
-            >
-              {{ tag.tag }}
-            </BTag>
-          </BTaglist>
-          <span
-            align="right"
-            class="tags-number"
-          >
-            {{ filteredTags.length }}
-          </span>
+        <TagPanel
+          title="Exist Tags"
+          :tags="filteredTags"
+          :enable-tag-edit="true"
+          placeholder="No tags currently"
+          @deleteTag="deleteTag"
+          @updateTag="updateTag"
+        />
 
-          <!-- tag edit panel -->
-          <BModal
-            :active.sync="isEditPanelOpen"
-            has-modal-card
+        <!-- tips -->
+        <div align="left">
+          <span
+            align="left"
+            class="tips-head"
           >
-            <TagEditor
-              :tag-id="tagId"
-              :tag-name="tagName"
-              @updateTag="updateTag"
-            />
-          </BModal>
-        </BField>
-        <BField align="left">
-          <span class="tips-head">
             TIPS:
           </span>
-        </BField>
-        <BField>
           <ul
             align="left"
             class="tips-item"
@@ -88,98 +58,35 @@
             <li>double click to edit tags</li>
             <li>click delete button to delete tag</li>
           </ul>
-        </BField>
+        </div>
         <br>
 
         <!-- modified tags -->
-        <h1 class="label">
-          Modified Tags
-        </h1>
-        <BField
-          grouped
-          class="taglist"
-        >
-          <BTaglist>
-            <!-- v-if="tag.isActive" -->
-            <BTag
-              v-for="tag in modified_tags"
-              :key="tag.uuid"
-              type="is-warning"
-              size="is-medium"
-              closable
-              aria-close-label="Close tag"
-              @close="deleteModifiedTag(tag)"
-            >
-              {{ tag.tag }}
-            </BTag>
-          </BTaglist>
-          <span
-            align="right"
-            class="tags-number"
-          >
-            {{ modified_tags.length }}
-          </span>
-        </BField>
+        <TagPanel
+          title="Modified Tags"
+          :tags="modified_tags"
+          placeholder="No modified tags currently"
+          tag-type="is-warning"
+          @deleteTag="deleteModifiedTag"
+        />
 
         <!-- added tags -->
-        <h1 class="label">
-          Added Tags
-        </h1>
-        <BField
-          grouped
-          class="taglist"
-        >
-          <BTaglist>
-            <!-- v-if="tag.isActive" -->
-            <BTag
-              v-for="tag in added_tags"
-              :key="tag.uuid"
-              type="is-success"
-              size="is-medium"
-              closable
-              aria-close-label="Close tag"
-              @close="deleteAddedTag(tag)"
-            >
-              {{ tag.tag }}
-            </BTag>
-          </BTaglist>
-          <span
-            align="right"
-            class="tags-number"
-          >
-            {{ added_tags.length }}
-          </span>
-        </BField>
+        <TagPanel
+          title="Added Tags"
+          :tags="added_tags"
+          placeholder="No new added tags currently"
+          tag-type="is-success"
+          @deleteTag="deleteAddedTag"
+        />
 
         <!-- deleted tags -->
-        <h1 class="label">
-          Deleted Tags
-        </h1>
-        <BField
-          grouped
-          class="taglist"
-        >
-          <BTaglist>
-            <!-- v-if="tag.isActive" -->
-            <BTag
-              v-for="tag in deleted_tags"
-              :key="tag.uuid"
-              type="is-danger"
-              size="is-medium"
-              closable
-              aria-close-label="Close tag"
-              @close="deleteDeletedTag(tag)"
-            >
-              {{ tag.tag }}
-            </BTag>
-          </BTaglist>
-          <span
-            align="right"
-            class="tags-number"
-          >
-            {{ deleted_tags.length }}
-          </span>
-        </BField>
+        <TagPanel
+          title="Deleted Tags"
+          :tags="deleted_tags"
+          placeholder="No deleted tags currently"
+          tag-type="is-danger"
+          @deleteTag="deleteDeletedTag"
+        />
 
         <BField grouped>
           <BButton
@@ -201,16 +108,16 @@ import { IS_LOGIN, IS_ADMIN } from '@/store/modules/store-types.js'
 import Api from '@/api'
 import Ui from '@/components/utils/ui'
 import Log from '@/components/utils/log'
-import TagEditor from './TagEditor'
 import AddTagPanel from './AddTagPanel'
+import TagPanel from './TagPanel'
 import { NOT_CHANGED, MODIFIED, ADDED } from './tag-status'
 import { USER } from '@/store/modules/module-names'
 
 export default {
   name: 'Tags',
   components: {
-    TagEditor,
-    AddTagPanel
+    AddTagPanel,
+    TagPanel,
   },
   data() {
     return {
@@ -402,30 +309,11 @@ export default {
 </script>
 
 <style scoped>
-h1.label {
-  font-size: x-large;
-  text-align: left;
-  color: gray;
-}
-
-.taglist {
-  border-radius: 6px;
-  border: 1px solid gainsboro;
-  padding: 15px;
-  position: relative;
-}
-
-.tags-number {
-  position: absolute;
-  bottom: 5px;
-  right: 10px;
-  font-size: smaller;
-  color: lightgray;
-}
-
 .tips-head {
   font-size: small;
+  font-weight: bold;
   color: silver;
+  white-space: nowrap;
 }
 
 .tips-item {
