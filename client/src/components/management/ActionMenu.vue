@@ -1,38 +1,37 @@
 <template>
   <div>
-    <b-menu label="Menu">
-      <b-menu-list>
-        <b-menu-item
+    <BMenu label="Menu">
+      <BMenuList>
+        <BMenuItem
           label="Statistic"
           tag="router-link"
           to="/management/stat"
           icon-pack="fas"
           icon="chart-bar"
-        ></b-menu-item>
-        <b-menu-item
+        />
+        <BMenuItem
           label="Articles"
           tag="router-link"
           to="/management/articles"
           icon-pack="fas"
           icon="newspaper"
-        ></b-menu-item>
-        <b-menu-item
+        />
+        <BMenuItem
           label="Tags"
           tag="router-link"
           to="/management/tags"
           icon-pack="fas"
           icon="tags"
-        ></b-menu-item>
-        <b-menu-item
+        />
+        <BMenuItem
           label="Settings"
           icon-pack="fas"
           tag="router-link"
           to="/management/settings"
           icon="cog"
-        ></b-menu-item>
-      </b-menu-list>
-
-    </b-menu>
+        />
+      </BMenuList>
+    </BMenu>
   </div>
 </template>
 <script>

@@ -2,16 +2,13 @@
   <div class="container">
     <div class="tile is-ancestor">
       <div class="tile is-vertical is-2">
-        <div class="tile">
-          <action-menu align="left" />
-        </div>
+        <ActionMenu align="left" />
       </div>
       <div class="tile is-vertical">
-        <router-view class="router-view"></router-view>
+        <RouterView class="router-view" />
       </div>
     </div>
   </div>
-
 </template>
 
 <script>

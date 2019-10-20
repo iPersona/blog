@@ -56,24 +56,35 @@
 
       <br><br>
     </div>
-    <!-- pagination -->
-    <BPagination
-      :total="articleCount"
-      :current.sync="currentPage"
-      range-before="3"
-      range-after="1"
-      order="is-centered"
-      :rounded="true"
-      :per-page="pageSize"
-      aria-next-label="Next page"
-      aria-previous-label="Previous page"
-      aria-page-label="Page"
-      aria-current-label="Current page"
-    />
-    <br>
+
+    <!-- article loading component -->
+    <InfiniteLoading
+      spinner="waveDots"
+      @infinite="infiniteHandler"
+    >
+      <div slot="no-more">
+        No more articles
+      </div>
+    </InfiniteLoading>
+
+    <!-- back to top button -->
+    <BackToTop
+      bottom="50px"
+      right="50px"
+    >
+      <BButton class="btn-to-top">
+        <BIcon
+          type="is-primary"
+          pack="fas"
+          icon="chevron-up"
+        />
+      </BButton>
+    </BackToTop>
   </div>
 </template>
 <script>
+import InfiniteLoading from 'vue-infinite-loading'
+import BackToTop from 'vue-backtotop'
 import Api from "@/api.js"
 import Ui from "./utils/ui"
 
@@ -87,12 +98,11 @@ let dateFormat = require('dateformat')
 
 export default {
   name: "ArticleList",
-  components: {},
+  components: {
+    InfiniteLoading,
+    BackToTop,
+  },
   props: {
-    // tagId: {
-    //   type: String,
-    //   default: ''
-    // },
     isFilteredByTag: {
       type: Boolean,
       default: false
@@ -100,7 +110,7 @@ export default {
   },
   data() {
     return {
-      articleCount: 0,
+      // articleCount: 0,
       articles: [],
       currentPage: 1,
       pageSize: 10,
@@ -116,7 +126,7 @@ export default {
   async mounted() {
     console.debug(`ArticleList mounted!`)
     await this.listenEventBus()
-    await this.reloadArticle()
+    // await this.reloadArticle()
   },
   methods: {
     listenEventBus() {
@@ -126,67 +136,74 @@ export default {
         await self.reloadArticle()
       })
     },
-    async reloadArticle() {
+    async reloadArticle($state) {
       this.$log.debug(`reloadArticle...`)
       this.$log.debug(`isFilteredByTag: ${this.isFilteredByTag}, tagId: ${this.tagId}`)
       if (this.isFilteredByTag) {
         if (this.tagId !== undefined) {
-          await this.getArticleNumberByTag()
-          await this.getArticlesByTag()
+          // await this.getArticleNumberByTag()
+          await this.getArticlesByTag($state)
         }
       } else {
-        await this.getArticleNumber()
-        await this.getArticles()
+        // await this.getArticleNumber()
+        await this.getArticles($state)
       }
     },
-    async getArticlesByTag() {
+    async getArticlesByTag($state) {
       let api = new Api();
       let rsp = await api.getArticlesByTag(this.tagId, this.pageSize, (this.currentPage - 1) * this.pageSize);
+      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`);
       if (!Api.isSuccessResponse(rsp)) {
         this.$log.error(`failed to get articles by tag-${this.tagId}: ${rsp.detail}`);
         return;
       }
-      this.articles = rsp.data;
-      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`);
-    },
-    async getArticleNumberByTag() {
-      let api = new Api();
-      let rsp = await api.getArticleNumberByTag(this.tagId);
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$log.error(`failed to get article number by tag-${this.tagId}: ${rsp.detail}`);
-        return;
-      }
-      if (!Api.isSuccessResponse(rsp)) {
-        this.ui.toastFail(`failed to load article list: ${rsp.detail}`)
+
+      if ($state === undefined) {
         return
       }
-      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`)
-      this.articleCount = rsp.data;
-      this.$log.debug(`article count: ${this.articleCount}`);
+
+      if (rsp.data.length > 0) {
+        console.log(`$state-load`)
+        this.currentPage += 1;
+        this.articles.push(...rsp.data)
+        $state.loaded()
+      } else {
+        console.log(`$state-complete`)
+        $state.complete()
+      }
     },
-    async getArticles() {
+    async getArticles($state) {
       let api = new Api();
       let rsp = await api.visitorViewAll(this.pageSize, (this.currentPage - 1) * this.pageSize);
+      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`);
       if (!Api.isSuccessResponse(rsp)) {
         this.$log.error(`failed to get articles: ${rsp.detail}`);
         return;
       }
-      this.articles = rsp.data;
-      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`);
-    },
-    async getArticleNumber() {
-      let api = new Api();
-      let rsp = await api.getArticleNumber();
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$log.error(`failed to get article number: ${rsp.detail}`);
-        return;
+
+      console.log(`aaaaaaa.state: ${$state}`)
+
+      if ($state === undefined) {
+        return
       }
-      this.articleCount = rsp.data;
-      this.$log.debug(`article count: ${this.articleCount}`);
+
+      if (rsp.data.length > 0) {
+        this.currentPage += 1;
+        this.articles.push(...rsp.data)
+        console.log(`$state-load`)
+        $state.loaded()
+      } else {
+        console.log(`$state-complete`)
+        $state.complete()
+      }
     },
     formatDate(datetime) {
       let d = Date.parse(datetime)
       return dateFormat(d, "yyyy-mm-dd")
+    },
+    async infiniteHandler($state) {
+      console.log(`infiniteHandler.state: ${JSON.stringify($state)}`)
+      this.reloadArticle($state)
     }
   }
 };
@@ -246,5 +263,14 @@ hr.short {
   float: left;
   font-size: small;
   height: 15px;
+}
+
+.btn-to-top {
+  width: 60px;
+  height: 60px;
+  padding: 10px 16px;
+  border-radius: 50%;
+  font-size: 22px;
+  line-height: 22px;
 }
 </style>

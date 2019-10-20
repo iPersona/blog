@@ -27,10 +27,11 @@
       class="container"
       align="left"
     >
-      <div v-highlight>
-        <!-- v-html="compiledMarkdown" -->
-        {{ compiledMarkdown }}
-      </div>
+      <!-- eslint-disable vue/no-v-html -->
+      <div
+        v-highlight
+        v-html="compiledMarkdown"
+      />
     </section>
     <br><br>
     <section

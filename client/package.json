@@ -28,6 +28,8 @@
     "style-loader": "^0.23.1",
     "vue": "^2.5.17",
     "vue-axios": "^2.1.4",
+    "vue-backtotop": "^1.6.1",
+    "vue-infinite-loading": "^2.4.4",
     "vue-localstorage": "^0.6.2",
     "vue-recaptcha-v3": "^1.7.0",
     "vue-router": "^3.0.2",

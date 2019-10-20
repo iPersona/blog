@@ -87,6 +87,11 @@ $ cargo build
 
 
 ## TODO
-- 使用 [argon2](https://crates.io/crates/rust-argon2) 来重写密码加密部分
-- 使用 [chrono](https://crates.io/crates/chrono) 来重写日期部分的方法
-- 使用 reCAPTCHA(https://www.google.com/recaptcha/intro/v3.html) 来实现验证码
+
+[] 使用 [argon2](https://crates.io/crates/rust-argon2) 来重写密码加密部分
+
+[X] 使用 [chrono](https://crates.io/crates/chrono) 来重写日期部分的方法
+
+[X] 使用 [reCAPTCHA](https://www.google.com/recaptcha/intro/v3.html) 来实现验证码
+
+[] 使用 [vue-element-loading](https://biigpongsatorn.github.io/#/vue-element-loading) 来实现加载画面
