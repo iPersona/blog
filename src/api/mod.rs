@@ -98,16 +98,16 @@ macro_rules! api_resp_err {
     };
 }
 
-//#[macro_export]
-// macro_rules! api_resp_err_with_code {
-//     ($code:expr, $detail:expr) => {
-//         api_resp!($crate::api::ApiResult::Error {
-//             status: $crate::api::Status::Err,
-//             code: $code,
-//             detail: String::from($detail)
-//         })
-//     };
-// }
+#[macro_export]
+macro_rules! api_resp_err_with_code {
+    ($code:expr, $detail:expr) => {
+        api_resp!($crate::api::ApiResult::Error {
+            status: $crate::api::Status::Err,
+            code: $code,
+            detail: String::from($detail)
+        })
+    };
+}
 
 //#[macro_export]
 macro_rules! api_resp_data {
@@ -119,7 +119,7 @@ macro_rules! api_resp_data {
 }
 
 macro_rules! extract_form_data {
-    ($data_type:ty, $body:expr, $state: expr) => {
+    ($data_type:ty, $req:expr, $body:expr, $state: expr) => {
         $body
             .map_err(actix_web::Error::from)
             .fold(web::BytesMut::new(), move |mut body, chunk| {
@@ -130,7 +130,7 @@ macro_rules! extract_form_data {
                 use $crate::models::FormDataExtractor;
                 let config = serde_qs::Config::new(10, false);
                 let data: $data_type = config.deserialize_bytes(&body).unwrap();
-                let res = data.execute(&$state);
+                let res = data.execute($req, &$state);
                 match res {
                     Ok(data) => {
                         use typename::TypeName;

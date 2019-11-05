@@ -54,8 +54,6 @@
 <script>
 import { mapMutations } from 'vuex'
 import Api from "@/api.js"
-import Log from "./utils/log"
-import Ui from './utils/ui'
 import Util from '@/utils.js'
 import { LOGIN } from "@/store/modules/mutation-types.js"
 import { USER } from '@/store/modules/module-names'
@@ -68,8 +66,6 @@ export default {
       username: '',
       password: '',
       remember: true,
-      log: new Log(this),
-      ui: new Ui(this),
     };
   },
   async mounted() {
@@ -94,25 +90,28 @@ export default {
       // let rsp = await api.login(this.username, Util.password(this.password), this.remember);
       let rsp = await api.login("admin", Util.password("admin"), true, rechaptchaToken);
       // let rsp = await api.login("user-1", Util.password("123456"), true);
-      this.log.debug("rsp: " + JSON.stringify(rsp));
+      this.$getLog().debug("rsp: " + JSON.stringify(rsp));
       if (!Api.isSuccessResponse(rsp)) {
-        this.ui.toastFail(`${rsp.detail}`)
+        this.$getUi.toast.fail(`${rsp.detail}`)
         return
       }
 
       // save token
       let token = rsp.data;
-      this.log.debug(`token: ${token}`)
+      this.$getLog().debug(`token: ${token}`)
       this.updateToken(token)
 
       // refresh page to make other components loading data
       window.location.reload()
     },
     async recaptcha() {
-      return await this.$recaptcha('login').then((token) => {
-        console.log(token) // Will print the token
-        return token
-      })
+      return await
+        this.$recaptchaLoaded().then(async () => {
+          return await this.$recaptcha('login').then((token) => {
+            this.$getLog().debug(`token: ${token}`) // Will print the token
+            return token
+          })
+        })
     }
   },
 }

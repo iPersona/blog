@@ -2,12 +2,12 @@ use super::super::comments;
 use super::super::comments::dsl::comments as all_comments;
 
 use super::super::UserInfo;
-use actix_session::Session;
+use super::FormDataExtractor;
+use crate::{ArticlesWithTag, UserNotify};
 use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::Text;
-use log::error;
 use uuid::Uuid;
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
@@ -29,7 +29,7 @@ impl Comments {
         offset: i64,
         id: Uuid,
     ) -> Result<Vec<Self>, String> {
-        let raw_sql = format!("select a.id, a.comment, a.article_id, a.user_id, b.nickname, a.create_time from comments a join users b on a.user_id=b.id where a.article_id='{}' order by a.create_time limit {} offset {};", id, limit, offset);
+        let raw_sql = format!("select a.id, a.comment, a.article_id, a.user_id, b.nickname, a.create_time from comments a join users b on a.user_id=b.id where a.article_id='{}' order by a.create_time desc limit {} offset {};", id, limit, offset);
         let res = diesel::sql_query(raw_sql).get_results::<Self>(conn);
         match res {
             Ok(data) => Ok(data),
@@ -83,26 +83,91 @@ impl NewComments {
         }
     }
 
-    pub fn insert(&self, conn: &PgConnection, session: &Session) -> bool {
-        let info = UserInfo::from_session(session);
-        match info {
-            Ok(v) => match v {
-                Some(v) => self.into_insert_comments(v.id).insert(conn),
-                None => false,
-            },
-            Err(e) => {
-                error!("Fail to parse UserInfo: {:?}", e);
-                false
-            }
-        }
+    pub fn insert(&self, conn: &PgConnection, user_info: &UserInfo) -> bool {
+        self.into_insert_comments(user_info.id).insert(conn)
     }
 
-    pub fn reply_user_id(&mut self) -> Option<Uuid> {
-        self.reply_user_id.take()
+    pub fn reply_user_id(&self) -> Option<Uuid> {
+        match self.reply_user_id {
+            Some(id) => Some(id.clone()),
+            None => None,
+        }
     }
 
     pub fn article_id(&self) -> Uuid {
         self.article_id
+    }
+}
+
+impl FormDataExtractor for NewComments {
+    type Data = ();
+
+    fn execute(
+        &self,
+        req: actix_web::HttpRequest,
+        state: &crate::AppState,
+    ) -> Result<Self::Data, String> {
+        let ext = req.extensions();
+        let user_or = ext.get::<UserInfo>();
+        match user_or {
+            Some(user) => {
+                let redis_pool = &state.cache.into_inner();
+                let pg_pool = &state.db.connection();
+
+                let admin = UserInfo::view_admin(pg_pool, redis_pool);
+                let article =
+                    ArticlesWithTag::query_without_article(&state, self.article_id(), false)
+                        .unwrap();
+                let reply_user_id = self.reply_user_id();
+                match reply_user_id {
+                    // Reply comment
+                    Some(reply_user_id) => {
+                        // Notification replyee
+                        let user_reply_notify = UserNotify {
+                            user_id: reply_user_id,
+                            send_user_name: user.nickname.clone(),
+                            article_id: article.id,
+                            article_title: article.title.clone(),
+                            notify_type: "reply".into(),
+                        };
+                        user_reply_notify.cache(&redis_pool);
+
+                        // If the sender is not an admin and also the responder is also not admin, notify admin
+                        if reply_user_id != admin.id && user.groups != 0 {
+                            let comment_notify = UserNotify {
+                                user_id: admin.id,
+                                send_user_name: user.nickname.clone(),
+                                article_id: article.id,
+                                article_title: article.title.clone(),
+                                notify_type: "comment".into(),
+                            };
+                            comment_notify.cache(&redis_pool);
+                        }
+                    }
+                    // Normal comment
+                    None => {
+                        if user.groups != 0 {
+                            let comment_notify = UserNotify {
+                                user_id: admin.id,
+                                send_user_name: user.nickname.clone(),
+                                article_id: article.id,
+                                article_title: article.title.clone(),
+                                notify_type: "comment".into(),
+                            };
+                            comment_notify.cache(&redis_pool);
+                        }
+                    }
+                }
+
+                let res = self.insert(&pg_pool, user);
+                if res {
+                    Ok(())
+                } else {
+                    Err("new_comment failed!".to_string())
+                }
+            }
+            None => Err("Permission denied, you need to login first!".to_string()),
+        }
     }
 }
 
@@ -113,34 +178,39 @@ pub struct DeleteComment {
 }
 
 impl DeleteComment {
-    pub fn delete(self, conn: &PgConnection, session: &Session, permission: &Option<i16>) -> bool {
-        match *permission {
-            Some(0) => Comments::delete_with_comment_id(conn, self.comment_id),
-            _ => {
-                let user_or = UserInfo::view_user_with_cookie(&session);
-                let user: UserInfo;
-                match user_or {
-                    Ok(v) => match v {
-                        Some(v) => user = v,
-                        None => {
-                            error!("failed to get userinfo from current session!");
-                            return false;
-                        }
-                    },
-                    Err(e) => {
-                        error!(
-                            "{}",
-                            format!("failed to get userinfo from current session: {:?}", e)
-                        );
-                        return false;
-                    }
-                }
-                if self.user_id == user.id {
-                    Comments::delete_with_comment_id(conn, self.comment_id)
+    pub fn delete(&self, conn: &PgConnection, user_info: &UserInfo) -> bool {
+        if user_info.is_admin() {
+            return Comments::delete_with_comment_id(conn, self.comment_id);
+        }
+        if self.user_id == user_info.id {
+            Comments::delete_with_comment_id(conn, self.comment_id)
+        } else {
+            false
+        }
+    }
+}
+
+impl FormDataExtractor for DeleteComment {
+    type Data = ();
+
+    fn execute(
+        &self,
+        req: actix_web::HttpRequest,
+        state: &crate::AppState,
+    ) -> Result<Self::Data, String> {
+        let ext = req.extensions();
+        let user_info = ext.get::<UserInfo>();
+        match user_info {
+            Some(user) => {
+                let pg_pool = &state.db.connection();
+                let res = self.delete(pg_pool, user);
+                if res {
+                    Ok(())
                 } else {
-                    false
+                    Err("delete_comment failed!".to_string())
                 }
             }
+            None => Err("permission denied".to_string()),
         }
     }
 }

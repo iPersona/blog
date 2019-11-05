@@ -4,9 +4,7 @@
     class="container"
   >
     <NavHeader />
-    <hr>
     <RouterView />
-    <hr>
     <NavFooter />
   </div>
 </template>
@@ -60,4 +58,7 @@ export default {
 }
 @import "https://cdn.materialdesignicons.com/2.5.94/css/materialdesignicons.min.css";
 @import "https://use.fontawesome.com/releases/v5.2.0/css/all.css";
+</style>
+
+<style scoped src="buefy/dist/buefy.css">
 </style>

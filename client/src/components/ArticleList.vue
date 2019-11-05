@@ -72,13 +72,12 @@
       bottom="50px"
       right="50px"
     >
-      <BButton class="btn-to-top">
-        <BIcon
-          type="is-primary"
-          pack="fas"
-          icon="chevron-up"
-        />
-      </BButton>
+      <BIcon
+        type="is-primary"
+        pack="fas"
+        icon="chevron-up"
+        size="is-medium"
+      />
     </BackToTop>
   </div>
 </template>
@@ -86,7 +85,6 @@
 import InfiniteLoading from 'vue-infinite-loading'
 import BackToTop from 'vue-backtotop'
 import Api from "@/api.js"
-import Ui from "./utils/ui"
 
 import { EventBus, EVENT_RELOAD_ARTICLE_LIST } from '@/event-bus'
 
@@ -114,7 +112,6 @@ export default {
       articles: [],
       currentPage: 1,
       pageSize: 10,
-      ui: new Ui(this),
     };
   },
   computed: {
@@ -137,8 +134,8 @@ export default {
       })
     },
     async reloadArticle($state) {
-      this.$log.debug(`reloadArticle...`)
-      this.$log.debug(`isFilteredByTag: ${this.isFilteredByTag}, tagId: ${this.tagId}`)
+      this.$getLog().debug(`reloadArticle...`)
+      this.$getLog().debug(`isFilteredByTag: ${this.isFilteredByTag}, tagId: ${this.tagId}`)
       if (this.isFilteredByTag) {
         if (this.tagId !== undefined) {
           // await this.getArticleNumberByTag()
@@ -152,9 +149,9 @@ export default {
     async getArticlesByTag($state) {
       let api = new Api();
       let rsp = await api.getArticlesByTag(this.tagId, this.pageSize, (this.currentPage - 1) * this.pageSize);
-      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`);
+      this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
       if (!Api.isSuccessResponse(rsp)) {
-        this.$log.error(`failed to get articles by tag-${this.tagId}: ${rsp.detail}`);
+        this.$getLog().error(`failed to get articles by tag-${this.tagId}: ${rsp.detail}`);
         return;
       }
 
@@ -175,9 +172,9 @@ export default {
     async getArticles($state) {
       let api = new Api();
       let rsp = await api.visitorViewAll(this.pageSize, (this.currentPage - 1) * this.pageSize);
-      this.$log.debug(`rsp: ${JSON.stringify(rsp)}`);
+      this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
       if (!Api.isSuccessResponse(rsp)) {
-        this.$log.error(`failed to get articles: ${rsp.detail}`);
+        this.$getLog().error(`failed to get articles: ${rsp.detail}`);
         return;
       }
 
@@ -263,14 +260,5 @@ hr.short {
   float: left;
   font-size: small;
   height: 15px;
-}
-
-.btn-to-top {
-  width: 60px;
-  height: 60px;
-  padding: 10px 16px;
-  border-radius: 50%;
-  font-size: 22px;
-  line-height: 22px;
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="page">
     <section
       v-if="isAdmin"
       align="right"
@@ -60,17 +60,20 @@
       :can-cancel="false"
     >
       <ArticleEditor
-        :article-id="this.$route.params.id"
+        :article-id="articleId"
         :is-create-new="false"
       />
     </BModal>
+    <hr>
+    <NewComment :article-id="articleId" />
+    <section class="container">
+      <Comments :article-id="articleId" />
+    </section>
   </div>
 </template>
 
 <script>
 import Api from "@/api.js";
-import Ui from './utils/ui.js'
-import Log from './utils/log.js'
 import marked from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/monokai-sublime.css'
@@ -78,25 +81,28 @@ import { mapGetters } from 'vuex'
 import { IS_ADMIN } from '@/store/modules/store-types.js'
 import { USER } from '@/store/modules/module-names'
 import ArticleEditor from './ArticleEditor'
+import Comments from './Comments'
 import { EventBus, EVENT_RELOAD_ARTICLE } from '@/event-bus.js'
+import NewComment from './NewComment'
 
 export default {
   name: "Article",
   components: {
     ArticleEditor,
+    Comments,
+    NewComment,
   },
   props: {},
   data() {
     return {
-      ui: new Ui(this),
-      log: new Log(this),
+      articleId: this.$route.params.id,
       article: {},
       isEditArticle: false,
     };
   },
   computed: {
     compiledMarkdown: function () {
-      this.log.debug(`compiledMarkdown: ${this.article.content}`);
+      this.$getLog().debug(`compiledMarkdown: ${this.article.content}`);
       if (this.article.content === undefined) {
         return marked('')
       }
@@ -114,18 +120,18 @@ export default {
     listenEventBus() {
       const self = this;
       EventBus.$on(EVENT_RELOAD_ARTICLE, async function () {
-        console.log(`event-bus: reload-data`)
+        console.log(`event-bus: ${EVENT_RELOAD_ARTICLE}`)
         await self.getArticle()
       })
     },
     async getArticle() {
       let api = new Api();
-      let id = this.$route.params.id;
-      let rsp = await api.visitorViewArticle(id);
+      let rsp = await api.visitorViewArticle(this.articleId);
       if (!Api.isSuccessResponse(rsp)) {
+        this.$getUi().toast.fail(`failed to load article: ${rsp.detail}`)
         return;
       }
-      this.log.debug(`rsp: ${JSON.stringify(rsp)}`);
+      this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
       this.article = rsp.data;
       this.trimTags()
     },

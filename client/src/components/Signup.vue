@@ -5,92 +5,96 @@
       style="width: auto"
     >
       <header class="modal-card-head">
-        <p class="modal-card-title">Signup</p>
+        <p class="modal-card-title">
+          Signup
+        </p>
       </header>
       <section class="modal-card-body">
-        <b-field
+        <BField
           label="Username"
           align="left"
         >
-          <b-input
+          <BInput
             v-model="username"
             placeholder="Your username"
             required
             validation-message="Username can only contains letters, number and underline"
             pattern="^/w{1,20}$"
-          >
-          </b-input>
-        </b-field>
+          />
+        </BField>
 
-        <b-field
+        <BField
           label="Password"
           align="left"
         >
-          <b-input
-            type="password"
+          <BInput
             v-model="password"
+            type="password"
             password-reveal
             placeholder="Your password"
             required
             validation-message="Password can only contains letters, numbers and underline with length between 8~16"
             pattern="^[a-zA-Z]/w{8,16}$"
-          >
-          </b-input>
-        </b-field>
+          />
+        </BField>
 
-        <b-field
+        <BField
           label="Nickname"
           align="left"
         >
-          <b-input
+          <BInput
             v-model="nickname"
             placeholder="Your nickname"
-          >
-          </b-input>
-        </b-field>
+          />
+        </BField>
 
-        <b-field
+        <BField
           label="Email"
           align="left"
         >
-          <b-input
-            type="email"
+          <BInput
             v-model="email"
+            type="email"
             placeholder="Your email"
             required
-          >
-          </b-input>
-        </b-field>
+          />
+        </BField>
 
-        <b-field align="left">
-          <b-button
+        <BField align="left">
+          <BButton
             type="is-primary"
             outlined
             @click="checkEmail"
-          >Verify email</b-button>
-        </b-field>
+          >
+            Verify email
+          </BButton>
+        </BField>
 
-        <b-field
+        <BField
           label="Signature"
           align="left"
         >
-          <b-input
+          <BInput
+            v-model="sign"
             maxlength="200"
             type="textarea"
-            v-model="sign"
-          ></b-input>
-        </b-field>
+          />
+        </BField>
       </section>
       <footer class="modal-card-foot">
         <button
           class="button"
           type="button"
           @click="$parent.close()"
-        >Close</button>
+        >
+          Close
+        </button>
         <button
           class="button is-primary"
           @click="signup"
-        >Signup</button>
+        >
+          Signup
+        </button>
       </footer>
     </div>
   </form>
@@ -98,12 +102,10 @@
 
 <script>
 import Api from '@/api.js'
-import Ui from './utils/ui.js'
-import Log from './utils/log.js'
 import Utils from '@/utils.js'
 
 export default {
-  name: 'signup',
+  name: 'Signup',
   components: {
 
   },
@@ -114,8 +116,6 @@ export default {
       nickname: "",
       email: "",
       sign: "",
-      ui: new Ui(this),
-      log: new Log(this),
     };
   },
   methods: {
@@ -137,9 +137,9 @@ export default {
 
       console.log("signup-resp: " + JSON.stringify(rsp));
       if (Api.isSuccessResponse(rsp)) {
-        this.ui.toastSuccess('Congratulation! You have successfully create an account!')
+        this.$getUi().toast.success('Congratulation! You have successfully create an account!')
       } else {
-        this.ui.toastFail('Sorry! We are failed to create an account for you now, please try again later.');
+        this.$getUi().toast.fail('Sorry! We are failed to create an account for you now, please try again later.');
       }
       this.$parent.close();  // close signup window
     },
@@ -152,9 +152,9 @@ export default {
       console.log("result: " + JSON.stringify(rsp));
 
       if (rsp.data === true) {
-        this.ui.toastFail('Sorry! We are failed to create an account for you now, please try again later.')
+        this.$getUi().toast.fail('Sorry! We are failed to create an account for you now, please try again later.')
       } else {
-        this.ui.toastSuccess('Congratulation! This email can be used for register!');
+        this.$getUi().toast.success('Congratulation! This email can be used for register!');
       }
     },
   },

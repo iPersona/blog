@@ -22,6 +22,7 @@ import VisitorHeader from './VisitorHeader'
 import AdminHeader from './AdminHeader'
 import { USER_NAME, TOKEN, IS_LOGIN, IS_ADMIN } from '@/store/modules/store-types.js'
 import { USER } from '@/store/modules/module-names'
+// import { EventBus, EVENT_HIDE_HEADER, EVENT_SHOW_HEADER } from '@/event-bus.js'
 
 export default {
   name: "Header",
@@ -33,6 +34,7 @@ export default {
   props: {},
   data() {
     return {
+      // visible: true,
     };
   },
   computed: {
@@ -43,9 +45,18 @@ export default {
     }),
   },
   mounted() {
+    // await this.listenEventBus()
   },
   methods: {
-
+    // listenEventBus() {
+    //   const self = this;
+    //   EventBus.$on(EVENT_HIDE_HEADER, async function () {
+    //     self.visible = false
+    //   })
+    //   EventBus.$on(EVENT_SHOW_HEADER, async function () {
+    //     self.visible = true
+    //   })
+    // },
   }
 };
 </script>

@@ -5,24 +5,29 @@
       style="width: auto"
     >
       <header class="modal-card-head">
-        <p class="modal-card-title">Tag: {{tagName}}</p>
+        <p class="modal-card-title">
+          Tag: {{ tagName }}
+        </p>
       </header>
       <section class="modal-card-body">
-        <b-field label="Name">
-          <b-input
-            type="text"
+        <BField label="Name">
+          <BInput
             v-model="newTagName"
+            type="text"
             required
-          >
-          </b-input>
-        </b-field>
+          />
+        </BField>
       </section>
       <footer class="modal-card-foot">
-        <b-button @click="$parent.close()">Cancel</b-button>
-        <b-button
+        <BButton @click="$parent.close()">
+          Cancel
+        </BButton>
+        <BButton
           class="is-primary"
           @click="modifyTag"
-        >Modify</b-button>
+        >
+          Modify
+        </BButton>
       </footer>
     </div>
   </form>
@@ -33,8 +38,14 @@ export default {
   name: 'TagEditor',
   components: {},
   props: {
-    tagId: '',
-    tagName: '',
+    tagId: {
+      type: String,
+      default: ''
+    },
+    tagName: {
+      type: String,
+      default: ''
+    },
   },
   data() {
     return {

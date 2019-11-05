@@ -1,73 +1,75 @@
 <template>
   <div class="container">
-    <b-navbar
+    <BNavbar
       class="is-bold container"
-      fixedTop
+      fixed-top
+      shadow
     >
       <template slot="brand">
-        <b-navbar-item href="/">
+        <BNavbarItem href="/">
           <img
             src="@/assets/logo.png"
             alt="Lightweight UI components for Vue.js based on Bulma"
-          />
-        </b-navbar-item>
+          >
+        </BNavbarItem>
       </template>
 
       <!-- Menu -->
       <!-- articles -->
       <template slot="start">
-        <b-navbar-item
+        <BNavbarItem
           tag="router-link"
           to="/articles"
         >
           <b>Articles</b>
-        </b-navbar-item>
+        </BNavbarItem>
 
         <!-- tag -->
-        <b-navbar-item
+        <BNavbarItem
           tag="router-link"
           to="/tags"
         >
           <b>Tags</b>
-        </b-navbar-item>
+        </BNavbarItem>
       </template>
 
       <template slot="end">
-        <b-navbar-item>
-          <b-button
+        <BNavbarItem>
+          <BButton
             type="is-text"
             @click="isLoginModalActive = true"
           >
             <b>Login</b>
-          </b-button>
-        </b-navbar-item>
+          </BButton>
+        </BNavbarItem>
 
-        <b-navbar-item>
-          <b-button
+        <BNavbarItem>
+          <BButton
             type="is-primary"
             outlined
             @click="isSignupModalActive = true"
-          ><b>Sign up</b></b-button>
-        </b-navbar-item>
+          >
+            <b>Sign up</b>
+          </BButton>
+        </BNavbarItem>
 
-        <b-modal
+        <BModal
           :active.sync="isLoginModalActive"
           has-modal-card
         >
-          <login-form />
-        </b-modal>
+          <LoginForm />
+        </BModal>
 
-        <b-modal
+        <BModal
           :active.sync="isSignupModalActive"
           has-modal-card
           full-screen
           :can-cancel="false"
         >
-          <signup-form></signup-form>
-        </b-modal>
+          <SignupForm />
+        </BModal>
       </template>
-
-    </b-navbar>
+    </BNavbar>
   </div>
 </template>
 

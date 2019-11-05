@@ -2,6 +2,7 @@ use super::super::tags;
 use super::super::tags::dsl::tags as all_tags;
 use super::Relations;
 
+use super::FormDataExtractor;
 use crate::AppState;
 use diesel;
 use diesel::prelude::*;
@@ -42,7 +43,7 @@ impl Tags {
     // }
 
     pub fn delete_tag(state: &AppState, id: Uuid) -> Result<usize, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         Relations::delete_all(conn, id, "tag");
         let res = diesel::delete(all_tags.filter(tags::id.eq(id))).execute(conn);
         match res {
@@ -56,7 +57,7 @@ impl Tags {
     }
 
     pub fn edit_tag(&self, state: &AppState) -> Result<usize, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = diesel::update(all_tags.filter(tags::id.eq(&self.id)))
             .set(tags::tag.eq(&self.tag))
             .execute(conn);
@@ -104,7 +105,7 @@ impl TagCount {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<TagCount>, String> {
-        let conn = state.db.into_inner().get().unwrap();
+        let conn = state.db.connection();
         let raw_sql = format!("select a.id, a.tag, (case when b.count is null then 0 else b.count end) as count from tags a left join \
                 (select tag_id, count(*) from article_tag_relation group by tag_id) b on a.id = b.tag_id order by a.id limit {} offset {};", limit, offset);
         let res = diesel::sql_query(raw_sql).load::<Self>(&conn);
@@ -220,6 +221,22 @@ impl TagsData {
         match result {
             Ok(_) => Ok(()),
             Err(_) => Err("update tags failed!".to_string()),
+        }
+    }
+}
+
+impl FormDataExtractor for TagsData {
+    type Data = ();
+
+    fn execute(
+        &self,
+        _req: actix_web::HttpRequest,
+        state: &AppState,
+    ) -> Result<Self::Data, String> {
+        let res = self.update(&state);
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("edit_article failed: {:?}", e).to_string()),
         }
     }
 }

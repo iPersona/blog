@@ -45,10 +45,11 @@
         horizontal
         label="Content"
       >
-        <Editor
-          v-model="content"
+        <MarkdownEditor
+          ref="editor"
           align="left"
-          :preview-style="previewStyle"
+          :initial-value="content"
+          toolbar-style="Article"
         />
       </BField>
       <BField
@@ -82,23 +83,15 @@
 </template>
 
 <script>
-import 'tui-editor/dist/tui-editor.css'
-import 'tui-editor/dist/tui-editor-contents.css'
-import 'codemirror/lib/codemirror.css'
-import { Editor } from '@toast-ui/vue-editor'
+import MarkdownEditor from './MarkdownEditor'
 
 import Api from '@/api.js'
-import Log from './utils/log.js'
-import Ui from './utils/ui.js'
-
-import { EventBus, EVENT_RELOAD_ARTICLE } from '@/event-bus.js';
-
-// import Editor from '@toast-ui/vue-editor'
+import { EventBus, EVENT_RELOAD_ARTICLE, EVENT_MARKDOWN_EDITOR_CONTENT_READY, EVENT_ARTICLE_EDITOR_CLOSED } from '@/event-bus.js';
 
 export default {
   name: 'ArticleEditor',
   components: {
-    'editor': Editor
+    MarkdownEditor
   },
   props: {
     articleId: {
@@ -118,8 +111,6 @@ export default {
       availableTags: [],
       deselectedTags: [],
       publish: true,
-      log: new Log(this),
-      ui: new Ui(this),
     };
   },
   async mounted() {
@@ -137,19 +128,20 @@ export default {
       if (!Api.isSuccessResponse(rsp)) {
         return;
       }
-      this.log.debug(`rsp: ${JSON.stringify(rsp)}`);
+      this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
       let article = rsp.data;
       this.title = article.title
       this.content = article.content
+      EventBus.$emit(EVENT_MARKDOWN_EDITOR_CONTENT_READY, this.content)
       this.tags = this.genTagObjectArray(article.tags, article.tags_id)
       this.oldTags = this.genTagObjectArray(article.tags, article.tags_id)
     },
     async getTags() {
       let api = new Api()
       let rsp = await api.getTags()
-      this.log.debug(`get tags: ${JSON.stringify(rsp)}`)
+      this.$getLog().debug(`get tags: ${JSON.stringify(rsp)}`)
       if (!Api.isSuccessResponse(rsp)) {
-        this.log.error(`get tags failed: ${rsp.detail}`)
+        this.$getLog().error(`get tags failed: ${rsp.detail}`)
         return
       }
       this.availableTags = rsp.data;
@@ -164,7 +156,7 @@ export default {
     },
     async publishArticle() {
       if (this.title === '') {
-        this.ui.toastFail('Title can not be empty!')
+        this.$getUi().toast.fail('Title can not be empty!')
         return
       }
 
@@ -176,22 +168,23 @@ export default {
       let newTags = this.tags.filter(t => {
         return typeof (t) === 'string'
       })
-      this.log.debug(`existTags: ${existTags}`)
-      this.log.debug(`newTags: ${newTags}`)
+      this.$getLog().debug(`existTags: ${existTags}`)
+      this.$getLog().debug(`newTags: ${newTags}`)
       let api = new Api()
       var rsp;
+      let content = this.$refs.editor.content()
       if (this.isCreateNew) {
-        rsp = await api.createArticle(this.title, this.content, existTags, newTags, this.publish)
+        rsp = await api.createArticle(this.title, content, existTags, newTags, this.publish)
       } else {
         let classifiedTags = this.classifyTags()
-        rsp = await api.editArticle(this.articleId, this.title, this.content, classifiedTags.newChoiceAlreadyExistTags, classifiedTags.deselectedTags, classifiedTags.newTags)
+        rsp = await api.editArticle(this.articleId, this.title, content, classifiedTags.newChoiceAlreadyExistTags, classifiedTags.deselectedTags, classifiedTags.newTags)
       }
       if (!Api.isSuccessResponse(rsp)) {
-        this.ui.toastFail(`Failed to ${this.isCreateNew ? "create" : "update"} article: ${rsp.detail}`)
+        this.$getUi().toast.fail(`Failed to ${this.isCreateNew ? "create" : "update"} article: ${rsp.detail}`)
         return
       }
 
-      this.ui.toastSuccess('Article is successfully published!')
+      this.$getUi().toast.success('Article is successfully published!')
 
       // reload article to update
       EventBus.$emit(EVENT_RELOAD_ARTICLE)
@@ -201,6 +194,8 @@ export default {
       this.$parent.close()
     },
     cancel() {
+      console.log(`close editor`)
+      EventBus.$emit(EVENT_ARTICLE_EDITOR_CLOSED)
       this.$parent.close()
     },
     classifyTags() {

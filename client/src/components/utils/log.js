@@ -1,17 +1,38 @@
 import Vue from 'vue'
 
-export default class Log {
-  constructor(component) {
-    this.component = component;
-  }
+// get name of component calling log function
+function getComponentName(instance) {
+  let list = instance.$vnode.tag.split('-')
+  return list[list.length - 1]
+}
 
-  async debug(str) {
-    // this.component.$log.debug(str);
-    Vue.$log.debug(str);
-  }
+function logStr(name, str) {
+  return `name: "${name}"  |  ${str}`
+}
 
-  async error(str) {
-    // this.component.$log.error(str);
-    Vue.$log.error(str);
+let Log = {}
+
+Log.install = function (Vue) {
+  Vue.prototype.$getLog = function () {
+    let name = getComponentName(this)
+    return {
+      debug: function (str) {
+        Vue.$log.debug(logStr(name, str));
+      },
+      error(str) {
+        Vue.$log.error(logStr(name, str));
+      },
+      info(str) {
+        Vue.$log.info(logStr(name, str));
+      },
+      warn(str) {
+        Vue.$log.warn(logStr(name, str));
+      },
+      fatal(str) {
+        Vue.$log.fatal(logStr(name, str));
+      }
+    }
   }
 }
+
+export default Log

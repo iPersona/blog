@@ -1,13 +1,10 @@
 use crate::api::recaptcha_api::verify_recaptcha;
-use crate::api::InnerContext;
 use crate::models::articles::{
-    ArticleNumWithTag, ArticleSummary, CommentsResponse, ListAllArticleFilterByTag, QuerySlice,
+    ArticleNumWithTag, ArticleSummary, ListAllArticleFilterByTag, QuerySlice,
 };
-use crate::models::token::{SimpleToken, Token};
-use crate::models::user::CheckUser;
-use crate::{
-    AppState, ArticleList, ArticlesWithTag, Comments, LoginUser, RegisteredUser, UserInfo,
-};
+use crate::models::token::Token;
+use crate::models::user::{CheckUser, UserInfo};
+use crate::{AppState, ArticleList, ArticlesWithTag, Comments, LoginUser, RegisteredUser};
 use actix_session::Session;
 use actix_web::web;
 use actix_web::web::Query;
@@ -42,7 +39,12 @@ impl Visitor {
         params: Query<ListAllArticleFilterByTag>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("list_all_article_filter_by_tag");
-        let is_admin = req.extensions().get::<SimpleToken>().unwrap().is_admin;
+        let ext = req.extensions();
+        let user_info = ext.get::<UserInfo>();
+        let is_admin = match user_info {
+            Some(u) => u.is_admin(),
+            None => false,
+        };
         let conn = &state.get_ref().db.connection();
         match ArticleSummary::list_articles_with_tag(
             conn,
@@ -61,7 +63,12 @@ impl Visitor {
         req: HttpRequest,
         params: Query<ArticleNumWithTag>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let is_admin = req.extensions().get::<SimpleToken>().unwrap().is_admin;
+        let ext = req.extensions();
+        let user_info = ext.get::<UserInfo>();
+        let is_admin = match user_info {
+            Some(u) => u.is_admin(),
+            None => false,
+        };
         let count = ArticleSummary::query_article_numbers_with_tag(&state, params.tag_id, is_admin);
         match count {
             Ok(n) => {
@@ -74,48 +81,19 @@ impl Visitor {
 
     fn list_comments(
         state: Data<AppState>,
-        req: HttpRequest,
+        _req: HttpRequest,
         article_id: Path<Uuid>,
         params: Query<QuerySlice>,
-        session: Session,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("list_comments");
-        let permission = req.extensions().get::<InnerContext>().unwrap().permission;
-        let (user_id, admin) = match permission {
-            Some(0) => {
-                let info = UserInfo::from_session(&session);
-                match info {
-                    Ok(v) => match v {
-                        Some(v) => (Some(v.id), true),
-                        None => (None, true),
-                    },
-                    Err(_) => (None, true),
-                }
-            }
-            Some(_) => {
-                let info = UserInfo::from_session(&session);
-                match info {
-                    Ok(v) => match v {
-                        Some(v) => (Some(v.id), false),
-                        None => (None, false),
-                    },
-                    Err(_) => (None, false),
-                }
-            }
-            _ => (None, false),
-        };
-        let pg_pool = state.get_ref().db.into_inner().get().unwrap();
+        let pg_pool = state.get_ref().db.connection();
         match Comments::query(
             &pg_pool,
             params.limit,
             params.offset,
             article_id.into_inner(),
         ) {
-            Ok(data) => api_resp_data!(CommentsResponse {
-                comments: data,
-                admin: admin,
-                user: user_id,
-            }),
+            Ok(data) => api_resp_data!(data),
             Err(err) => api_resp_err!(&*err),
         }
     }
@@ -137,7 +115,6 @@ impl Visitor {
         state: Data<AppState>,
         mut _req: HttpRequest,
         params: Form<LoginUser>,
-        session: Session,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         let params = &params.into_inner();
 
@@ -150,8 +127,8 @@ impl Visitor {
         let is_remember = params.get_remember();
         let max_age: Option<i64> = if is_remember { Some(24 * 90) } else { None };
 
-        let pg_pool = state.db.into_inner().get().unwrap();
-        match params.verification(&pg_pool, &session, &max_age) {
+        let pg_pool = state.db.connection();
+        match params.verification(&pg_pool, &max_age) {
             Ok(user_info) => {
                 let token = Token::new(&user_info);
                 match token.encode() {
@@ -223,7 +200,7 @@ impl Visitor {
         params: Form<RegisteredUser>,
         session: Session,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let pg_pool = state.db.into_inner().get().unwrap();
+        let pg_pool = state.db.connection();
         match params.into_inner().insert(&pg_pool, &session) {
             Ok(_) => api_resp_ok!(),
             Err(err) => api_resp_err!(&*err),
@@ -235,7 +212,7 @@ impl Visitor {
         _req: HttpRequest,
         params: Form<CheckUser>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let pg_pool = state.db.into_inner().get().unwrap();
+        let pg_pool = state.db.connection();
         let exist = params.into_inner().is_user_exist(&pg_pool);
         api_resp_data!(exist)
     }
@@ -244,7 +221,12 @@ impl Visitor {
         state: Data<AppState>,
         req: HttpRequest,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let is_admin = req.extensions().get::<SimpleToken>().unwrap().is_admin;
+        let ext = req.extensions();
+        let user_info = ext.get::<UserInfo>();
+        let is_admin = match user_info {
+            Some(u) => u.is_admin(),
+            None => false,
+        };
         let count = ArticleList::query_article_numbers(&state, is_admin);
         match count {
             Ok(n) => {
@@ -260,7 +242,7 @@ impl Visitor {
             web::resource("articles").route(web::get().to_async(Visitor::list_all_article)),
         )
         .service(
-            web::resource("article/view_comment/{article_id}")
+            web::resource("article/{article_id}/comments")
                 .route(web::get().to_async(Visitor::list_comments)),
         )
         .service(

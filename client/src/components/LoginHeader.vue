@@ -1,82 +1,81 @@
 <template>
   <div class="container">
-    <b-navbar
+    <BNavbar
       class="is-bold container"
-      fixedTop
+      fixed-top
+      shadow
     >
       <template slot="brand">
-        <b-navbar-item href="/">
+        <BNavbarItem href="/">
           <img
             src="@/assets/logo.png"
             alt="Lightweight UI components for Vue.js based on Bulma"
-          />
-        </b-navbar-item>
+          >
+        </BNavbarItem>
       </template>
 
       <!-- Menu -->
       <!-- articles -->
       <template slot="start">
-        <b-navbar-item
+        <BNavbarItem
           tag="router-link"
           to="/articles"
         >
           <b>Articles</b>
-        </b-navbar-item>
+        </BNavbarItem>
 
         <!-- tag -->
-        <b-navbar-item
+        <BNavbarItem
           tag="router-link"
           to="/tags"
         >
           <b>Tags</b>
-        </b-navbar-item>
+        </BNavbarItem>
       </template>
 
       <template slot="end">
-        <b-navbar-item>
-          <b-dropdown
+        <BNavbarItem>
+          <BDropdown
             v-model="item"
             position="is-bottom-left"
             aria-role="menu"
           >
             <button
+              slot="trigger"
               class="button rounded"
               type="button"
-              slot="trigger"
             >
               <template>
-                <b-icon icon="account"></b-icon>
-                <span><b>{{userName}}</b></span>
-                <b-icon icon="menu-down"></b-icon>
+                <BIcon icon="account" />
+                <span><b>{{ userName }}</b></span>
+                <BIcon icon="menu-down" />
               </template>
             </button>
-            <b-dropdown-item
+            <BDropdownItem
               value="home"
               aria-role="menuitem"
             >
-              <b-icon icon="home"></b-icon>
+              <BIcon icon="home" />
               Home
-            </b-dropdown-item>
-            <hr class="dropdown-divider" />
-            <b-dropdown-item value="settings">
-              <b-icon icon="settings"></b-icon>
+            </BDropdownItem>
+            <hr class="dropdown-divider">
+            <BDropdownItem value="settings">
+              <BIcon icon="settings" />
               Settings
-            </b-dropdown-item>
-            <b-dropdown-item
+            </BDropdownItem>
+            <BDropdownItem
               value="logout"
               aria-role="menuitem"
               @click="logout"
             >
-              <b-icon icon="logout"></b-icon>
+              <BIcon icon="logout" />
               Logout
-            </b-dropdown-item>
-          </b-dropdown>
-        </b-navbar-item>
+            </BDropdownItem>
+          </BDropdown>
+        </BNavbarItem>
       </template>
-
-    </b-navbar>
+    </BNavbar>
   </div>
-
 </template>
 
 <script>

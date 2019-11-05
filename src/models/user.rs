@@ -1,6 +1,7 @@
 use super::super::users;
 use super::super::users::dsl::users as all_users;
 
+use super::FormDataExtractor;
 use super::UserNotify;
 use chrono::{Local, NaiveDateTime};
 use diesel;
@@ -12,6 +13,7 @@ use uuid::Uuid;
 use super::super::{
     /*get_github_primary_email, */ get_password, random_string, sha3_256_encode, RedisPool,
 };
+use super::token::Token;
 use crate::AppState;
 use actix_session::Session;
 use actix_web::Error;
@@ -36,7 +38,7 @@ pub struct Users {
 
 impl Users {
     pub fn delete(state: &AppState, id: Uuid) -> Result<usize, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let redis_pool = &state.cache.into_inner();
         let res = diesel::delete(all_users.find(id)).execute(conn);
         match res {
@@ -49,7 +51,7 @@ impl Users {
     }
 
     pub fn change_permission(state: &AppState, data: ChangePermission) -> Result<usize, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = diesel::update(all_users.filter(users::id.eq(data.id)))
             .set(users::groups.eq(data.permission))
             .execute(conn);
@@ -73,7 +75,7 @@ impl Users {
     }
 
     pub fn disabled_user(state: &AppState, data: DisabledUser) -> Result<usize, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = diesel::update(all_users.filter(users::id.eq(data.id)))
             .set(users::disabled.eq(data.disabled))
             .execute(conn);
@@ -185,8 +187,17 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
-    pub fn from_session(session: &Session) -> Result<Option<UserInfo>, Error> {
-        session.get::<UserInfo>("info")
+    pub fn from_token(token: &Token) -> Self {
+        UserInfo {
+            id: Uuid::parse_str(token.user_id.as_str()).unwrap(),
+            account: token.user_name.clone(),
+            nickname: token.user_nickname.clone(),
+            groups: if token.is_admin { 0 } else { 1 },
+            say: None,
+            email: token.email.clone(),
+            create_time: token.user_create_time,
+            github: None,
+        }
     }
 
     pub fn is_admin(&self) -> bool {
@@ -229,7 +240,7 @@ impl UserInfo {
     }
 
     pub fn view_user_list(state: &AppState, limit: i64, offset: i64) -> Result<Vec<Self>, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = all_users
             .select((
                 users::id,
@@ -333,34 +344,40 @@ pub struct EditUser {
 }
 
 impl EditUser {
-    pub fn edit_user(self, conn: &PgConnection, session: &Session) -> Result<usize, String> {
-        let user_or = UserInfo::from_session(&session);
-        let user: UserInfo;
-        match user_or {
-            Ok(v) => match v {
-                Some(v) => user = v,
-                None => return Err("failed to get userinfo from current session!".to_string()),
-            },
-            Err(e) => {
-                return Err(
-                    format!("failed to get userinfo from current session: {:?}", e).to_string(),
-                )
-            }
-        }
-
-        let res = diesel::update(all_users.filter(users::id.eq(user.id)))
+    pub fn edit_user(&self, conn: &PgConnection, user_info: &UserInfo) -> Result<Token, String> {
+        let res = diesel::update(all_users.filter(users::id.eq(user_info.id)))
             .set((
-                users::nickname.eq(self.nickname),
-                users::say.eq(self.say),
-                users::email.eq(self.email),
+                users::nickname.eq(self.nickname.clone()),
+                users::say.eq(self.say.clone()),
+                users::email.eq(self.email.clone()),
             ))
             .get_result::<Users>(conn);
         match res {
-            Ok(data) => {
-                data.into_user_info().save_to_session(session);
-                Ok(1)
-            }
+            Ok(_) => Ok(Token::new(user_info)),
             Err(err) => Err(format!("{}", err)),
+        }
+    }
+}
+
+impl FormDataExtractor for EditUser {
+    type Data = Token;
+
+    fn execute(
+        &self,
+        req: actix_web::HttpRequest,
+        state: &crate::AppState,
+    ) -> Result<(Self::Data), String> {
+        let ext = req.extensions();
+        let user_info = ext.get::<UserInfo>();
+        match user_info {
+            Some(u) => {
+                let pg_pool = &state.db.connection();
+                match self.edit_user(pg_pool, &u) {
+                    Ok(token) => Ok(token),
+                    Err(err) => Err(err),
+                }
+            }
+            None => Err("Permission denied, please login and retry!".to_string()),
         }
     }
 }
@@ -383,7 +400,6 @@ impl LoginUser {
     pub fn verification(
         &self,
         conn: &PgConnection,
-        session: &Session,
         _max_age: &Option<i64>,
     ) -> Result<UserInfo, String> {
         let res = all_users
@@ -403,14 +419,14 @@ impl LoginUser {
                     //                        None => 24 * 60 * 60,       // 1 day
                     //                    };
                     let user_info = data.into_user_info();
-                    let r = session.set("login_time", Local::now().timestamp());
-                    if r.is_err() {
-                        error!("set session value 'login_time' failed!");
-                    }
-                    let r = session.set("info", json!(user_info).to_string());
-                    if r.is_err() {
-                        error!("set session value 'login_time' failed!");
-                    }
+                    // let r = session.set("login_time", Local::now().timestamp());
+                    // if r.is_err() {
+                    //     error!("set session value 'login_time' failed!");
+                    // }
+                    // let r = session.set("info", json!(user_info).to_string());
+                    // if r.is_err() {
+                    //     error!("set session value 'login_time' failed!");
+                    // }
                     //                    redis_pool.expire(&cookie, ttl);
                     Ok(user_info)
                 } else {

@@ -1,5 +1,7 @@
 <template>
-  <footer class="footer">Copyright © coimioc 2019-</footer>
+  <footer class="footer">
+    Copyright © coimioc 2019-
+  </footer>
 </template>
 <script>
 export default {
@@ -12,4 +14,3 @@ export default {
   methods: {}
 };
 </script>
-

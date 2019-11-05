@@ -5,27 +5,33 @@
       style="width: auto"
     >
       <header class="modal-card-head">
-        <p class="modal-card-title">Add Tags</p>
+        <p class="modal-card-title">
+          Add Tags
+        </p>
       </header>
       <section class="modal-card-body">
-        <b-taginput
+        <BTaginput
           v-model="tags"
           ellipsis
           icon="label"
           placeholder="Add a tag"
-        >
-        </b-taginput>
+        />
       </section>
       <footer class="modal-card-foot">
-        <b-button @click="$parent.close()">Cancel</b-button>
-        <b-button
+        <BButton @click="$parent.close()">
+          Cancel
+        </BButton>
+        <BButton
           class="is-primary"
           @click="addNewTag"
-        >Done</b-button>
+        >
+          Done
+        </BButton>
       </footer>
     </div>
   </form>
 </template>
+
 <script>
 export default {
   name: 'AddTagPanel',

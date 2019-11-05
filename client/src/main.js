@@ -33,7 +33,7 @@ const options = {
   logLevel: isProduction ? 'error' : 'debug',
   stringifyArguments: false,
   showLogLevel: true,
-  showMethodName: true,
+  // showMethodName: true,
   separator: '|',
   showConsoleColors: true
 };
@@ -55,8 +55,19 @@ Vue.use(VueReCaptcha, {
   loaderOptions: {
     autoHideBadge: true,
   }
-
 })
+
+// ui control
+import Ui from './components/utils/ui'
+Vue.use(Ui)
+
+// logger
+import Log from './components/utils/log'
+Vue.use(Log)
+
+// global css
+import '@/assets/css/page.css'
+import '@/assets/css/avatar.css'
 
 new Vue({
   router,

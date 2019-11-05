@@ -19,9 +19,12 @@ use jsonwebtoken::{decode, encode, errors::Result, Algorithm, Header, Validation
 use actix_http::httpmessage::HttpMessage;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpResponse;
+use chrono::NaiveDateTime;
 use futures::future::{ok, Either, FutureResult};
 use futures::Poll;
 use log::{debug, error, info};
+use typename::TypeName;
+use uuid::Uuid;
 
 macro_rules! token_check_error {
     ($req:expr) => {
@@ -35,28 +38,32 @@ macro_rules! token_expired_error {
     };
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, TypeName)]
 pub struct Token {
     // issuer
-    iss: String,
+    pub iss: String,
     // subject
-    sub: String,
+    pub sub: String,
     //issued at
-    iat: i64,
+    pub iat: i64,
     // expiry
-    exp: i64,
+    pub exp: i64,
     // user id
-    user_id: String,
+    pub user_id: String,
     // user type
-    user_type: i16,
+    pub user_type: i16,
     // user name
-    user_name: String,
+    pub user_name: String,
     // nick name
-    user_nickname: String,
+    pub user_nickname: String,
+    // user create time
+    pub user_create_time: NaiveDateTime,
+    // user signature
+    pub user_sign: Option<String>,
     // email
-    email: String,
+    pub email: String,
     // is admin
-    is_admin: bool,
+    pub is_admin: bool,
 }
 
 impl Token {
@@ -70,10 +77,32 @@ impl Token {
             user_type: user.groups,
             user_name: user.account.clone(),
             user_nickname: user.nickname.clone(),
+            user_create_time: user.create_time.clone(),
+            user_sign: match &user.say {
+                Some(v) => Some(v.clone()),
+                None => None,
+            },
             email: user.email.clone(),
             is_admin: user.is_admin(),
         }
     }
+
+    pub fn to_user_info(&self) -> UserInfo {
+        UserInfo {
+            id: Uuid::parse_str(self.user_id.as_str()).unwrap(),
+            account: self.user_name.clone(),
+            nickname: self.user_nickname.clone(),
+            groups: if self.is_admin() { 0 } else { 1 },
+            say: match &self.user_sign {
+                Some(v) => Some(v.clone()),
+                None => None,
+            },
+            email: self.email.clone(),
+            create_time: self.user_create_time.clone(),
+            github: None,
+        }
+    }
+
     pub fn decode(t: &str) -> Result<Self> {
         let data = decode::<Self>(
             t,
@@ -159,10 +188,10 @@ where
         match token {
             Some(t) => {
                 let t = Token::decode(t.to_str().unwrap());
-                let mut is_admin = false;
+                let mut user_info: Option<UserInfo> = None;
                 let result = match t {
                     Ok(t) => {
-                        is_admin = t.is_admin();
+                        user_info = Some(t.to_user_info());
                         Permission::new(path, Some(&t)).check(Some(&t))
                     }
                     Err(e) => match e.kind() {
@@ -177,9 +206,10 @@ where
                     Ok(is_ok) => {
                         if is_ok {
                             // Save token info
-                            req.extensions_mut()
-                                .insert(SimpleToken { is_admin: is_admin });
-
+                            match user_info {
+                                Some(u) => req.extensions_mut().insert(u),
+                                None => {}
+                            }
                             Either::A(self.service.call(req))
                         } else {
                             Either::B(token_check_error!(req))
@@ -200,9 +230,6 @@ where
                 match result {
                     Ok(is_ok) => {
                         if is_ok {
-                            // Save token info
-                            req.extensions_mut().insert(SimpleToken { is_admin: false });
-
                             Either::A(self.service.call(req))
                         } else {
                             Either::B(token_check_error!(req))
@@ -334,16 +361,6 @@ impl Permission {
         let user_url = UserUrl::from_str(self.url.as_str());
         let visitor_url = VisitorUrl::from_str(self.url.as_str());
         user_url.is_some() || visitor_url.is_some()
-
-        // let user_resources = [
-        //     "/user/change_pwd",
-        //     "/user/view",
-        //     "/user/sign_out",
-        //     "/user/edit",
-        //     "/user/new_comment",
-        //     "/user/delete_comment",
-        // ];
-        // user_resources.contains(&self.url.as_str())
     }
 
     fn is_visitor_permission(&self) -> bool {
@@ -357,18 +374,6 @@ impl Permission {
         debug!("p: {:?}", p);
         let visitor_url = VisitorUrl::from_str(&p.as_str());
         visitor_url.is_some()
-
-        // let visitor_resources = [
-        //     "/articles",
-        //     "/article/view_comment",
-        //     "/article/view",
-        //     "/user/login",
-        //     "/user/new",
-        //     "/user/exist",
-        //     "/article/count",
-        // ];
-
-        // visitor_resources.contains(&p.as_str())
     }
 }
 

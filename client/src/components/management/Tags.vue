@@ -106,8 +106,6 @@
 import { mapGetters } from 'vuex'
 import { IS_LOGIN, IS_ADMIN } from '@/store/modules/store-types.js'
 import Api from '@/api'
-import Ui from '@/components/utils/ui'
-import Log from '@/components/utils/log'
 import AddTagPanel from './AddTagPanel'
 import TagPanel from './TagPanel'
 import { NOT_CHANGED, MODIFIED, ADDED } from './tag-status'
@@ -126,8 +124,6 @@ export default {
       deleted_tags: [],
       added_tags: [],
       modified_tags: [],
-      log: new Log(this),
-      ui: new Ui(this),
       isEditPanelOpen: false,
       isAddTagPanelOpen: false,
       tagId: '',
@@ -163,7 +159,7 @@ export default {
     async getTags() {
       let api = new Api()
       let rsp = await api.getTags();
-      this.log.debug(`tags: ${JSON.stringify(rsp)}`)
+      this.$getLog().debug(`tags: ${JSON.stringify(rsp)}`)
       if (!Api.isSuccessResponse(rsp)) {
         return
       }
@@ -296,9 +292,9 @@ export default {
       let rsp = await api.updateTags(modified_tags, added_tags, deleted_tags)
       console.log(`data: ${JSON.stringify(rsp)}`)
       if (Api.isSuccessResponse(rsp)) {
-        this.ui.toastSuccess('tags are successfully updated!')
+        this.$getUi().toast.success('tags are successfully updated!')
       } else {
-        this.ui.toastFail(`update tags failed(${rsp.code}): ${rsp.detail}`)
+        this.$getUi().toast.fail(`update tags failed(${rsp.code}): ${rsp.detail}`)
       }
 
       // reload tags

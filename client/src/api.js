@@ -21,6 +21,7 @@ export default class Api {
         this.host = 'http://localhost:8880/api/v1';
         console.log('host: ' + this.host);
         this.vue = vue;
+        let self = this;
         (this.config = {
             Accept: 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -28,7 +29,7 @@ export default class Api {
             'Access-Control-Allow-Credentials': true
         }),
         (this.url = {
-            login: `${this.host}/user/login`, // 登录
+            // article
             createArticle: `${this.host}/article/new`, // 创建文章
             deleteArticle: `${this.host}/article/delete`, // 删除文章
             adminView: `${this.host}/article/admin/view`, // 获取文章html
@@ -41,14 +42,26 @@ export default class Api {
             articleNumber: `${this.host}/article/count`, // 访客：文章数量
             articleNumberByTag: `${this.host}/article/tag/count`,
             articleByTag: `${this.host}/article/tag`,
+
+            // comment
+            comments: function (articleId) {
+                return `${self.host}/article/${articleId}/comments`
+            },
+            newComment: `${this.host}/user/comment/new`,
+
+            // user
+            login: `${this.host}/user/login`, // 登录
             signup: `${this.host}/user/new`, // 游客：用户注册
             userExist: `${this.host}/user/exist`, // 游客：检查用户是否存在
+
+            // tag
             getTags: `${this.host}/tag/view`,
             getTagsWithCount: `${this.host}/tag/view/count`,
             addTags: `${this.host}/tag/new`,
             delTag: `${this.host}/tag/delete`,
             editTag: `${this.host}/tag/edit`,
             updateTags: `${this.host}/tag/update`,
+
         });
         // request拦截器
         this.axios.interceptors.request.use(req => {
@@ -68,6 +81,22 @@ export default class Api {
             console.log(error) // for debug
             Promise.reject(error)
         });
+    }
+
+    async newComment(articleId, content, userId) {
+        return this.post(this.url.newComment, {
+            comment: content,
+            article_id: articleId,
+            reply_user_id: userId
+        })
+    }
+
+    async getComments(articleId, limit, offset) {
+        let url = this.url.comments(articleId)
+        return this.get(url, {
+            limit: limit,
+            offset: offset,
+        })
     }
 
     async getArticleNumberByTag(tagId) {

@@ -14,10 +14,14 @@ import {
 
 import {
   USER_NAME,
+  USER_ID,
   TOKEN,
   IS_LOGIN,
   IS_ADMIN,
 } from './store-types'
+import {
+  userInfo
+} from 'os'
 
 function saveState(s) {
   console.log(`saveState...`)
@@ -45,6 +49,7 @@ function loadState(state) {
   }
 
   state[USER_NAME] = s[USER_NAME]
+  state[USER_ID] = s[USER_ID]
   state[IS_LOGIN] = s[IS_LOGIN]
   state[TOKEN] = s[TOKEN]
   state[IS_ADMIN] = s[IS_ADMIN]
@@ -52,6 +57,7 @@ function loadState(state) {
 
 const state = {
   [USER_NAME]: '',
+  [USER_ID]: '',
   [TOKEN]: '',
   [IS_LOGIN]: false,
   [IS_ADMIN]: false,
@@ -82,6 +88,8 @@ const mutations = {
     state[IS_LOGIN] = true
     state[TOKEN] = token
     state[USER_NAME] = decoded.payload.user_name
+    state[USER_ID] = decoded.payload.user_id
+    console.log(`login user-id: ${state[USER_ID]}`)
     state[IS_ADMIN] = decoded.payload.is_admin
     saveState(state)
   },
@@ -92,19 +100,18 @@ const mutations = {
 
 const getters = {
   [USER_NAME]: (state) => {
-    // loadState(state)
     return state[USER_NAME]
   },
+  [USER_ID]: (state) => {
+    return state[USER_ID]
+  },
   [IS_LOGIN]: (state) => {
-    // loadState(state)
     return state[IS_LOGIN]
   },
   [IS_ADMIN]: (state) => {
-    // loadState(state)
     return state[IS_ADMIN]
   },
   [TOKEN]: (state) => {
-    // loadState(state)
     return state[TOKEN]
   }
 }

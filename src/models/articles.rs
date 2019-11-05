@@ -55,7 +55,7 @@ pub struct ArticlesWithTag {
 
 impl ArticlesWithTag {
     pub fn delete_with_id(state: &AppState, id: Uuid) -> Result<usize, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let redis_pool = &state.cache.into_inner();
         Relations::delete_all(conn, id, "article");
         let res = diesel::delete(all_articles.filter(articles::id.eq(&id))).execute(conn);
@@ -94,7 +94,7 @@ impl ArticlesWithTag {
         id: Uuid,
         admin: bool,
     ) -> Result<ArticlesWithoutContent, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = if admin {
             all_article_with_tag
                 .filter(article_with_tag::id.eq(id))
@@ -112,7 +112,7 @@ impl ArticlesWithTag {
     }
 
     pub fn query_raw_article(state: &AppState, id: Uuid) -> Result<ArticlesWithTag, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = all_article_with_tag
             .filter(article_with_tag::id.eq(id))
             .get_result::<RawArticlesWithTag>(conn);
@@ -123,7 +123,7 @@ impl ArticlesWithTag {
     }
 
     pub fn publish_article(state: &AppState, data: &ModifyPublish) -> Result<usize, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = diesel::update(all_articles.filter(articles::id.eq(data.id)))
             .set(articles::published.eq(data.publish))
             .execute(conn);
@@ -252,7 +252,7 @@ impl ArticleSummary {
             tag_id,
             if admin { "" } else { "and published = true" }
         );
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = diesel::sql_query(raw_sql).load::<Count>(conn);
         match res {
             Ok(n) => Ok(n[0].count),
@@ -278,7 +278,7 @@ impl ArticleList {
         offset: i64,
         admin: bool,
     ) -> Result<Vec<ArticleList>, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = if admin {
             all_articles
                 .select((
@@ -315,7 +315,7 @@ impl ArticleList {
     }
 
     pub fn query_article_numbers(state: &AppState, admin: bool) -> Result<i64, String> {
-        let conn = &state.db.into_inner().get().unwrap();
+        let conn = &state.db.connection();
         let res = if admin {
             all_articles
                 .select(diesel::dsl::count(articles::id))
@@ -400,7 +400,11 @@ impl NewArticle {
 impl FormDataExtractor for NewArticle {
     type Data = ();
 
-    fn execute(&self, state: &AppState) -> Result<Self::Data, String> {
+    fn execute(
+        &self,
+        _req: actix_web::HttpRequest,
+        state: &AppState,
+    ) -> Result<Self::Data, String> {
         let conn = &state.db.connection();
         let r = self.insert(conn);
         if r {
@@ -423,7 +427,7 @@ pub struct EditArticle {
 
 impl EditArticle {
     pub fn edit_article(&self, state: &AppState) -> Result<usize, String> {
-        let conn = state.db.into_inner().get().unwrap();
+        let conn = state.db.connection();
         let res = diesel::update(all_articles.filter(articles::id.eq(self.id)))
             .set((
                 articles::title.eq(self.title.clone()),
@@ -454,7 +458,11 @@ impl EditArticle {
 impl FormDataExtractor for EditArticle {
     type Data = ();
 
-    fn execute(&self, state: &AppState) -> Result<Self::Data, String> {
+    fn execute(
+        &self,
+        _req: actix_web::HttpRequest,
+        state: &AppState,
+    ) -> Result<Self::Data, String> {
         let res = self.edit_article(state);
         match res {
             Ok(_) => Ok(()),

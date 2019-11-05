@@ -3,7 +3,11 @@
 /// in used to process with extracted form data
 pub trait FormDataExtractor {
     type Data;
-    fn execute(&self, state: &crate::AppState) -> Result<(Self::Data), String>;
+    fn execute(
+        &self,
+        req: actix_web::HttpRequest,
+        state: &crate::AppState,
+    ) -> Result<(Self::Data), String>;
 }
 pub mod article_tag_relation;
 pub mod articles;

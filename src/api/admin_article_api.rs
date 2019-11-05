@@ -16,19 +16,11 @@ pub struct AdminArticle;
 impl AdminArticle {
     pub fn create_article(
         state: Data<AppState>,
-        // params: Form<NewArticle>,
+        req: HttpRequest,
         body: web::Payload,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("create article");
-        extract_form_data!(NewArticle, body, &state)
-
-        // let conn = &state.db.connection();
-        // let r = params.into_inner().insert(conn);
-        // if r {
-        //     api_resp_ok!()
-        // } else {
-        //     api_resp_err!("create article failed!")
-        // }
+        extract_form_data!(NewArticle, req, body, &state)
     }
 
     pub fn delete_article(
@@ -92,12 +84,11 @@ impl AdminArticle {
 
     pub fn edit_article(
         state: Data<AppState>,
-        _req: HttpRequest,
-        // params: Form<EditArticle>,
+        req: HttpRequest,
         body: web::Payload,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("edit_article");
-        extract_form_data!(EditArticle, body, &state)
+        extract_form_data!(EditArticle, req, body, &state)
     }
 
     pub fn update_publish(
