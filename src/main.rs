@@ -11,46 +11,52 @@ extern crate strip_markdown;
 extern crate typename;
 
 use actix_files as fs;
-use actix_redis::RedisSession;
+//use actix_redis::RedisSession;
 use actix_web::{App, HttpServer};
 use blog::util::env::Env;
 use dotenv::dotenv;
 
-#[macro_use]
+// #[macro_use]
 extern crate log;
 
-use actix_web::cookie::SameSite;
+extern crate clap;
+
+use actix::{SyncArbiter, System};
+//use actix_web::cookie::SameSite;
+use blog::cache::executor::VisitStatisticActor;
+use blog::util::cli::Opts;
 use blog::util::postgresql_pool::DataBase;
 use blog::util::redis_pool::Cache;
 use blog::{AdminArticle, AdminUser, AppState, Tag, User, Visitor};
-use time::Duration;
+use log::debug;
 
-fn main() -> std::io::Result<()> {
+fn main() {
     // ::std::env::set_var("RUST_LOG", "debug,actix_web=debug");
     ::std::env::set_var("RUST_LOG", "debug");
-    // 获取环境变量
+    // init env variable
     dotenv().ok();
     // init logger
     env_logger::init();
-    // 显示环境变量
+    // show env variable
     Env::get().print();
 
     // let mut static_file_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    // VSCode调试必须用绝对路径，这里获取不到该CARGO变量值
-    let mut static_file_dir = if cfg!(target_os = "macos") {
-        "/Users/iPersona/Documents/blog".to_owned()
-    } else {
-        "/home/omi/Documents/dev/blog".to_owned()
-    };
+    let opt = Opts::new();
+    let work_dir = opt.work_dir.clone();
+    let mut static_file_dir = opt.work_dir.clone();
     static_file_dir.push_str("/dist");
-    info!("static_file_dir: {}", static_file_dir);
+    debug!("static_file_dir: {}", static_file_dir);
+
+    let sys = System::builder().stop_on_panic(true).name("blog").build();
+    let visit_statistic_actor = SyncArbiter::start(1, move || VisitStatisticActor::default());
 
     //    System::new("example");
     HttpServer::new(move || {
         App::new()
             .data(AppState {
                 db: DataBase::new(),
-                cache: Cache::new(),
+                cache: Cache::new(Some(work_dir.as_str())),
+                visit_statistic: visit_statistic_actor.clone(),
             })
             // TODO: 调试完成后屏蔽掉
             .wrap(blog::util::debug_middleware::Debug)
@@ -67,16 +73,19 @@ fn main() -> std::io::Result<()> {
             //         .secure(false)
             //         .max_age(24 * 60 * 60),
             // )
-            .wrap(
-                RedisSession::new(Env::get().redis_url.as_str(), &[0; 32])
-                    .cookie_name("blog_session")
-                    .ttl(7200) // 保存2小时的cookie数据
-                    //                .cookie_secure(true)  // TODO: 调试完成后开启
-                    .cookie_max_age(Duration::hours(24))
-                    .cookie_same_site(SameSite::Strict), // 禁止跨站传输cookie
-            )
+            //            .wrap(
+            //                RedisSession::new(Env::get().redis_url.as_str(), &[0; 32])
+            //                    .cookie_name("blog_session")
+            //                    .ttl(7200) // 保存2小时的cookie数据
+            //                    //                .cookie_secure(true)  // TODO: 调试完成后开启
+            //                    .cookie_max_age(Duration::hours(24))
+            //                    .cookie_same_site(SameSite::Strict), // 禁止跨站传输cookie
+            //            )
             .service(fs::Files::new("/", static_file_dir.as_str()).index_file("index.html"))
     })
-    .bind("0.0.0.0:8888")?
-    .run()
+    .bind("0.0.0.0:8888")
+    .unwrap()
+    .start();
+
+    let _ = sys.run();
 }

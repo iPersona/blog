@@ -1,4 +1,4 @@
-use log::info;
+use log::debug;
 use std::env;
 
 pub struct Env {
@@ -21,9 +21,9 @@ impl Env {
     }
 
     pub fn print(&self) {
-        info!("DATABASE_URL: {}", self.database_url);
-        info!("REDIS_URL: {}", self.redis_url);
-        info!("REDIS_NOTIFY_URL: {}", self.redis_notify_url);
-        info!("TOKEN_SECRET: {}", self.token_secret);
+        debug!("DATABASE_URL: {}", self.database_url);
+        debug!("REDIS_URL: {}", self.redis_url);
+        debug!("REDIS_NOTIFY_URL: {}", self.redis_notify_url);
+        debug!("TOKEN_SECRET: {}", self.token_secret);
     }
 }

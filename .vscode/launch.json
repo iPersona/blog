@@ -50,7 +50,9 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "-w", "${workspaceFolder}"
+            ],
             "env": {
                 "RUST_BACKTRACE": "1"
             },

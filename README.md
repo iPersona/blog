@@ -1,4 +1,4 @@
-## About
+# About
 
 This is my personal blog.
 
@@ -7,6 +7,7 @@ This is my personal blog.
 ![img](imges/architecture.png)
 
 ## Dependences
+
 - Redis
 - Postgresql
 
@@ -14,36 +15,44 @@ This is my personal blog.
 
 ### [Rust](https://www.rust-lang.org/)
 
-```
-$ curl https://sh.rustup.rs -sSf | sh
+```bash
+curl https://sh.rustup.rs -sSf | sh
 ```
 
 ### [Diesel Cli](https://github.com/diesel-rs/diesel)
+
 This project use Diesel as Orm framework, so you need to install its command line tool via Rust package manager(eg, Cargo)
-```
-$ cargo install diesel_cli --no-default-features --features postgres
+
+```bash
+cargo install diesel_cli --no-default-features --features postgres
 ```
 
 ### [Postgresql](https://www.postgresql.org/)
+
 you need to install Postgresql database, and then configure postgresql by following document’s guide
 
 #### Install the corresponding version of contrib
-```
-$ yum install postgresql96-contrib
+
+``` bash
+yum install postgresql96-contrib
 ```
 
 #### init database
+
+```bash
+./init.sh # press 3 to init database
+diesel migration run # this will renew schema.rs without view created in create_tags/up.sql
 ```
-$ ./init.sh # press 3 to init database
-$ diesel migration run # this will renew schema.rs without view created in create_tags/up.sql
-```
+
 [Diesel.rs Trick: Treat View as Table](https://deterministic.space/diesel-view-table-trick.html)
 
 ### [Nginx](http://nginx.org/en/download.html)
+
 nginx has been used in the development of the time
 
-##### config:
-```
+#### config
+
+```conf
 server {
         listen       8880;
         server_name  127.0.0.1;
@@ -64,34 +73,55 @@ server {
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         }
 ```
-Ref: 
+
+Ref:
 [Accessing host machine from within docker container Docker Desktop for Mac docker](https://forums.docker.com/t/accessing-host-machine-from-within-docker-container/14248/15)
 
 ### blog
-```
-$ cargo run --bin blog_web // listen on 127.0.0.1:8080
 
-$ cargo run --bin blog_api // listen on 127.0.0.1:8888
+```bash
+cargo run --bin blog_web // listen on 127.0.0.1:8080
+cargo run --bin blog_api // listen on 127.0.0.1:8888
 ```
 
 if you want to login admin, the account is `admin`, password is `admin`
 
+## Problems & Solutions
 
-## Solution
-- Could not compile `awc`
+### Could not compile `awc`
+
 ```bash
-$ cargo clean
-$ rm cargo.lock
-$ cargo build
+cargo clean
+rm cargo.lock
+cargo build
 ```
 
+### the trait `diesel::Queryable<diesel::sql_types::Text, diesel::pg::Pg>` is not implemented for `std::option::Option<std::string::String>`
+
+#### REASON
+
+the field order of the struct defined in rust code is not the same in schema.rs
+
+#### HOW TO FIX
+
+make the filed order the same in schema.rs
+
+### view is NOT generated as table in `schema.rs` with `diesel migration run`
+
+#### HOW TO FIX
+
+use init.sh script under docker folder to automatically add the view as table into`schema.rs`
+
+## Useful Documents
+
+- [Postgres & Diesel types](https://kotiri.com/2018/01/31/postgresql-diesel-rust-types.html)
 
 ## TODO
 
-[] 使用 [argon2](https://crates.io/crates/rust-argon2) 来重写密码加密部分
+[] use [argon2](https://crates.io/crates/rust-argon2)  to rewrite encryption
 
-[X] 使用 [chrono](https://crates.io/crates/chrono) 来重写日期部分的方法
+[X] use [chrono](https://crates.io/crates/chrono) to rewrite datetime
 
-[X] 使用 [reCAPTCHA](https://www.google.com/recaptcha/intro/v3.html) 来实现验证码
+[X] use [reCAPTCHA](https://www.google.com/recaptcha/intro/v3.html) to implement login verification
 
-[] 使用 [vue-element-loading](https://biigpongsatorn.github.io/#/vue-element-loading) 来实现加载画面
+[] use [vue-element-loading](https://biigpongsatorn.github.io/#/vue-element-loading) to implement loading animation

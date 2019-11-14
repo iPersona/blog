@@ -104,8 +104,7 @@ impl Visitor {
         params: Path<Uuid>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         debug!("view_article: {:?}", &params);
-        let conn = state.db.connection();
-        match ArticlesWithTag::query_article(&conn, params.into_inner(), false) {
+        match ArticlesWithTag::query_article(&state, params.into_inner(), false) {
             Ok(data) => api_resp_data!(data),
             Err(err) => api_resp_err!(&*err),
         }

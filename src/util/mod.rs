@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod debug_middleware;
 pub mod env;
 pub mod errors;

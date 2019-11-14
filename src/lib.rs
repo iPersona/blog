@@ -24,6 +24,7 @@ extern crate tiny_keccak;
 extern crate uuid;
 
 pub mod api;
+pub mod cache;
 pub mod models;
 pub mod schema;
 pub mod util;
@@ -53,10 +54,8 @@ pub use actix::Addr;
 pub(crate) use util::{get_password, markdown_render, random_string, sha3_256_encode};
 pub use web::{Admin, ArticleWeb};
 
-// pub type DbAddr = Addr<crate::util::postgresql_pool::DataBase>;
-// pub type CacheAddr = Addr<crate::util::redis_pool::Cache>;
-
 pub struct AppState {
     pub db: crate::util::postgresql_pool::DataBase,
     pub cache: crate::util::redis_pool::Cache,
+    pub visit_statistic: actix::Addr<crate::cache::executor::VisitStatisticActor>,
 }

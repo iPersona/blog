@@ -16,6 +16,7 @@ use super::super::markdown_render;
 use super::super::{article_with_tag, articles};
 use super::FormDataExtractor;
 use super::{RelationTag, Relations, UserNotify};
+use crate::cache::executor::IncreaseArticleVisitNum;
 use std::cell::Ref;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -69,10 +70,16 @@ impl ArticlesWithTag {
     }
 
     pub fn query_article(
-        conn: &PgConnection,
+        state: &AppState,
         id: Uuid,
         admin: bool,
     ) -> Result<ArticlesWithTag, String> {
+        // statistic visitor number
+        state.visit_statistic.do_send(IncreaseArticleVisitNum {
+            article_id: id.clone(),
+        });
+
+        let conn = &state.db.connection();
         let res = if admin {
             all_article_with_tag
                 .filter(article_with_tag::id.eq(id))
@@ -539,6 +546,7 @@ struct Articles {
     pub published: bool,
     pub create_time: NaiveDateTime,
     pub modify_time: NaiveDateTime,
+    pub visitor_num: i64,
 }
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
@@ -658,4 +666,56 @@ pub struct ArticleNumWithTag {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ListComments {
     pub article_id: Uuid,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UpdateArticleVisitNum {
+    pub article_id: Uuid,
+    pub visit_num: i64,
+}
+
+impl UpdateArticleVisitNum {
+    pub fn from_strings(mut str_list: Vec<String>) -> Vec<Self> {
+        let mut items = Vec::new();
+        while str_list.len() > 0 {
+            let num_str = str_list.pop().unwrap();
+            let id_str = str_list.pop().unwrap();
+
+            items.push(Self {
+                article_id: Uuid::parse_str(id_str.as_str()).unwrap(),
+                visit_num: num_str.as_str().parse::<i64>().unwrap(),
+            })
+        }
+        items
+    }
+}
+
+impl UpdateArticleVisitNum {
+    pub fn update_visit_num(&self, conn: &PgConnection) -> Result<usize, String> {
+        let res = diesel::update(all_articles.filter(articles::id.eq(self.article_id.clone())))
+            .set(articles::visitor_num.eq(self.visit_num))
+            .execute(conn);
+        match res {
+            Ok(num) => Ok(num),
+            Err(err) => Err(format!("{}", err)),
+        }
+    }
+
+    pub fn update_all(items: Vec<Self>, conn: &PgConnection) -> Result<(), String> {
+        let result = conn.transaction(|| {
+            for i in items.into_iter() {
+                let res = i.update_visit_num(conn);
+                if let Err(_) = res {
+                    return Err(diesel::result::Error::RollbackTransaction);
+                }
+            }
+
+            Ok(())
+        });
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(_) => Err("update visit num failed!".to_string()),
+        }
+    }
 }

@@ -120,6 +120,27 @@ impl RedisPool {
             .unwrap()
     }
 
+    pub fn hgetall<T>(&self, redis_key: &str) -> Vec<T>
+    where
+        T: redis::FromRedisValue,
+    {
+        redis::cmd("hgetall")
+            .arg(redis_key)
+            .query(&*self.pool.get().unwrap())
+            .unwrap()
+    }
+
+    pub fn hincrby(&self, redis_key: &str, hash_key: &str, num: i64) {
+        let a = |conn: &redis::Connection| {
+            redis::cmd("hincrby")
+                .arg(redis_key)
+                .arg(hash_key)
+                .arg(num)
+                .execute(conn)
+        };
+        self.with_conn(a);
+    }
+
     pub fn hexists(&self, redis_key: &str, hash_key: &str) -> bool {
         redis::cmd("hexists")
             .arg(redis_key)
@@ -216,8 +237,15 @@ pub struct Cache(pub Arc<RedisPool>);
 // }
 
 impl Cache {
-    pub fn new() -> Cache {
-        Cache(Arc::new(create_redis_pool(Some("lua/visitor_log.lua"))))
+    pub fn new(work_dir: Option<&str>) -> Cache {
+        match work_dir {
+            Some(wd) => {
+                let mut path = wd.to_owned();
+                path.push_str("/lua/visitor_log.lua");
+                Cache(Arc::new(create_redis_pool(Some(path.as_str()))))
+            }
+            None => Cache(Arc::new(create_redis_pool(None))),
+        }
     }
 
     pub fn into_inner(&self) -> Arc<RedisPool> {

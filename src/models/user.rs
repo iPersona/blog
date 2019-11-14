@@ -25,7 +25,6 @@ use std::collections::HashMap;
 pub struct Users {
     pub id: Uuid,
     pub account: String,
-    pub github: Option<String>,
     pub password: String,
     pub salt: String,
     pub groups: i16,
@@ -34,6 +33,7 @@ pub struct Users {
     pub email: String,
     pub disabled: i16,
     pub create_time: NaiveDateTime,
+    pub github: Option<String>,
 }
 
 impl Users {
