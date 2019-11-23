@@ -4,16 +4,12 @@
 
 <script>
 export default {
-  name: 'Settings',
-  component: {},
+  name: "Settings",
+  components: {},
   data() {
-    return {}
+    return {};
   },
-  mounted() {
-
-  },
-  methods: {
-
-  },
-}
+  mounted() {},
+  methods: {}
+};
 </script>

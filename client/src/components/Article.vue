@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div>
     <section
       v-if="isAdmin"
       align="right"
@@ -33,12 +33,13 @@
         v-html="compiledMarkdown"
       />
     </section>
-    <br><br>
+    <br>
+    <br>
     <section
       class="container"
       align="left"
     >
-      <b>Tags: </b>
+      <b>Tags:</b>
       <BTaglist
         v-for="t in article.tags"
         :key="t"
@@ -74,71 +75,71 @@
 
 <script>
 import Api from "@/api.js";
-import marked from 'marked'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/monokai-sublime.css'
-import { mapGetters } from 'vuex'
-import { IS_ADMIN } from '@/store/modules/store-types.js'
-import { USER } from '@/store/modules/module-names'
-import ArticleEditor from './ArticleEditor'
-import Comments from './Comments'
-import { EventBus, EVENT_RELOAD_ARTICLE } from '@/event-bus.js'
-import NewComment from './NewComment'
+import marked from "marked";
+import hljs from "highlight.js";
+import "highlight.js/styles/monokai-sublime.css";
+import { mapGetters } from "vuex";
+import { IS_ADMIN } from "@/store/modules/store-types.js";
+import { USER } from "@/store/modules/module-names";
+import ArticleEditor from "./ArticleEditor";
+import Comments from "./Comments";
+import { EventBus, EVENT_RELOAD_ARTICLE } from "@/event-bus.js";
+import NewComment from "./NewComment";
 
 export default {
   name: "Article",
   components: {
     ArticleEditor,
     Comments,
-    NewComment,
+    NewComment
   },
   props: {},
   data() {
     return {
       articleId: this.$route.params.id,
       article: {},
-      isEditArticle: false,
+      isEditArticle: false
     };
   },
   computed: {
-    compiledMarkdown: function () {
+    compiledMarkdown: function() {
       this.$getLog().debug(`compiledMarkdown: ${this.article.content}`);
       if (this.article.content === undefined) {
-        return marked('')
+        return marked("");
       }
       return marked(this.article.content);
     },
     ...mapGetters(USER, {
-      isAdmin: IS_ADMIN,
-    }),
+      isAdmin: IS_ADMIN
+    })
   },
   async mounted() {
-    await this.getArticle()
-    await this.listenEventBus()
+    await this.getArticle();
+    await this.listenEventBus();
   },
   methods: {
     listenEventBus() {
       const self = this;
-      EventBus.$on(EVENT_RELOAD_ARTICLE, async function () {
-        console.log(`event-bus: ${EVENT_RELOAD_ARTICLE}`)
-        await self.getArticle()
-      })
+      EventBus.$on(EVENT_RELOAD_ARTICLE, async function() {
+        console.log(`event-bus: ${EVENT_RELOAD_ARTICLE}`);
+        await self.getArticle();
+      });
     },
     async getArticle() {
       let api = new Api();
       let rsp = await api.visitorViewArticle(this.articleId);
       if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`failed to load article: ${rsp.detail}`)
+        this.$getUi().toast.fail(`failed to load article: ${rsp.detail}`);
         return;
       }
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
       this.article = rsp.data;
-      this.trimTags()
+      this.trimTags();
     },
     initMarked() {
       marked.setOptions({
         renderer: new marked.Renderer(),
-        highlight: function (code, lang) {
+        highlight: function(code, lang) {
           if (lang && hljs.getLanguage(lang)) {
             return hljs.highlight(lang, code, true).value;
           } else {
@@ -160,16 +161,15 @@ export default {
       });
     },
     editArticle() {
-      this.isEditArticle = true
+      this.isEditArticle = true;
     },
     hasTags() {
-      return this.article.tags !== undefined
-        && this.article.tags.length > 0
+      return this.article.tags !== undefined && this.article.tags.length > 0;
     },
     trimTags() {
       this.article.tags = this.article.tags.filter(t => {
-        return t !== null
-      })
+        return t !== null;
+      });
     }
   }
 };

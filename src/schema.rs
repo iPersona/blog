@@ -44,6 +44,14 @@ table! {
 }
 
 table! {
+    daily_statistic (id) {
+        id -> Uuid,
+        today -> Timestamp,
+        visit_num -> Int8,
+    }
+}
+
+table! {
     tags (id) {
         id -> Uuid,
         tag -> Varchar,
@@ -71,4 +79,11 @@ joinable!(article_tag_relation -> tags (tag_id));
 joinable!(comments -> articles (article_id));
 joinable!(comments -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(article_tag_relation, articles, comments, tags, users,);
+allow_tables_to_appear_in_same_query!(
+    article_tag_relation,
+    articles,
+    comments,
+    daily_statistic,
+    tags,
+    users,
+);

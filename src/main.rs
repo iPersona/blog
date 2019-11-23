@@ -27,7 +27,7 @@ use blog::cache::executor::VisitStatisticActor;
 use blog::util::cli::Opts;
 use blog::util::postgresql_pool::DataBase;
 use blog::util::redis_pool::Cache;
-use blog::{AdminArticle, AdminUser, AppState, Tag, User, Visitor};
+use blog::{AdminArticle, AdminUser, AppState, ChartData, Tag, User, Visitor};
 use log::debug;
 
 fn main() {
@@ -67,6 +67,7 @@ fn main() {
             .configure(Tag::configure)
             .configure(AdminUser::configure)
             .configure(User::configure)
+            .configure(ChartData::configure)
             // .wrap(
             //     CookieSession::signed(&[0; 32])
             //         .name("blog_session")

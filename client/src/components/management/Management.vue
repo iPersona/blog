@@ -1,5 +1,5 @@
 <template>
-  <div class="container">
+  <div class="container area">
     <div class="tile is-ancestor">
       <div class="tile is-vertical is-2">
         <ActionMenu align="left" />
@@ -12,24 +12,33 @@
 </template>
 
 <script>
-import ActionMenu from './ActionMenu'
+import ActionMenu from "./ActionMenu"
 
 export default {
-  name: 'Management',
+  name: "Management",
   components: { ActionMenu },
   data() {
     return {}
   },
   mounted() {
-
+    this.setupDefaultView()
   },
   methods: {
-  },
+    setupDefaultView() {
+      this.$router.push({
+        path: "/management/stat"
+      })
+    }
+  }
 }
 </script>
 
 <style scoped>
 .router-view {
   margin-left: 20px;
+}
+
+.area {
+  margin-bottom: 50px;
 }
 </style>

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use chrono::NaiveDateTime;
-use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Text};
 use strip_markdown::strip_markdown;
@@ -17,6 +16,7 @@ use super::super::{article_with_tag, articles};
 use super::FormDataExtractor;
 use super::{RelationTag, Relations, UserNotify};
 use crate::cache::executor::IncreaseArticleVisitNum;
+use log::error;
 use std::cell::Ref;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -692,9 +692,15 @@ impl UpdateArticleVisitNum {
 
 impl UpdateArticleVisitNum {
     pub fn update_visit_num(&self, conn: &PgConnection) -> Result<usize, String> {
-        let res = diesel::update(all_articles.filter(articles::id.eq(self.article_id.clone())))
-            .set(articles::visitor_num.eq(self.visit_num))
-            .execute(conn);
+        // let res = diesel::update(all_articles.filter(articles::id.eq(self.article_id.clone())))
+        //     .set(articles::visitor_num.eq(self.visit_num))
+        //     .execute(conn);
+        let raw_sql = format!(
+            "UPDATE articles SET visitor_num = visitor_num + {} WHERE id = '{}'",
+            self.visit_num,
+            self.article_id.to_hyphenated().to_string()
+        );
+        let res = diesel::sql_query(raw_sql).execute(conn);
         match res {
             Ok(num) => Ok(num),
             Err(err) => Err(format!("{}", err)),
@@ -705,7 +711,8 @@ impl UpdateArticleVisitNum {
         let result = conn.transaction(|| {
             for i in items.into_iter() {
                 let res = i.update_visit_num(conn);
-                if let Err(_) = res {
+                if let Err(e) = res {
+                    error!("update_visit_num failed: {:?}", e);
                     return Err(diesel::result::Error::RollbackTransaction);
                 }
             }
@@ -716,6 +723,30 @@ impl UpdateArticleVisitNum {
         match result {
             Ok(_) => Ok(()),
             Err(_) => Err("update visit num failed!".to_string()),
+        }
+    }
+}
+
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize)]
+pub struct ArticleVisitNum {
+    pub visitor_num: i64,
+}
+
+impl ArticleVisitNum {
+    pub fn total_visit_num(conn: &PgConnection) -> Result<i64, String> {
+        use crate::schema::articles::dsl::*;
+        use bigdecimal::*;
+        use diesel::dsl::sum;
+
+        let res = articles
+            .select(sum(visitor_num))
+            .first::<Option<BigDecimal>>(conn);
+        match res {
+            Ok(n) => match n {
+                Some(v) => Ok(v.to_i64().unwrap()),
+                None => Ok(0),
+            },
+            Err(e) => Err(format!("sum visitor_num failed: {:?}", e)),
         }
     }
 }

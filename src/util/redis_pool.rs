@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::util::env::Env;
+use crate::util::redis_pool::RedisKeys::VisitCache;
 use dotenv;
 use r2d2;
 use r2d2::Pool;
@@ -218,12 +219,28 @@ impl RedisPool {
             .invoke::<bool>(&*self.pool.get().unwrap())
             .unwrap()
     }
+
+    pub fn get_redis_key(key: RedisKeys) -> String {
+        key.to_string()
+    }
+}
+
+pub enum RedisKeys {
+    VisitCache,
+}
+
+impl RedisKeys {
+    pub fn to_string(&self) -> String {
+        match self {
+            VisitCache => "visit-cache".to_string(),
+        }
+    }
 }
 
 fn create_redis_pool(path: Option<&str>) -> RedisPool {
     dotenv::dotenv().ok();
 
-    let database_url = Env::get().redis_notify_url;
+    let database_url = Env::get().redis_url;
     match path {
         Some(path) => RedisPool::new_with_script(database_url.as_str(), path),
         None => RedisPool::new(database_url.as_str()),

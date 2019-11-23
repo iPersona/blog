@@ -12,6 +12,7 @@ pub trait FormDataExtractor {
 pub mod article_tag_relation;
 pub mod articles;
 pub mod comment;
+pub mod daily_statistic;
 pub mod notifys;
 pub mod tag;
 pub mod token;

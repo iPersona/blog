@@ -54,7 +54,7 @@
                 "-w", "${workspaceFolder}"
             ],
             "env": {
-                "RUST_BACKTRACE": "1"
+                "RUST_BACKTRACE": "full"
             },
             "cwd": "${workspaceFolder}"
         },

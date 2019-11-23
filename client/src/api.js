@@ -62,6 +62,9 @@ export default class Api {
             editTag: `${this.host}/tag/edit`,
             updateTags: `${this.host}/tag/update`,
 
+            // statistic
+            getDailyPeriod: `${this.host}/statistic/period`,
+
         });
         // request拦截器
         this.axios.interceptors.request.use(req => {
@@ -81,6 +84,13 @@ export default class Api {
             console.log(error) // for debug
             Promise.reject(error)
         });
+    }
+
+    async getDailyPeriod(start, end) {
+        return this.get(this.url.getDailyPeriod, {
+            start,
+            end
+        })
     }
 
     async newComment(articleId, content, userId) {

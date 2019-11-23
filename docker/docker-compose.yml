@@ -28,15 +28,6 @@ services:
       - ./redis/data:/data:rw
       # 若需要自定义配置的话，取消下面一行的注释
     #   - ./redis.conf:/usr/local/etc/redis/redis.conf
-
-  redis_notify:
-    image: redis:alpine
-    container_name: redis_notify
-    ports:
-      - 6380:6379
-    volumes:
-      - ./redis_notify/data:/data:rw
-
 #networks:
 #  default:
 #    external:

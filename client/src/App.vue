@@ -4,15 +4,15 @@
     class="container"
   >
     <NavHeader />
-    <RouterView />
+    <RouterView class="router-view" />
     <NavFooter />
   </div>
 </template>
 
 <script>
-import { mapMutations } from 'vuex'
-import { LOAD_USER, LOAD_TAG } from '@/store/modules/mutation-types'
-import { USER, TAG } from '@/store/modules/module-names'
+import { mapMutations } from "vuex";
+import { LOAD_USER, LOAD_TAG } from "@/store/modules/mutation-types";
+import { USER, TAG } from "@/store/modules/module-names";
 
 import NavHeader from "@/components/Header";
 import NavFooter from "@/components/Footer";
@@ -29,8 +29,8 @@ export default {
     };
   },
   mounted() {
-    console.log(`App mounted`)
-    this.loadAppData()
+    console.log(`App mounted`);
+    this.loadAppData();
   },
   methods: {
     ...mapMutations(USER, {
@@ -40,10 +40,10 @@ export default {
       loadTag: LOAD_TAG
     }),
     loadAppData() {
-      this.loadUser()
-      this.loadTag()
+      this.loadUser();
+      this.loadTag();
     }
-  },
+  }
 };
 </script>
 
@@ -58,6 +58,11 @@ export default {
 }
 @import "https://cdn.materialdesignicons.com/2.5.94/css/materialdesignicons.min.css";
 @import "https://use.fontawesome.com/releases/v5.2.0/css/all.css";
+
+.router-view {
+  margin-left: 15%;
+  margin-right: 15%;
+}
 </style>
 
 <style scoped src="buefy/dist/buefy.css">

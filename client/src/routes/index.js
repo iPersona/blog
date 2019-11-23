@@ -73,6 +73,7 @@ export default new Router({
             path: '/management',
             name: 'management',
             component: Management,
+            redirect: '/management/stat',
             children: [{
                     path: 'stat',
                     name: 'stat',

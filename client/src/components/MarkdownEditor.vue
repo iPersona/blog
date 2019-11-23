@@ -1,32 +1,30 @@
 <template>
-  <div
-    class="editor"
-    align="left"
-  >
+  <!-- eslint-disable-next-line -->
+  <div align="left" class="editor">
     <textarea id="editor" />
     <!-- 可能是vscode格式化插件的问题，div老是被缩进4个空格，不能和起始div对齐 -->
     <!-- eslint-disable-next-line -->
-    </div>
+  </div>
 </template>
 
 <script>
-import EasyMDE from 'easymde'
-import "easymde/dist/easymde.min.css"
+import EasyMDE from "easymde";
+import "easymde/dist/easymde.min.css";
 
-import Hljs from 'highlight.js'
-import 'highlight.js/styles/solarized-dark.css'
+import Hljs from "highlight.js";
+import "highlight.js/styles/solarized-dark.css";
 
-import { EventBus, EVENT_MARKDOWN_EDITOR_CONTENT_READY } from '@/event-bus.js'
+import { EventBus, EVENT_MARKDOWN_EDITOR_CONTENT_READY } from "@/event-bus.js";
 
 // import { EventBus, EVENT_HIDE_HEADER, EVENT_SHOW_HEADER } from '@/event-bus.js'
 
 export default {
-  name: 'MarkdownEditor',
-  component: {},
+  name: "MarkdownEditor",
+  components: {},
   props: {
     placeholder: {
       type: String,
-      default: ''
+      default: ""
     },
     minHeight: {
       type: Number,
@@ -34,45 +32,73 @@ export default {
     },
     toolbarStyle: {
       type: String,
-      default: 'Article'
+      default: "Article"
     },
     initialValue: {
       type: String,
-      default: ''
-    },
+      default: ""
+    }
   },
   data() {
     return {
       editor: null,
       toolbarSet: {
-        Article: ['heading', 'bold', 'italic', 'strikethrough', '|', 'quote', 'unordered-list', 'ordered-list', 'link', 'image', 'code', {
-          name: "table",
-          action: EasyMDE.drawTable,
-          className: "fa fa-table",
-          title: "Table",
-        }, 'horizontal-rule', 'preview', 'side-by-side', 'fullscreen'],
+        Article: [
+          "heading",
+          "bold",
+          "italic",
+          "strikethrough",
+          "|",
+          "quote",
+          "unordered-list",
+          "ordered-list",
+          "link",
+          "image",
+          "code",
+          {
+            name: "table",
+            action: EasyMDE.drawTable,
+            className: "fa fa-table",
+            title: "Table"
+          },
+          "horizontal-rule",
+          "preview",
+          "side-by-side",
+          "fullscreen"
+        ],
 
         Comment: [
-          "heading", "bold", "italic", "|", "quote", "code", "link", "|", "unordered-list", "ordered-list", "|", "preview"
+          "heading",
+          "bold",
+          "italic",
+          "|",
+          "quote",
+          "code",
+          "link",
+          "|",
+          "unordered-list",
+          "ordered-list",
+          "|",
+          "preview"
         ]
       }
-    }
+    };
   },
   mounted() {
-    this.initEditor()
-    this.listenEvent()
+    this.initEditor();
+    this.listenEvent();
   },
   methods: {
     listenEvent() {
       const self = this;
-      EventBus.$on(EVENT_MARKDOWN_EDITOR_CONTENT_READY, async function (val) {
-        console.log(`event-bus: ${EVENT_MARKDOWN_EDITOR_CONTENT_READY}`)
-        self.editor.value(val)
-      })
+      EventBus.$on(EVENT_MARKDOWN_EDITOR_CONTENT_READY, async function(val) {
+        console.log(`event-bus: ${EVENT_MARKDOWN_EDITOR_CONTENT_READY}`);
+        self.editor.value(val);
+      });
     },
     initEditor() {
       this.editor = new EasyMDE({
-        element: document.getElementById('editor'),
+        element: document.getElementById("editor"),
         minHeight: `${this.minHeight}px`,
         placeholder: this.placeholder,
         status: false,
@@ -83,10 +109,10 @@ export default {
         // onToggleFullScreen: this.onToggleFullScreen,
         renderingConfig: {
           codeSyntaxHighlighting: true,
-          hljs: Hljs,
+          hljs: Hljs
         },
-        spellChecker: false,
-      })
+        spellChecker: false
+      });
     },
 
     // onToggleFullScreen(isFullScreen) {
@@ -99,15 +125,15 @@ export default {
     // },
 
     content() {
-      return this.editor.value()
+      return this.editor.value();
     },
 
     setContent(content) {
-      console.log(`set-content: ${content}`)
-      this.editor.value(content)
+      console.log(`set-content: ${content}`);
+      this.editor.value(content);
     }
-  },
-}
+  }
+};
 </script>
 
 <style scoped>
