@@ -24,33 +24,33 @@
       </RouterLink>
 
       <!-- bottom -->
-      <section class="article-bottom columns">
-        <div
+      <section class="article-bottom">
+        <b-field
+          grouped
           align="left"
-          class="column is-1"
         >
-          <span class="article-time ">
+          <span class="article-time">
             {{ formatDate(article.modify_time) }}
           </span>
-        </div>
-        <div
-          v-if="article.tags.length > 0"
-          align="left"
-          class="column is-4"
-        >
-          <BTaglist
-            v-for="t in article.tags"
-            :key="t"
-            class="article-tags"
+
+          <div
+            v-if="article.tags.length > 0"
+            align="left"
           >
-            <BTag
-              v-if="article.tags.length > 0"
-              class="article-tag"
+            <BTaglist
+              v-for="t in article.tags"
+              :key="t"
+              class="article-tags"
             >
-              {{ t }}
-            </BTag>
-          </BTaglist>
-        </div>
+              <BTag
+                v-if="article.tags.length > 0"
+                class="article-tag"
+              >
+                {{ t }}
+              </BTag>
+            </BTaglist>
+          </div>
+        </b-field>
       </section>
       <hr class="short">
 
@@ -232,9 +232,11 @@ hr.short {
 
 .article-time {
   font-size: small;
+  font-style: italic;
   color: gray;
-  vertical-align: middle;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  margin-right: 30px;
 }
 
 .article-tags {
@@ -244,6 +246,14 @@ hr.short {
 
 .article-tag {
   margin-right: 10px;
+}
+
+.tags:not(:last-child) {
+  margin-bottom: 0;
+}
+
+.tags .tag {
+  margin-bottom: 0;
 }
 
 .read-more {
