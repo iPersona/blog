@@ -245,8 +245,7 @@ impl Visitor {
                 .route(web::get().to_async(Visitor::list_comments)),
         )
         .service(
-            web::resource("article/view/{article_id}")
-                .route(web::get().to_async(Visitor::view_article)),
+            web::resource("article/{article_id}").route(web::get().to_async(Visitor::view_article)),
         )
         .service(web::resource("user/login").route(web::post().to_async(Visitor::login)))
         .service(web::resource("user/new").route(web::post().to_async(Visitor::create_user)))

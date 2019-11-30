@@ -38,7 +38,7 @@ export default class Api {
             editArticle: `${this.host}/article/edit`, // 编辑文章
             publishArticle: `${this.host}/article/publish`, // 发布文章
             visitorViewAll: `${this.host}/articles`, // 游客：访问文章列表
-            visitorViewArticle: `${this.host}/article/view`, // 游客：访问文章列表
+            visitorViewArticle: `${this.host}/article`, // 游客：访问文章列表
             articleNumber: `${this.host}/article/count`, // 访客：文章数量
             articleNumberByTag: `${this.host}/article/tag/count`,
             articleByTag: `${this.host}/article/tag`,

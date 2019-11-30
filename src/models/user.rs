@@ -266,7 +266,7 @@ impl UserInfo {
     /// key is `admin_info`
     pub fn view_admin(conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Self {
         if redis_pool.exists("admin_info") {
-            serde_json::from_str::<UserInfo>(&redis_pool.get("admin_info")).unwrap()
+            serde_json::from_str::<UserInfo>(&redis_pool.get("admin_info").unwrap()).unwrap()
         } else {
             let info = all_users
                 .select((

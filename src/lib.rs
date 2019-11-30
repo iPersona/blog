@@ -19,6 +19,7 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate regex;
 extern crate serde_urlencoded;
 extern crate tiny_keccak;
 extern crate uuid;
@@ -58,4 +59,5 @@ pub struct AppState {
     pub db: crate::util::postgresql_pool::DataBase,
     pub cache: crate::util::redis_pool::Cache,
     pub visit_statistic: actix::Addr<crate::cache::executor::VisitStatisticActor>,
+    pub cron: actix::Addr<crate::cache::cron::Cron>,
 }

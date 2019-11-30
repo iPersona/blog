@@ -21,8 +21,9 @@ extern crate log;
 
 extern crate clap;
 
-use actix::{SyncArbiter, System};
+use actix::{Actor, Arbiter, SyncArbiter, System};
 //use actix_web::cookie::SameSite;
+use blog::cache::cron::Cron;
 use blog::cache::executor::VisitStatisticActor;
 use blog::util::cli::Opts;
 use blog::util::postgresql_pool::DataBase;
@@ -48,7 +49,10 @@ fn main() {
     debug!("static_file_dir: {}", static_file_dir);
 
     let sys = System::builder().stop_on_panic(true).name("blog").build();
-    let visit_statistic_actor = SyncArbiter::start(1, move || VisitStatisticActor::default());
+    let statistic_addr = SyncArbiter::start(1, move || VisitStatisticActor::default());
+    let statistic_cron_addr = statistic_addr.clone();
+    let corn_addr =
+        Cron::start_in_arbiter(&Arbiter::new(), move |_| Cron::new(statistic_cron_addr));
 
     //    System::new("example");
     HttpServer::new(move || {
@@ -56,7 +60,8 @@ fn main() {
             .data(AppState {
                 db: DataBase::new(),
                 cache: Cache::new(Some(work_dir.as_str())),
-                visit_statistic: visit_statistic_actor.clone(),
+                visit_statistic: statistic_addr.clone(),
+                cron: corn_addr.clone(),
             })
             // TODO: 调试完成后屏蔽掉
             .wrap(blog::util::debug_middleware::Debug)

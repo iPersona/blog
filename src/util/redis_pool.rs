@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use crate::util::env::Env;
-use crate::util::redis_pool::RedisKeys::VisitCache;
 use dotenv;
 use r2d2;
 use r2d2::Pool;
@@ -76,11 +75,17 @@ impl RedisPool {
         self.with_conn(a);
     }
 
-    pub fn get(&self, redis_key: &str) -> String {
-        redis::cmd("get")
+    pub fn get(&self, redis_key: &str) -> Option<String> {
+        let res = redis::cmd("get")
             .arg(redis_key)
-            .query(&*self.pool.get().unwrap())
-            .unwrap()
+            .query(&*self.pool.get().unwrap());
+        match res {
+            Ok(v) => v,
+            Err(_) => {
+                // not found
+                None
+            }
+        }
     }
 
     pub fn hset<T>(&self, redis_key: &str, hash_key: &str, value: T)
@@ -146,6 +151,13 @@ impl RedisPool {
         redis::cmd("hexists")
             .arg(redis_key)
             .arg(hash_key)
+            .query(&*self.pool.get().unwrap())
+            .unwrap()
+    }
+
+    pub fn hlen(&self, redis_key: &str) -> i64 {
+        redis::cmd("hlen")
+            .arg(redis_key)
             .query(&*self.pool.get().unwrap())
             .unwrap()
     }
@@ -227,12 +239,14 @@ impl RedisPool {
 
 pub enum RedisKeys {
     VisitCache,
+    PersistTime,
 }
 
 impl RedisKeys {
     pub fn to_string(&self) -> String {
         match self {
-            VisitCache => "visit-cache".to_string(),
+            Self::VisitCache => "visit-cache".to_string(),
+            Self::PersistTime => "visit-cache-persist-time".to_string(),
         }
     }
 }

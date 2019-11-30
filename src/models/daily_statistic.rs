@@ -12,14 +12,20 @@ use typename::TypeName;
 #[table_name = "daily_statistic"]
 pub struct InsertDailyStatistic {
     pub visit_num: i64,
+    pub today: NaiveDateTime,
 }
 
 impl InsertDailyStatistic {
-    pub fn insert(conn: &PgConnection, redis: &Arc<RedisPool>) -> Result<bool, String> {
+    pub fn insert(
+        conn: &PgConnection,
+        redis: &Arc<RedisPool>,
+        time: NaiveDateTime,
+    ) -> Result<bool, String> {
         let res = DailyStatistic::get_today_from_cache(redis)?;
         let res = diesel::insert_into(daily_statistic::table)
             .values(Self {
                 visit_num: res.visit_num,
+                today: time,
             })
             .execute(conn);
         match res {
