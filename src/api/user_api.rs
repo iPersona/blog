@@ -12,29 +12,32 @@ pub struct User;
 impl User {
     fn view_user(
         _state: Data<AppState>,
-        _req: HttpRequest,
-        session: Session,
+        req: HttpRequest,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let user_info = UserInfo::view_user_with_cookie(&session);
+        let ext = req.extensions();
+        let user_info = ext.get::<UserInfo>();
         match user_info {
-            Ok(v) => match v {
-                Some(v) => api_resp_data!(v),
-                None => api_resp_err!("can not get userinfo from session!"),
-            },
-            Err(e) => api_resp_err!(format!("can not get userinfo from session: {:?}", e)),
+            Some(v) => api_resp_data!(v),
+            None => api_resp_err!(format!("can not get userinfo from session!")),
         }
     }
 
     fn change_pwd(
         state: Data<AppState>,
-        _req: HttpRequest,
+        req: HttpRequest,
         params: Form<ChangePassword>,
-        session: Session,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let pg_pool = &state.db.connection();
-        match params.into_inner().change_password(pg_pool, &session) {
-            Ok(data) => api_resp_data!(data),
-            Err(err) => api_resp_err!(&*err),
+        let ext = req.extensions();
+        let user_info = ext.get::<UserInfo>();
+        match user_info {
+            Some(u) => {
+                let pg_pool = &state.db.connection();
+                match params.into_inner().change_password(u, pg_pool) {
+                    Ok(data) => api_resp_data!(data),
+                    Err(err) => api_resp_err!(&*err),
+                }
+            }
+            None => api_resp_err!(format!("failed to get user info from token")),
         }
     }
 
@@ -79,7 +82,7 @@ impl User {
     }
 
     pub fn configure(cfg: &mut web::ServiceConfig) {
-        cfg.service(web::resource("user/change_pwd").route(web::get().to_async(User::change_pwd)))
+        cfg.service(web::resource("user/change_pwd").route(web::post().to_async(User::change_pwd)))
             .service(web::resource("user/view").route(web::get().to_async(User::view_user)))
             .service(web::resource("user/sign_out").route(web::get().to_async(User::sign_out)))
             .service(web::resource("user/edit").route(web::post().to_async(User::edit)))

@@ -30,16 +30,16 @@ export default class Api {
         }),
         (this.url = {
             // article
-            createArticle: `${this.host}/article/new`, // 创建文章
-            deleteArticle: `${this.host}/article/delete`, // 删除文章
-            adminView: `${this.host}/article/admin/view`, // 获取文章html
-            adminViewRaw: `${this.host}/article/admin/view_raw`, // 获取文章md
-            adminViewAll: `${this.host}/article/admin/view_all`, // 获取文章列表
-            editArticle: `${this.host}/article/edit`, // 编辑文章
-            publishArticle: `${this.host}/article/publish`, // 发布文章
-            visitorViewAll: `${this.host}/articles`, // 游客：访问文章列表
-            visitorViewArticle: `${this.host}/article`, // 游客：访问文章列表
-            articleNumber: `${this.host}/article/count`, // 访客：文章数量
+            createArticle: `${this.host}/article/new`, // [admin] create article
+            deleteArticle: `${this.host}/article/delete`, // [admin] delete article
+            adminView: `${this.host}/article/admin/view`, // [admin] get article
+            adminViewRaw: `${this.host}/article/admin/view_raw`, // [admin] get article markdown
+            adminViewAll: `${this.host}/article/admin/view_all`, // [admin] get article list
+            editArticle: `${this.host}/article/edit`, // edit article
+            publishArticle: `${this.host}/article/publish`, // publish article
+            visitorViewAll: `${this.host}/articles`, // get article list
+            visitorViewArticle: `${this.host}/article`, // get article
+            articleNumber: `${this.host}/article/count`, // article count
             articleNumberByTag: `${this.host}/article/tag/count`,
             articleByTag: `${this.host}/article/tag`,
 
@@ -50,9 +50,11 @@ export default class Api {
             newComment: `${this.host}/user/comment/new`,
 
             // user
-            login: `${this.host}/user/login`, // 登录
-            signup: `${this.host}/user/new`, // 游客：用户注册
-            userExist: `${this.host}/user/exist`, // 游客：检查用户是否存在
+            login: `${this.host}/user/login`, // login
+            signup: `${this.host}/user/new`, // register
+            userExist: `${this.host}/user/exist`, // check whether user exists
+            editProfile: `${this.host}/user/edit`, // edit user profile
+            updatePassword: `${this.host}/user/change_pwd`, // update password
 
             // tag
             getTags: `${this.host}/tag/view`,
@@ -72,9 +74,7 @@ export default class Api {
             // console.log(`store: ${store}`)
             // console.log(`STORE_KEY: ${STORE_KEY}`)
             if (localStorage[STORE_KEY] !== undefined) {
-                // req.headers['X-Token'] =
-                //     localStorage // 让每个请求携带token--['X-Token']为自定义key
-                // 请根据实际情况自行修改
+                // add token into headers
                 req.headers.Authorization = store.getters[`user/${TOKEN}`];
                 // console.log(`token: ${store.getters[TOKEN]}`)
             }
@@ -84,6 +84,21 @@ export default class Api {
             console.log(error) // for debug
             Promise.reject(error)
         });
+    }
+
+    async updatePassword(oldPassword, newPassword) {
+        return this.post(this.url.updatePassword, {
+            old_password: oldPassword,
+            new_password: newPassword,
+        })
+    }
+
+    async editProfile(profile) {
+        return this.post(this.url.editProfile, {
+            nickname: profile.nickname,
+            say: profile.sign,
+            email: profile.email,
+        })
     }
 
     async getDailyPeriod(start, end) {
@@ -405,7 +420,7 @@ export default class Api {
         }
     }
 
-    static async isSuccessResponse(rsp) {
+    static isSuccessResponse(rsp) {
         return rsp.hasOwnProperty('data') ||
             rsp.hasOwnProperty('status') && rsp.status === 'Ok';
     }

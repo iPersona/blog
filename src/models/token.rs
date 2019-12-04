@@ -22,7 +22,7 @@ use actix_web::HttpResponse;
 use chrono::NaiveDateTime;
 use futures::future::{ok, Either, FutureResult};
 use futures::Poll;
-use log::{debug, error, info};
+use log::{error, info};
 use regex::Regex;
 use typename::TypeName;
 use uuid::Uuid;
@@ -381,15 +381,6 @@ impl Permission {
     }
 
     fn is_visitor_permission(&self) -> bool {
-        use crate::util::path::{path_components_num, path_without_last_component};
-
-        // let p = if path_components_num(self.url.as_str()) >= 4 {
-        //     path_without_last_component(self.url.as_str())
-        // } else {
-        //     self.url.as_str().to_string()
-        // };
-        // debug!("p: {:?}", p);
-        // let visitor_url = VisitorUrl::from_str(&p.as_str());
         let visitor_url = VisitorUrl::from_str(&self.url.as_str());
         visitor_url.is_some()
     }

@@ -18,16 +18,20 @@ import About from '@/components/About'
 import Login from '@/components/Login'
 import Tags from '@/components/Tags'
 import ArticleEditor from '@/components/ArticleEditor'
-import Settings from '@/components/Settings'
+import Settings from '@/components/settings/Settings'
 import Management from '@/components/management/Management'
 import Statistic from '@/components/management/Statistic'
 import ArticlesManagement from '@/components/management/Articles'
 import TagsManagement from '@/components/management/Tags'
 import ArticleListByTag from '@/components/ArticleListByTag'
+import Profile from '@/components/settings/Profile'
+import PersonalSettings from '@/components/settings/PersonalSettings'
+import Security from '@/components/settings/Security'
 
 Vue.use(Router)
 
 export default new Router({
+    linkActiveClass: 'is-active',
     routes: [{
             path: '/',
             name: 'home',
@@ -100,6 +104,23 @@ export default new Router({
             path: '/settings',
             name: 'settings',
             component: Settings
+        },
+        {
+            path: '/personal',
+            name: 'personal',
+            component: PersonalSettings,
+            redirect: '/personal/profile',
+            children: [{
+                    path: 'profile',
+                    name: 'profile',
+                    component: Profile,
+                },
+                {
+                    path: 'security',
+                    name: 'security',
+                    component: Security,
+                },
+            ]
         },
         {
             path: '*',

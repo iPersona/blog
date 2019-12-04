@@ -52,11 +52,14 @@
               </template>
             </button>
             <BDropdownItem
-              value="home"
+              value="profile"
               aria-role="menuitem"
             >
-              <BIcon icon="home" />
-              Home
+              <BIcon
+                pack="fas"
+                icon="id-card"
+              />
+              Profile
             </BDropdownItem>
             <hr class="dropdown-divider">
             <BDropdownItem value="settings">

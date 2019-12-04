@@ -5,7 +5,7 @@
       :key="article.id"
       class="article-list"
     >
-      <RouterLink :to="`/article/${article.id}`">
+      <RouterLink :to="{name: 'article', params: {id: article.id}}">
         <!-- title -->
         <div
           align="left"

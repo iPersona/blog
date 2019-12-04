@@ -2,7 +2,7 @@
   <div class="container area">
     <div class="tile is-ancestor">
       <div class="tile is-vertical is-2">
-        <ActionMenu align="left" />
+        <PersonalSettingMenu align="left" />
       </div>
       <div class="tile is-vertical">
         <RouterView class="router-view" />
@@ -12,25 +12,26 @@
 </template>
 
 <script>
-import ActionMenu from "./ActionMenu"
-
+import PersonalSettingMenu from './PersonalSettingsMenu'
 export default {
-  name: "Management",
-  components: { ActionMenu },
+  name: 'PersonalSettings',
+  components: {
+    PersonalSettingMenu,
+  },
   data() {
     return {}
   },
   mounted() {
-    // set default view to dashboard
+    // set default view to profile settings
     this.setupDefaultView()
   },
   methods: {
     setupDefaultView() {
       this.$router.push({
-        name: 'stat'
+        name: 'profile'
       })
     }
-  }
+  },
 }
 </script>
 

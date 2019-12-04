@@ -2,7 +2,7 @@
   <div>
     <b-collapse class="panel">
       <div class="panel-heading">
-        <b>Management</b>
+        <b>Personal settings</b>
       </div>
       <router-link
         v-for="i in items"
@@ -37,44 +37,24 @@ export default {
     }
   },
   mounted() {
-    this.listenEventBus()
   },
   beforeDestroy() {
-    EventBus.$off(EVENT_STATISTIC_VIEW_MOUNTED)
   },
   methods: {
-    listenEventBus() {
-      let self = this
-      EventBus.$on(EVENT_STATISTIC_VIEW_MOUNTED, function () {
-        self.resetItem()
-      })
-    },
     defaultItems() {
       return [
         {
-          label: 'Dashboard',
-          to: '/management/stat',
+          label: 'Profile',
+          to: { name: 'profile' },
           active: true,
-          icon: 'chart-bar'
+          icon: 'id-card'
         },
         {
-          label: 'Articles',
-          to: '/management/articles',
+          label: 'Security',
+          to: { name: 'security' },
           active: false,
-          icon: 'newspaper'
+          icon: 'lock'
         },
-        {
-          label: 'Tags',
-          to: '/management/tags',
-          active: false,
-          icon: 'tags'
-        },
-        {
-          label: 'Settings',
-          to: '/management/settings',
-          active: false,
-          icon: 'cog'
-        }
       ]
     },
     menuItemClicked(mouseEvent) {

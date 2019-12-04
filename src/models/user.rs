@@ -16,7 +16,6 @@ use super::super::{
 use super::token::Token;
 use crate::AppState;
 use actix_session::Session;
-use actix_web::Error;
 use log::{debug, error};
 use std::cell::Ref;
 use std::collections::HashMap;
@@ -235,10 +234,6 @@ impl UserInfo {
         }
     }
 
-    pub fn view_user_with_cookie(session: &Session) -> Result<Option<UserInfo>, Error> {
-        session.get::<UserInfo>("info")
-    }
-
     pub fn view_user_list(state: &AppState, limit: i64, offset: i64) -> Result<Vec<Self>, String> {
         let conn = &state.db.connection();
         let res = all_users
@@ -295,28 +290,18 @@ pub struct ChangePassword {
 }
 
 impl ChangePassword {
-    pub fn change_password(&self, conn: &PgConnection, session: &Session) -> Result<usize, String> {
-        let user_or = UserInfo::view_user_with_cookie(&session);
-        let user: UserInfo;
-        match user_or {
-            Ok(v) => match v {
-                Some(v) => user = v,
-                None => return Err("failed to get userinfo from current session!".to_string()),
-            },
-            Err(e) => {
-                return Err(
-                    format!("failed to get userinfo from current session: {:?}", e).to_string(),
-                )
-            }
-        }
-
-        if !self.verification(conn, &user.id) {
-            return Err("Verification error".to_string());
+    pub fn change_password(
+        &self,
+        user_info: &UserInfo,
+        conn: &PgConnection,
+    ) -> Result<usize, String> {
+        if !self.verification(conn, &user_info.id) {
+            return Err("Verification error: old password is not correct".to_string());
         }
 
         let salt = random_string(6);
         let password = sha3_256_encode(get_password(&self.new_password) + &salt);
-        let res = diesel::update(all_users.filter(users::id.eq(user.id)))
+        let res = diesel::update(all_users.filter(users::id.eq(user_info.id)))
             .set((users::password.eq(&password), users::salt.eq(&salt)))
             .execute(conn);
         match res {
@@ -344,8 +329,8 @@ pub struct EditUser {
 }
 
 impl EditUser {
-    pub fn edit_user(&self, conn: &PgConnection, user_info: &UserInfo) -> Result<Token, String> {
-        let res = diesel::update(all_users.filter(users::id.eq(user_info.id)))
+    pub fn edit_user(&self, conn: &PgConnection, user_id: Uuid) -> Result<String, String> {
+        let res = diesel::update(all_users.filter(users::id.eq(user_id)))
             .set((
                 users::nickname.eq(self.nickname.clone()),
                 users::say.eq(self.say.clone()),
@@ -353,14 +338,20 @@ impl EditUser {
             ))
             .get_result::<Users>(conn);
         match res {
-            Ok(_) => Ok(Token::new(user_info)),
-            Err(err) => Err(format!("{}", err)),
+            Ok(user) => {
+                let token = Token::new(&user.into_user_info()).encode();
+                match token {
+                    Ok(t) => Ok(t),
+                    Err(e) => Err(format!("{}", e)),
+                }
+            }
+            Err(e) => Err(format!("{}", e)),
         }
     }
 }
 
 impl FormDataExtractor for EditUser {
-    type Data = Token;
+    type Data = String;
 
     fn execute(
         &self,
@@ -372,7 +363,8 @@ impl FormDataExtractor for EditUser {
         match user_info {
             Some(u) => {
                 let pg_pool = &state.db.connection();
-                match self.edit_user(pg_pool, &u) {
+                let user_id = u.id.clone();
+                match self.edit_user(pg_pool, user_id) {
                     Ok(token) => Ok(token),
                     Err(err) => Err(err),
                 }

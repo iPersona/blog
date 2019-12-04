@@ -21,12 +21,14 @@ Ui.install = function (Vue) {
         },
         fail: function (msg, isBottom) {
           if (isBottom === undefined) {
-            Vue.$buefy.toast.open({
+            // Vue.$buefy.toast.open({
+            self.$options.parent.$buefy.toast.open({
               message: msg,
               type: 'is-danger'
             })
           } else {
-            Vue.$buefy.toast.open({
+            // Vue.$buefy.toast.open({
+            self.$options.parent.$buefy.toast.open({
               message: msg,
               position: 'is-bottom',
               type: 'is-danger'

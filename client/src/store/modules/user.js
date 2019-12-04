@@ -9,13 +9,15 @@ export const STORE_KEY = 'coimioc-state'
 import {
   LOGOUT,
   LOGIN,
-  LOAD_USER
+  LOAD_USER,
+  UPDATE_TOKEN,
 } from './mutation-types'
 
 import {
   USER_NAME,
   USER_ID,
   TOKEN,
+  USER_INFO,
   IS_LOGIN,
   IS_ADMIN,
 } from './store-types'
@@ -55,6 +57,39 @@ function loadState(state) {
   state[IS_ADMIN] = s[IS_ADMIN]
 }
 
+function updateToken(state, token) {
+  if (token === undefined || token === null) {
+    return
+  }
+
+  // decode jwt
+  let decoded = jwt.decode(token, {
+    complete: true
+  })
+
+  if (decoded === null) {
+    return
+  }
+
+  state[IS_LOGIN] = true
+  state[TOKEN] = token
+  state[USER_NAME] = decoded.payload.user_name
+  state[USER_ID] = decoded.payload.user_id
+  console.log(`login user-id: ${state[USER_ID]}`)
+  state[IS_ADMIN] = decoded.payload.is_admin
+  saveState(state)
+}
+
+function userInfoFromPayload(payload) {
+  return {
+    name: payload.user_name,
+    nickname: payload.user_nickname,
+    email: payload.email,
+    sign: payload.user_sign,
+    registTime: payload.user_create_time,
+  }
+}
+
 const state = {
   [USER_NAME]: '',
   [USER_ID]: '',
@@ -64,7 +99,6 @@ const state = {
 }
 
 const mutations = {
-  // 我们可以使用 ES2015 风格的计算属性命名功能来使用一个常量作为函数名
   [LOGOUT](state) {
     state[IS_LOGIN] = false
     state[USER_NAME] = ''
@@ -72,29 +106,13 @@ const mutations = {
     clearState()
   },
   [LOGIN](state, token) {
-    if (token === undefined || token === null) {
-      return
-    }
-
-    // decode jwt
-    let decoded = jwt.decode(token, {
-      complete: true
-    })
-
-    if (decoded === null) {
-      return
-    }
-
-    state[IS_LOGIN] = true
-    state[TOKEN] = token
-    state[USER_NAME] = decoded.payload.user_name
-    state[USER_ID] = decoded.payload.user_id
-    console.log(`login user-id: ${state[USER_ID]}`)
-    state[IS_ADMIN] = decoded.payload.is_admin
-    saveState(state)
+    updateToken(state, token)
   },
   [LOAD_USER](state) {
     loadState(state)
+  },
+  [UPDATE_TOKEN](state, token) {
+    updateToken(state, token)
   }
 }
 
@@ -113,6 +131,21 @@ const getters = {
   },
   [TOKEN]: (state) => {
     return state[TOKEN]
+  },
+  [USER_INFO]: (state) => {
+    let token = state[TOKEN]
+    // decode jwt
+    let decoded = jwt.decode(token, {
+      complete: true
+    })
+
+    if (decoded === null) {
+      return
+    }
+
+    let ret = userInfoFromPayload(decoded.payload)
+    console.log(`userinfo: ${JSON.stringify(ret)}`)
+    return ret
   }
 }
 

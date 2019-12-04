@@ -9,7 +9,7 @@
         <BNavbarItem href="/">
           <img
             src="@/assets/logo.png"
-            alt="Lightweight UI components for Vue.js based on Bulma"
+            alt="Welcome home"
           >
         </BNavbarItem>
       </template>
@@ -68,24 +68,57 @@
               </template>
             </button>
             <BDropdownItem
-              value="home"
+              value="profile"
               aria-role="menuitem"
+              has-link
             >
-              <BIcon icon="home" />
-              Home
+              <router-link
+                v-model="profile"
+                :to="{name: 'profile'}"
+                exact
+              >
+                <BIcon
+                  pack="fas"
+                  icon="id-card"
+                />
+                <span>
+                  Profile
+                </span>
+              </router-link>
             </BDropdownItem>
+
             <hr class="dropdown-divider">
-            <BDropdownItem value="settings">
-              <BIcon icon="settings" />
-              Settings
+
+            <BDropdownItem
+              value="settings"
+              aria-role="menuitem"
+              has-link
+            >
+              <router-link
+                v-model="settings"
+                :to="{name: 'settings'}"
+                exact
+              >
+                <BIcon
+                  pack="fas"
+                  icon="cog"
+                />
+                <span>
+                  Settings
+                </span>
+              </router-link>
             </BDropdownItem>
+
             <BDropdownItem
               value="logout"
               aria-role="menuitem"
               @click="logout"
             >
-              <BIcon icon="logout" />
-              Logout
+              <BIcon
+                pack="fas"
+                icon="sign-out-alt"
+              />
+              <span>Logout</span>
             </BDropdownItem>
           </BDropdown>
         </BNavbarItem>
@@ -121,6 +154,11 @@ export default {
     return {
       item: '',
       isEditArticle: false,
+
+      // the props below is defined just for ignoring vue warning:
+      // Property or method is not defined on the instance but referenced during render.
+      profile: 'profile',
+      settings: 'settings'
     }
   },
   computed: {

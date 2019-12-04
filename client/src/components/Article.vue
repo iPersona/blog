@@ -102,7 +102,7 @@ export default {
     };
   },
   computed: {
-    compiledMarkdown: function() {
+    compiledMarkdown: function () {
       this.$getLog().debug(`compiledMarkdown: ${this.article.content}`);
       if (this.article.content === undefined) {
         return marked("");
@@ -120,7 +120,7 @@ export default {
   methods: {
     listenEventBus() {
       const self = this;
-      EventBus.$on(EVENT_RELOAD_ARTICLE, async function() {
+      EventBus.$on(EVENT_RELOAD_ARTICLE, async function () {
         console.log(`event-bus: ${EVENT_RELOAD_ARTICLE}`);
         await self.getArticle();
       });
@@ -139,7 +139,7 @@ export default {
     initMarked() {
       marked.setOptions({
         renderer: new marked.Renderer(),
-        highlight: function(code, lang) {
+        highlight: function (code, lang) {
           if (lang && hljs.getLanguage(lang)) {
             return hljs.highlight(lang, code, true).value;
           } else {

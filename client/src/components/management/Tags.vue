@@ -91,9 +91,9 @@
         <BField grouped>
           <BButton
             type="is-primary"
-            @click="submit"
+            @click="updateTags"
           >
-            Submit
+            Update tags
           </BButton>
         </BField>
       </section>
@@ -274,7 +274,7 @@ export default {
     openAddTagPanel() {
       this.isAddTagPanelOpen = true
     },
-    async submit() {
+    async updateTags() {
       let modified_tags = this.modified_tags.map(item => {
         return {
           id: item.id,
