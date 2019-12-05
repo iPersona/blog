@@ -3,3 +3,5 @@
 cmake*/
 .idea/
 .DS_Store
+.redisConsole.log
+dist/

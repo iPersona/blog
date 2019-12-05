@@ -1,55 +1,89 @@
-use crate::api::JsonResponse;
-use crate::models::tag::{DeleteTag, ViewTag};
+use crate::models::tag::{DeleteTag, TagsData};
 use crate::{AppState, NewTag, TagCount, Tags};
-use actix_web::error::ErrorInternalServerError;
-use actix_web::http::Method;
-use actix_web::{App, AsyncResponder, Form, HttpRequest};
-use futures::future::Future;
+use actix_web::web::Data;
+use actix_web::{web, web::Form, Error, HttpRequest, HttpResponse};
+use futures::{Future, Stream};
+use log::debug;
 
 pub struct Tag;
 
 impl Tag {
-    pub fn create_tag((req, params): (HttpRequest<AppState>, Form<NewTag>)) -> JsonResponse {
-        let res = params.into_inner().insert(&req.state());
+    pub fn create_tag(
+        state: Data<AppState>,
+        params: Form<NewTag>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let res = params.into_inner().insert(state.get_ref());
         match res {
             true => api_resp_ok!(),
             false => api_resp_err!("create_tag failed!"),
         }
     }
 
-    pub fn delete_tag((req, params): (HttpRequest<AppState>, Form<DeleteTag>)) -> JsonResponse {
-        let res = Tags::delete_tag(&req.state(), params.into_inner().id);
+    pub fn delete_tag(
+        state: Data<AppState>,
+        params: Form<DeleteTag>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let res = Tags::delete_tag(state.get_ref(), params.into_inner().id);
         match res {
             Ok(v) => api_resp_data!(v),
             Err(_) => api_resp_err!("delete_tag failed!"),
         }
     }
 
-    pub fn view_tag(req: &HttpRequest<AppState>) -> JsonResponse {
-        ViewTag::new(req.query()).map_or(api_resp_err!("parse query string failed!"), |params| {
-            let res = TagCount::view_all_tag_count(&req.state(), params.limit, params.offset);
-            match res {
-                Ok(v) => api_resp_data!(v),
-                Err(_) => api_resp_err!("delete_tag failed!"),
-            }
-        })
+    pub fn get_tag_with_count(
+        state: Data<AppState>,
+        _req: HttpRequest,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let res = TagCount::view_tag_count(&state.db.connection());
+        match res {
+            Ok(v) => api_resp_data!(v),
+            Err(_) => api_resp_err!("view_tag_with_count failed!"),
+        }
     }
 
-    pub fn edit_tag((req, params): (HttpRequest<AppState>, Form<Tags>)) -> JsonResponse {
-        let res = params.into_inner().edit_tag(&req.state());
+    pub fn get_tag_without_count(
+        state: Data<AppState>,
+        _req: HttpRequest,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let res = Tags::view_list_tag(state.get_ref());
+        match res {
+            Ok(v) => api_resp_data!(v),
+            Err(_) => api_resp_err!("get all tag failed!"),
+        }
+    }
+
+    pub fn edit_tag(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Form<Tags>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let res = params.into_inner().edit_tag(state.get_ref());
         match res {
             Ok(v) => api_resp_data!(v),
             Err(_) => api_resp_err!("edit_tag failed!"),
         }
     }
 
-    pub fn configure(app: App<AppState>) -> App<AppState> {
-        app.scope("/api/v1/tag", |scope| {
-            scope
-                .resource("/new", |r| r.method(Method::POST).with(Tag::create_tag))
-                .resource("/view", |r| r.get().f(Tag::view_tag))
-                .resource("/delete", |r| r.method(Method::POST).with(Tag::delete_tag))
-                .resource("/edit", |r| r.method(Method::POST).with(Tag::edit_tag))
-        })
+    pub fn update_tags(
+        state: Data<AppState>,
+        req: HttpRequest,
+        body: web::Payload,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        debug!("update_tags");
+        extract_form_data!(TagsData, req, body, &state)
+    }
+
+    pub fn configure(cfg: &mut web::ServiceConfig) {
+        cfg.service(web::resource("/tag/new").route(web::post().to_async(Tag::create_tag)))
+            .service(
+                web::resource("/tag/view/count")
+                    .route(web::get().to_async(Tag::get_tag_with_count)),
+            )
+            .service(
+                web::resource("/tag/view").route(web::get().to_async(Tag::get_tag_without_count)),
+            )
+            .service(web::resource("/tag/delete").route(web::delete().to_async(Tag::delete_tag)))
+            .service(web::resource("/tag/update").route(web::post().to_async(Tag::update_tags)))
+            .service(web::resource("/tag/edit").route(web::post().to_async(Tag::edit_tag)));
     }
 }

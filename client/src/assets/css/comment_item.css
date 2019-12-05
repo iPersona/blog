@@ -1,0 +1,39 @@
+.bubble {
+  position: relative;
+  background: white;
+  color: black;
+  font-family: Arial;
+  text-align: center;
+  border-radius: 5px;
+  padding: 8px;
+  border: #e7eaed solid 1px;
+}
+
+.bubble:after {
+  content: "";
+  position: absolute;
+  display: block;
+  width: 0;
+  z-index: 1;
+  border-style: solid;
+  /* border-color: transparent #f6f8fa; */
+  border-color: transparent white;
+  border-width: 6px 6px 6px 0;
+  top: 10%;
+  left: -6px;
+  margin-top: -6px;
+}
+
+.bubble:before {
+  content: "";
+  position: absolute;
+  width: 0;
+  z-index: 0;
+  border-style: solid;
+  border-color: transparent #e7eaed;
+  border-width: 7px 7px 7px 0;
+  top: 10%;
+  left: -7px;
+  margin-top: -7px;
+  display: block;
+}

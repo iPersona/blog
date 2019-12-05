@@ -19,11 +19,13 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate regex;
 extern crate serde_urlencoded;
 extern crate tiny_keccak;
 extern crate uuid;
 
 pub mod api;
+pub mod cache;
 pub mod models;
 pub mod schema;
 pub mod util;
@@ -36,25 +38,26 @@ pub use api::Tag;
 pub use api::User;
 pub use api::Visitor;
 pub(crate) use models::UserNotify;
-pub(crate) use models::{ArticleList, ArticlesWithTag, EditArticle, ModifyPublish, NewArticle,
-                        PublishedStatistics};
-pub(crate) use models::{ChangePassword, ChangePermission, DisabledUser, EditUser, LoginUser,
-                        RegisteredUser, UserInfo, Users};
+pub(crate) use models::{
+    ArticleList, ArticlesWithTag, EditArticle,
+    /*ModifyPublish,*/ NewArticle, /*PublishedStatistics,*/
+};
+pub(crate) use models::{
+    ChangePassword, ChangePermission, DisabledUser, EditUser, LoginUser, RegisteredUser, UserInfo,
+    Users,
+};
 pub(crate) use models::{Comments, DeleteComment, NewComments};
 pub(crate) use models::{NewTag, TagCount, Tags};
 pub(crate) use schema::{article_tag_relation, article_with_tag, articles, comments, tags, users};
-pub use util::{RedisPool};
+pub use util::RedisPool;
 //pub(crate) use util::{get_github_account_nickname_address, get_github_primary_email, get_github_token};
+pub use actix::Addr;
 pub(crate) use util::{get_password, markdown_render, random_string, sha3_256_encode};
 pub use web::{Admin, ArticleWeb};
-pub use actix::Addr;
-
-// pub type DbAddr = Addr<crate::util::postgresql_pool::DataBase>;
-// pub type CacheAddr = Addr<crate::util::redis_pool::Cache>;
 
 pub struct AppState {
     pub db: crate::util::postgresql_pool::DataBase,
     pub cache: crate::util::redis_pool::Cache,
+    pub visit_statistic: actix::Addr<crate::cache::executor::VisitStatisticActor>,
+    pub cron: actix::Addr<crate::cache::cron::Cron>,
 }
-
-

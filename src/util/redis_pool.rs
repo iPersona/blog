@@ -1,8 +1,6 @@
 use std::sync::Arc;
-use std::{env, io};
 
-use crate::{UserInfo, UserNotify};
-use actix::{Actor, Handler, Message, SyncContext};
+use crate::util::env::Env;
 use dotenv;
 use r2d2;
 use r2d2::Pool;
@@ -10,9 +8,6 @@ use r2d2_redis::RedisConnectionManager;
 use redis;
 use std::fs::File;
 use std::io::Read;
-use tera::Context;
-use crate::api::InnerContext;
-use crate::models::InnerError;
 
 pub struct RedisPool {
     pool: Pool<RedisConnectionManager>,
@@ -26,10 +21,7 @@ impl RedisPool {
     {
         let manager = RedisConnectionManager::new(address).unwrap();
         let pool = r2d2::Pool::new(manager).unwrap();
-        RedisPool {
-            pool: pool,
-            script: None,
-        }
+        RedisPool { pool, script: None }
     }
 
     pub fn new_with_script<T>(address: T, path: &str) -> Self
@@ -42,7 +34,7 @@ impl RedisPool {
         let mut lua = String::new();
         file.read_to_string(&mut lua).unwrap();
         RedisPool {
-            pool: pool,
+            pool,
             script: Some(redis::Script::new(&lua)),
         }
     }
@@ -83,11 +75,17 @@ impl RedisPool {
         self.with_conn(a);
     }
 
-    pub fn get(&self, redis_key: &str) -> String {
-        redis::cmd("get")
+    pub fn get(&self, redis_key: &str) -> Option<String> {
+        let res = redis::cmd("get")
             .arg(redis_key)
-            .query(&*self.pool.get().unwrap())
-            .unwrap()
+            .query(&*self.pool.get().unwrap());
+        match res {
+            Ok(v) => v,
+            Err(_) => {
+                // not found
+                None
+            }
+        }
     }
 
     pub fn hset<T>(&self, redis_key: &str, hash_key: &str, value: T)
@@ -128,10 +126,38 @@ impl RedisPool {
             .unwrap()
     }
 
+    pub fn hgetall<T>(&self, redis_key: &str) -> Vec<T>
+    where
+        T: redis::FromRedisValue,
+    {
+        redis::cmd("hgetall")
+            .arg(redis_key)
+            .query(&*self.pool.get().unwrap())
+            .unwrap()
+    }
+
+    pub fn hincrby(&self, redis_key: &str, hash_key: &str, num: i64) {
+        let a = |conn: &redis::Connection| {
+            redis::cmd("hincrby")
+                .arg(redis_key)
+                .arg(hash_key)
+                .arg(num)
+                .execute(conn)
+        };
+        self.with_conn(a);
+    }
+
     pub fn hexists(&self, redis_key: &str, hash_key: &str) -> bool {
         redis::cmd("hexists")
             .arg(redis_key)
             .arg(hash_key)
+            .query(&*self.pool.get().unwrap())
+            .unwrap()
+    }
+
+    pub fn hlen(&self, redis_key: &str) -> i64 {
+        redis::cmd("hlen")
+            .arg(redis_key)
             .query(&*self.pool.get().unwrap())
             .unwrap()
     }
@@ -205,12 +231,30 @@ impl RedisPool {
             .invoke::<bool>(&*self.pool.get().unwrap())
             .unwrap()
     }
+
+    pub fn get_redis_key(key: RedisKeys) -> String {
+        key.to_string()
+    }
+}
+
+pub enum RedisKeys {
+    VisitCache,
+    PersistTime,
+}
+
+impl RedisKeys {
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::VisitCache => "visit-cache".to_string(),
+            Self::PersistTime => "visit-cache-persist-time".to_string(),
+        }
+    }
 }
 
 fn create_redis_pool(path: Option<&str>) -> RedisPool {
     dotenv::dotenv().ok();
 
-    let database_url = env::var("REDIS_URL").expect("DATABASE_URL must be set");
+    let database_url = Env::get().redis_url;
     match path {
         Some(path) => RedisPool::new_with_script(database_url.as_str(), path),
         None => RedisPool::new(database_url.as_str()),
@@ -224,8 +268,15 @@ pub struct Cache(pub Arc<RedisPool>);
 // }
 
 impl Cache {
-    pub fn new() -> Cache {
-        Cache(Arc::new(create_redis_pool(Some("lua/visitor_log.lua"))))
+    pub fn new(work_dir: Option<&str>) -> Cache {
+        match work_dir {
+            Some(wd) => {
+                let mut path = wd.to_owned();
+                path.push_str("/lua/visitor_log.lua");
+                Cache(Arc::new(create_redis_pool(Some(path.as_str()))))
+            }
+            None => Cache(Arc::new(create_redis_pool(None))),
+        }
     }
 
     pub fn into_inner(&self) -> Arc<RedisPool> {

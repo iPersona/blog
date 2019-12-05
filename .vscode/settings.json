@@ -1,0 +1,8 @@
+{
+    "python.venvPath": "/Users/iPersona/.local/share/virtualenvs/blog-xs3VU6wY",
+    "python.pythonPath": "/Users/iPersona/.pyenv/versions/3.7.3/bin/python",
+    "redis-console.host": "localhost",
+    "redis-console.port": 6379,
+    "redis-console.password": "",
+    "redis-console.hostIpFamily": 4
+}

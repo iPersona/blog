@@ -1,69 +1,69 @@
 <template>
-  <div id="app">
-    <b-navbar
-      fixed="top"
-      toggleable="md"
-      type="dark"
-      variant="primary"
-    >
-      <b-navbar-brand href="#">USDKTest</b-navbar-brand>
-      <b-navbar-nav>
-        <!-- [导航选项激活问题解决](https://stackoverflow.com/a/44679936/10366378) -->
-        <b-nav-item
-          href="#/"
-          v-bind:active="tab === 1"
-          v-on:click="tab = 1"
-        >
-          主页
-        </b-nav-item>
-        <b-nav-item
-          href="#/files"
-          v-bind:active="tab === 2"
-          v-on:click="tab = 2"
-        >
-          文件
-        </b-nav-item>
-        <b-nav-item
-          href="#/debug"
-          v-bind:active="tab === 3"
-          v-on:click="tab = 3"
-        >
-          测试
-        </b-nav-item>
-        <!-- <b-nav-item
-          href="#/result"
-          v-bind:active="tab === 4"
-          v-on:click="tab = 4"
-        >
-          结果
-        </b-nav-item> -->
-      </b-navbar-nav>
-    </b-navbar>
-    <hr />
-    <router-view />
+  <div
+    id="app"
+    class="container"
+  >
+    <NavHeader />
+    <RouterView class="router-view" />
+    <NavFooter />
   </div>
 </template>
 
 <script>
-  export default {
-    name: 'app',
-    components: {
-    },
-    data() {
-      return {
-        tab: 1
-      }
+import { mapMutations } from "vuex";
+import { LOAD_USER, LOAD_TAG } from "@/store/modules/mutation-types";
+import { USER, TAG } from "@/store/modules/module-names";
+
+import NavHeader from "@/components/Header";
+import NavFooter from "@/components/Footer";
+
+export default {
+  name: "App",
+  components: {
+    NavHeader,
+    NavFooter
+  },
+  data() {
+    return {
+      tab: 1
+    };
+  },
+  mounted() {
+    console.log(`App mounted`);
+    this.loadAppData();
+  },
+  methods: {
+    ...mapMutations(USER, {
+      loadUser: LOAD_USER
+    }),
+    ...mapMutations(TAG, {
+      loadTag: LOAD_TAG
+    }),
+    loadAppData() {
+      this.loadUser();
+      this.loadTag();
     }
   }
+};
 </script>
 
 <style>
-  #app {
-    font-family: "Avenir", Helvetica, Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-align: center;
-    color: #2c3e50;
-    margin-top: 60px;
-  }
+#app {
+  font-family: "Avenir", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-align: center;
+  color: #2c3e50;
+  margin-top: 60px;
+}
+@import "https://cdn.materialdesignicons.com/2.5.94/css/materialdesignicons.min.css";
+@import "https://use.fontawesome.com/releases/v5.2.0/css/all.css";
+
+.router-view {
+  margin-left: 15%;
+  margin-right: 15%;
+}
+</style>
+
+<style scoped src="buefy/dist/buefy.css">
 </style>

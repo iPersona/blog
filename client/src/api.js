@@ -1,43 +1,82 @@
-import qs from "qs";
-import Vue from "vue";
+import qs from 'qs';
+import Vue from 'vue';
+import store from '@/store/index'
+import {
+    STORE_KEY
+} from '@/store/modules/user'
+import {
+    TOKEN
+} from '@/store/modules/store-types'
+import {
+    LOGOUT
+} from '@/store/modules/mutation-types'
+import {
+    USER
+} from '@/store/modules/module-names'
 
 export default class Api {
-    constructor() {
+    constructor(vue) {
         this.axios = Vue.axios;
         // this.host = document.location.host;
-        this.host = "http://localhost:8880";
-        console.log("host: " + this.host);
+        this.host = 'http://localhost:8880/api/v1';
+        console.log('host: ' + this.host);
+        this.vue = vue;
+        let self = this;
         (this.config = {
-            Accept: "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Credentials": true
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': true
         }),
         (this.url = {
-            results: `${this.host}/api/results`, // 获取测试结果数据 JSON
-            file: `${this.host}/api/file`, // 获取指定文件内容
-            list: `${this.host}/api/list`, // 获取USDK测试目录结构
-            save: `${this.host}/api/save`, // 保存文件
-            description: `${this.host}/api/description`, // 获取用例描述
-            task: `${this.host}/api/task`, // 获取任务执行状态（用例的执行状态列表）
-            taskinfo: `${this.host}/api/taskinfo`, // 获取任务执行状态（用例的执行状态列表）
-            control: `${this.host}/api/control`, // 获取任务执行状态（用例的执行状态列表）
-            reloadcases: `${this.host}/api/reloadcases`, // 将用例载入到数据库中
-            login: `${this.host}/login`, // 登录
-            createArticle: `${this.host}/api/v1/article/new`, // 创建文章
-            deleteArticle: `${this.host}/article/delete`, // 删除文章
-            adminView: `${this.host}/article/admin/view`, // 获取文章html
-            adminViewRaw: `${this.host}/article/admin/view_raw`, // 获取文章md
-            adminViewAll: `${this.host}/article/admin/view_all`, // 获取文章列表
-            editArticle: `${this.host}/article/edit`, // 编辑文章
-            publishArticle: `${this.host}/api/v1/article/publish`, // 发布文章
+            // article
+            createArticle: `${this.host}/article/new`, // [admin] create article
+            deleteArticle: `${this.host}/article/delete`, // [admin] delete article
+            adminView: `${this.host}/article/admin/view`, // [admin] get article
+            adminViewRaw: `${this.host}/article/admin/view_raw`, // [admin] get article markdown
+            adminViewAll: `${this.host}/article/admin/view_all`, // [admin] get article list
+            editArticle: `${this.host}/article/edit`, // edit article
+            publishArticle: `${this.host}/article/publish`, // publish article
+            visitorViewAll: `${this.host}/articles`, // get article list
+            visitorViewArticle: `${this.host}/article`, // get article
+            articleNumber: `${this.host}/article/count`, // article count
+            articleNumberByTag: `${this.host}/article/tag/count`,
+            articleByTag: `${this.host}/article/tag`,
+
+            // comment
+            comments: function (articleId) {
+                return `${self.host}/article/${articleId}/comments`
+            },
+            newComment: `${this.host}/user/comment/new`,
+
+            // user
+            login: `${this.host}/user/login`, // login
+            signup: `${this.host}/user/new`, // register
+            userExist: `${this.host}/user/exist`, // check whether user exists
+            editProfile: `${this.host}/user/edit`, // edit user profile
+            updatePassword: `${this.host}/user/change_pwd`, // update password
+
+            // tag
+            getTags: `${this.host}/tag/view`,
+            getTagsWithCount: `${this.host}/tag/view/count`,
+            addTags: `${this.host}/tag/new`,
+            delTag: `${this.host}/tag/delete`,
+            editTag: `${this.host}/tag/edit`,
+            updateTags: `${this.host}/tag/update`,
+
+            // statistic
+            getDailyPeriod: `${this.host}/statistic/period`,
+
         });
         // request拦截器
         this.axios.interceptors.request.use(req => {
             // Do something before request is sent
-            localStorage.token = '666-66-6666-66666';
-            if (localStorage.token !== undefined) {
-                req.headers['X-Token'] = localStorage // 让每个请求携带token--['X-Token']为自定义key 请根据实际情况自行修改
+            // console.log(`store: ${store}`)
+            // console.log(`STORE_KEY: ${STORE_KEY}`)
+            if (localStorage[STORE_KEY] !== undefined) {
+                // add token into headers
+                req.headers.Authorization = store.getters[`user/${TOKEN}`];
+                // console.log(`token: ${store.getters[TOKEN]}`)
             }
             return req
         }, error => {
@@ -47,15 +86,118 @@ export default class Api {
         });
     }
 
-    async login(account, password, remember) {
-        return this.post(this.url.login, {
-            account: account,
-            password: password,
-            remember: remember
+    async updatePassword(oldPassword, newPassword) {
+        return this.post(this.url.updatePassword, {
+            old_password: oldPassword,
+            new_password: newPassword,
+        })
+    }
+
+    async editProfile(profile) {
+        return this.post(this.url.editProfile, {
+            nickname: profile.nickname,
+            say: profile.sign,
+            email: profile.email,
+        })
+    }
+
+    async getDailyPeriod(start, end) {
+        return this.get(this.url.getDailyPeriod, {
+            start,
+            end
+        })
+    }
+
+    async newComment(articleId, content, userId) {
+        return this.post(this.url.newComment, {
+            comment: content,
+            article_id: articleId,
+            reply_user_id: userId
+        })
+    }
+
+    async getComments(articleId, limit, offset) {
+        let url = this.url.comments(articleId)
+        return this.get(url, {
+            limit: limit,
+            offset: offset,
+        })
+    }
+
+    async getArticleNumberByTag(tagId) {
+        return this.get(this.url.articleNumberByTag, {
+            tag_id: tagId
+        })
+    }
+
+    async getArticlesByTag(tagId, limit, offset) {
+        return this.get(this.url.articleByTag, {
+            tag_id: tagId,
+            limit: limit,
+            offset: offset,
+        })
+    }
+
+    async getTagsWithCount() {
+        return this.get(this.url.getTagsWithCount)
+    }
+
+    async updateTags(modifiedTags, addedTags, deletedTags) {
+        let args = {}
+        if (modifiedTags !== undefined) {
+            args.modified_tags = modifiedTags
+        }
+        if (addedTags !== undefined) {
+            args.added_tags = addedTags
+        }
+        if (deletedTags !== undefined) {
+            args.deleted_tags = deletedTags
+        }
+        return this.post(this.url.updateTags, args)
+    }
+
+    async editTag(tagObj) {
+        return this.post(this.url.editTag, tagObj)
+    }
+
+    async delTag(id) {
+        return this.delete(this.url.delTag, id)
+    }
+
+    async addTags(tags) {
+        let data = tags.map(item => {
+            return {
+                "tag": item
+            }
+        })
+        return this.post(this.url.addTags, data)
+    }
+
+    async getTags() {
+        return this.get(this.url.getTags)
+    }
+
+    async signup(info) {
+        return this.post(this.url.signup, {
+            account: info.username,
+            password: info.password,
+            nickname: info.nickname,
+            say: info.sign,
+            email: info.email
         });
     }
 
-    async createArticle(title, rawContent, existTags, newTags) {
+    async login(account, password, remember, token) {
+        return this.post(
+            this.url.login, {
+                account: account,
+                password: password,
+                remember: remember,
+                token: token,
+            });
+    }
+
+    async createArticle(title, rawContent, existTags, newTags, publish) {
         let args = {
             title: title,
             raw_content: rawContent
@@ -66,13 +208,19 @@ export default class Api {
         if (newTags !== undefined) {
             args.new_tags = newTags;
         }
+        args.publish = publish;
         return this.post(this.url.createArticle, args);
     }
 
-    async deleteArticle(id) {
-        return this.post(this.url.deleteArticle, {
-            id: id
+    async checkUserExist(email) {
+        return this.post(this.url.userExist, {
+            email: email
         });
+    }
+
+    async deleteArticle(id) {
+        let url = `${this.url.deleteArticle}/${id}`;
+        return this.delete(url);
     }
 
     async adminView(id) {
@@ -94,7 +242,9 @@ export default class Api {
         });
     }
 
-    async editArticle(id, title, rawContent, newChoiceAlreadyExistsTags, deselectTags, newTags) {
+    async editArticle(
+        id, title, rawContent, newChoiceAlreadyExistsTags, deselectTags,
+        newTags) {
         let args = {
             id: id,
             title: title,
@@ -119,10 +269,21 @@ export default class Api {
         });
     }
 
+    async visitorViewAll(limit, offset) {
+        return this.get(this.url.visitorViewAll, {
+            limit: limit,
+            offset: offset,
+        });
+    }
 
+    async visitorViewArticle(id) {
+        let url = `${this.url.visitorViewArticle}/${id}`;
+        return this.get(url);
+    }
 
-
-
+    async getArticleNumber() {
+        return this.get(this.url.articleNumber);
+    }
 
     async getResults() {
         return this.get(this.url.results);
@@ -171,12 +332,13 @@ export default class Api {
             });
         }
 
-        console.log("controlTask: cases: " + JSON.stringify(cases));
-        return this.post(this.url.control, {
-            start: start,
-            taskType: taskType,
-            cases: JSON.stringify(cases)
-        });
+        console.log('controlTask: cases: ' + JSON.stringify(cases));
+        return this.post(
+            this.url.control, {
+                start: start,
+                taskType: taskType,
+                cases: JSON.stringify(cases)
+            });
     }
 
     async reloadCases() {
@@ -184,25 +346,37 @@ export default class Api {
     }
 
     async post(url, args) {
-        return this.doRequest(url, "post", args);
+        return this.doRequest(url, 'post', args);
     }
 
     async get(url, args) {
-        return this.doRequest(url, "get", args);
+        return this.doRequest(url, 'get', args);
+    }
+
+    async delete(url, args) {
+        return this.doRequest(url, 'delete', args)
     }
 
     async doRequest(url, method, args) {
         try {
             console.log(
-                "url=" + url + ", method=" + method + ", args: " + JSON.stringify(args)
-            );
+                'url=' + url + ', method=' + method +
+                ', args: ' + JSON.stringify(args));
             var res;
-            if (method === "post") {
+            if (method === 'post') {
                 // POST 方式
                 if (args === undefined) {
                     res = await this.axios.post(url);
                 } else {
+                    console.log(`post-args: ${qs.stringify(args)}`)
                     res = await this.axios.post(url, qs.stringify(args));
+                }
+            } else if (method === 'delete') {
+                // DELETE 方式
+                if (args === undefined) {
+                    res = await this.axios.delete(url);
+                } else {
+                    res = await this.axios.delete(url, qs.stringify(args));
                 }
             } else {
                 // GET 方式
@@ -221,6 +395,10 @@ export default class Api {
             });
         } catch (error) {
             console.error(`server error: ${error}`);
+            if (error.response.status === 410) {
+                // need to login again
+                store.commit(`${USER}/${LOGOUT}`)
+            }
 
             if (error.response) {
                 // The request was made and the server responded with a status code
@@ -232,12 +410,17 @@ export default class Api {
                 // `error.request` is an instance of XMLHttpRequest in the browser and
                 // an instance of http.ClientRequest in node.js
                 console.log(error.request);
-                throw new Error("no response received!");
+                throw new Error('no response received!');
             } else {
                 // Something happened in setting up the request that triggered an Error
-                console.log("Error", error.message);
-                throw new Error("internal error: " + error.message);
+                console.log('Error', error.message);
+                throw new Error('internal error: ' + error.message);
             }
         }
+    }
+
+    static isSuccessResponse(rsp) {
+        return rsp.hasOwnProperty('data') ||
+            rsp.hasOwnProperty('status') && rsp.status === 'Ok';
     }
 }

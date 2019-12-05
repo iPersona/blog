@@ -1,49 +1,68 @@
 [package]
 name = "blog"
 version = "0.2.0"
-authors = ["piaoliu <441594700@qq.com>"]
+authors = ["oz <freedom2028@gmail.com>"]
 edition = "2018"
 
 [dependencies]
- dotenv = "^0.10.0"
- serde = "^1.0.17"
- serde_json = "^1.0.5"
- serde_derive = "^1.0.17"
- rand = "^0.5"
- tiny-keccak = "^1.3.1"
- comrak = "^0.2.4"
- redis = '^0.8.0'
- r2d2 = '^0.8.1'
- r2d2_redis = '^0.7.0'
- ammonia = "^1.1.0"
- hyper-native-tls = "^0.3.0"
- hyper = "^0.10.13"
- serde_urlencoded = "^0.5.1"
+dotenv = "^0.10.0"
+clap = "2.33.0"
+serde = "^1.0.17"
+serde_json = "^1.0.5"
+serde_derive = "^1.0.17"
+serde_urlencoded = "^0.5.1"
+serde_qs = "0.5.0"
+rand = "^0.5"
+tiny-keccak = "^1.3.1"
+comrak = "^0.2.4"
+redis = '^0.8.0'
+r2d2 = '^0.8.1'
+r2d2_redis = '^0.7.0'
+ammonia = "^1.1.0"
+hyper-native-tls = "^0.3.0"
+hyper = "^0.10.13"
+regex = "1.3.1"
 
 # actix
-log = "^0.4.6"
-env_logger = "0.6.0"
-num_cpus = "1.9.0"
-actix = "^0.7.9"
-actix-redis = "^0.5.1"
-actix-web = "^0.7.18"
-actix-diesel = "^0.1.5"
-futures = "0.1.25"
-failure = "^0.1.5"
+log = "0.4.8"
+env_logger = "0.6.2"
+num_cpus = "1.10.1"
+actix = "0.8.3"
+actix-redis = "0.6.1"
+actix-web = "1.0.9"
+actix-diesel = "0.3.0"
+actix-session = "0.2.0"
+actix-cors = "0.1.0"
+actix-files = "0.1.4"
+futures = "0.1.28"
+failure = "0.1.5"
 tera = "0.11.20"
 time = "0.1.42"
+json = "0.11.15"
+jsonwebtoken = "6.0.1"
+base64 = "0.10.1"
+strip_markdown = "0.1.0"
+actix-http = "0.2.10"
+typename = "0.1.1"
+bigdecimal = "0.1.0"
 
+# support socks proxy
+[dependencies.reqwest]
+features = ["socks"]
+version = "0.9.22"
+
+# to support uuid v0.7.0, the `uuidv07` feature should be enabled
 [dependencies.diesel]
-features = ["postgres", "chrono", "uuid", "r2d2"]
-version = "^1.3.3"
+features = ["postgres", "chrono", "uuid", "r2d2", "uuidv07", "numeric"]
+version = "1.4.3"
 
 [dependencies.chrono]
 features = ["serde"]
-version = "^0.4.0"
+version = "0.4.9"
 
 [dependencies.uuid]
 features = ["serde", "v4"]
-version = "^0.6.0"
+version = "0.7.4"
 
 [dependencies.clippy]
 optional = true
