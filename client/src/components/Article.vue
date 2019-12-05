@@ -1,20 +1,55 @@
 <template>
   <div>
-    <section
+    <nav
       v-if="isAdmin"
-      align="right"
       class="container"
     >
-      <div>
-        <BButton
-          icon-pack="fas"
-          icon-left="edit"
-          @click="editArticle"
-        >
-          Edit
-        </BButton>
-      </div>
-    </section>
+      <b-field
+        expanded
+        position="is-right"
+      >
+        <p class="control">
+          <BButton
+            icon-pack="fas"
+            icon-left="edit"
+            @click="editArticle"
+          >
+            Edit
+          </BButton>
+        </p>
+
+        <p class="control">
+          <b-dropdown
+            hoverable
+            aria-role="list"
+            expanded
+          >
+            <button
+              slot="trigger"
+              class="button"
+            >
+              <b-icon
+                pack="fas"
+                icon="ellipsis-h"
+              />
+            </button>
+
+            <b-dropdown-item
+              aria-role="listitem"
+              @click="deleteArticle"
+            >
+              <b-icon
+                pack="fas"
+                icon="trash-alt"
+              />
+              <span>
+                Delete
+              </span>
+            </b-dropdown-item>
+          </b-dropdown>
+        </p>
+      </b-field>
+    </nav>
     <section class="container">
       <div class="container">
         <h1 class="title">
@@ -30,6 +65,7 @@
       <!-- eslint-disable vue/no-v-html -->
       <div
         v-highlight
+        align="left"
         v-html="compiledMarkdown"
       />
     </section>
@@ -170,6 +206,30 @@ export default {
       this.article.tags = this.article.tags.filter(t => {
         return t !== null;
       });
+    },
+    deleteArticle() {
+      let self = this
+      this.$buefy.dialog.confirm({
+        title: 'Deleting article',
+        message: 'Are you sure you want to <b>delete</b> this article? This action cannot be undone.',
+        confirmText: 'Delete Article',
+        type: 'is-danger',
+        hasIcon: true,
+        onConfirm: () => {
+          self.doDeleteArticle()
+        }
+      })
+    },
+    async doDeleteArticle() {
+      let api = new Api()
+      let rsp = await api.deleteArticle(this.articleId)
+      if (!Api.isSuccessResponse(rsp)) {
+        this.$getUi().toast.fail(`failed to delete article: ${rsp.detail}`)
+        return
+      }
+      this.$getUi().toast.success(`delete article successfully!`)
+      // redirect to article list
+      this.$router.replace({ name: 'article' })
     }
   }
 };

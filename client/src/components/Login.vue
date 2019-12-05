@@ -88,11 +88,11 @@ export default {
 
       let api = new Api();
       // let rsp = await api.login(this.username, Util.password(this.password), this.remember);
-      let rsp = await api.login("admin", Util.password("admin1"), true, rechaptchaToken);
+      let rsp = await api.login("admin", Util.password("admin"), true, rechaptchaToken);
       // let rsp = await api.login("user-1", Util.password("123456"), true);
       this.$getLog().debug("rsp: " + JSON.stringify(rsp));
       if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi.toast.fail(`${rsp.detail}`)
+        this.$getUi().toast.fail(`${rsp.detail}`)
         return
       }
 

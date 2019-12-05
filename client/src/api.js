@@ -219,9 +219,8 @@ export default class Api {
     }
 
     async deleteArticle(id) {
-        return this.post(this.url.deleteArticle, {
-            id: id
-        });
+        let url = `${this.url.deleteArticle}/${id}`;
+        return this.delete(url);
     }
 
     async adminView(id) {

@@ -1,4 +1,4 @@
-use actix_web::web::{Data, Form, Query};
+use actix_web::web::{Data, Form, Path, Query};
 use actix_web::{Error, HttpRequest, HttpResponse};
 use futures::future::Future;
 use futures::stream::Stream;
@@ -25,13 +25,10 @@ impl AdminArticle {
 
     pub fn delete_article(
         state: Data<AppState>,
-        params: Form<DeleteArticlesWithTags>,
+        article_id: Path<Uuid>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("delete article");
-        let res = ArticlesWithTag::delete_with_id(
-            state.get_ref(),
-            Uuid::parse_str(params.id.as_str()).unwrap(),
-        );
+        let res = ArticlesWithTag::delete_with_id(state.get_ref(), article_id.into_inner());
         match res {
             Ok(v) => api_resp_data!(v),
             Err(e) => api_resp_err!(&e[..]),
@@ -109,7 +106,7 @@ impl AdminArticle {
             web::resource("article/new").route(web::post().to_async(AdminArticle::create_article)),
         )
         .service(
-            web::resource("article/delete")
+            web::resource("article/delete/{article_id}")
                 .route(web::delete().to_async(AdminArticle::delete_article)),
         )
         .service(
