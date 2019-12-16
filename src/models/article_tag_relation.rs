@@ -17,7 +17,7 @@ impl Relations {
     pub fn new(article_id: Uuid, tag_id: Uuid) -> Relations {
         Relations { tag_id, article_id }
     }
-//
+    //
     pub fn insert(&self, conn: &PgConnection) -> bool {
         diesel::insert_into(relation::table)
             .values(self)
@@ -42,16 +42,17 @@ impl Relations {
             all_relation
                 .filter(relation::article_id.eq(self.article_id))
                 .filter(relation::tag_id.eq(self.tag_id)),
-        ).execute(conn)
-            .is_ok()
+        )
+        .execute(conn)
+        .is_ok()
     }
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct RelationTag {
     article_id: Uuid,
-    tag_id: Option<Vec<Uuid>>,
-    tag: Option<Vec<String>>,
+    tag_id: Option<Vec<Uuid>>, // existed tags
+    tag: Option<Vec<String>>,  // new tags
 }
 
 impl RelationTag {
@@ -64,6 +65,7 @@ impl RelationTag {
     }
 
     pub fn insert_all(&self, conn: &PgConnection) -> bool {
+        // TODO: check if tag already exist, if tag exists, DO NOT insert into the table to avoid duplicate tag
         // If `tag` exist, insert all the new tags into the table all at once,
         // and return the ID of the newly added tag
         let mut tags_id = if self.tag.is_some() {

@@ -1,0 +1,19 @@
+localhost:8880 {
+    log /srv/log/proxy.log
+    root /srv
+    gzip
+    proxy /api/v1 http://docker.for.mac.localhost:8888 {
+        without /api/v1
+        header_upstream Host {host}
+        header_upstream X-Real-IP {remote}
+        header_upstream X-Forwarded-For {remote}
+        header_upstream X-Forwarded-Proto {scheme}
+    }
+
+    proxy / http://docker.for.mac.localhost:8080 {
+        header_upstream Host {host}
+        header_upstream X-Real-IP {remote}
+        header_upstream X-Forwarded-For {remote}
+        header_upstream X-Forwarded-Proto {scheme}
+    }
+}

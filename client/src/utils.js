@@ -1,36 +1,19 @@
 export default class Utils {
   constructor() {}
 
-  static isValidJsonString(jsonStr) {
-    try {
-      JSON.parse(jsonStr);
-    } catch (e) {
-      return false;
+  static randomString(len) {
+    len = len || 32;
+    let chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var maxPos = chars.length;
+    var pwd = '';
+    for (var i = 0; i < len; i++) {
+      //0~32的整数
+      pwd += chars.charAt(Math.floor(Math.random() * (maxPos + 1)));
     }
-    return true;
+    return pwd;
   }
 
-  static prettyStringify(obj) {
-    return JSON.stringify(obj, null, 2)
-  }
-
-  static getObjectHash(obj) {
-    let hash = require('object-hash');
-    let collapseId = '' + hash(obj);
-    return collapseId;
-  }
-
-  static getLog(caseSet, caseId) {
-    return 'logs/log_' + caseSet + '_' + caseId + '.txt';
-  }
-
-  static getCaseIdFromQueryString(queryStr) {
-    if (queryStr === undefined) {
-      return;
-    }
-    let caseIds = queryStr.split(",");
-    return caseIds.map(item => {
-      return item.trim();
-    });
+  static password(password) {
+    return Utils.randomString(6) + password
   }
 }

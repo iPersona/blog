@@ -1,6 +1,5 @@
 use super::super::RedisPool;
 
-use crate::util::redis_pool::Cache;
 use serde_json;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -20,8 +19,8 @@ impl UserNotify {
         let content = serde_json::to_string(self).unwrap();
         let notify_key = format!(
             "notify:{}:{}",
-            self.article_id.hyphenated().to_string(),
-            self.user_id.hyphenated().to_string()
+            self.article_id.to_hyphenated().to_string(),
+            self.user_id.to_hyphenated().to_string()
         );
         // remove old value
         redis_pool.lrem(&notify_key, 0, &content);
@@ -36,7 +35,7 @@ impl UserNotify {
 
     /// Get all the notifications about the user
     pub fn get_notifys(user_id: Uuid, redis_pool: &RedisPool) -> Option<Vec<UserNotify>> {
-        let pattern = format!("notify:*:{}", user_id.hyphenated().to_string());
+        let pattern = format!("notify:*:{}", user_id.to_hyphenated().to_string());
         let mut notify = Vec::new();
 
         for notify_key in redis_pool.keys(&pattern) {
@@ -66,15 +65,15 @@ impl UserNotify {
     ) {
         let notify_key = format!(
             "notify:{}:{}",
-            article_id.hyphenated().to_string(),
-            user_id.hyphenated().to_string()
+            article_id.to_hyphenated().to_string(),
+            user_id.to_hyphenated().to_string()
         );
         redis_pool.del(notify_key);
     }
 
     /// Remove the notification of the specified article, e.g use on remove the specified article
     pub fn remove_with_article(article_id: Uuid, redis_pool: &Arc<RedisPool>) {
-        let pattern = format!("notify:{}*", article_id.hyphenated().to_string());
+        let pattern = format!("notify:{}*", article_id.to_hyphenated().to_string());
         // redis_pool.del(redis_pool.keys(&pattern));
         let keys = redis_pool.keys(&pattern);
         if keys.len() == 0 {
@@ -85,7 +84,7 @@ impl UserNotify {
 
     /// Remove the notification of the user, e.g use on remove the user
     pub fn remove_with_user(user_id: Uuid, redis_pool: &RedisPool) {
-        let pattern = format!("notify:*:{}", user_id.hyphenated().to_string());
+        let pattern = format!("notify:*:{}", user_id.to_hyphenated().to_string());
         redis_pool.del(redis_pool.keys(&pattern));
     }
 }

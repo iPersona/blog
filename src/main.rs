@@ -1,144 +1,97 @@
 extern crate actix;
+extern crate actix_files;
 extern crate actix_web;
+extern crate base64;
 extern crate blog;
 extern crate dotenv;
+extern crate jsonwebtoken;
 extern crate num_cpus;
+extern crate strip_markdown;
+extern crate typename;
 
-use actix::{Addr, SyncArbiter, System};
-use actix_web::{
-    fs, http,
-    http::{header, Method},
-    middleware::cors::Cors,
-    server, App, HttpRequest, HttpResponse, Result,
-};
-use blog::util::cookies::Cookies;
+use actix_files as fs;
+//use actix_redis::RedisSession;
+use actix_web::{App, HttpServer};
+use blog::util::env::Env;
 use dotenv::dotenv;
-use std::env;
 
-#[macro_use]
+// #[macro_use]
 extern crate log;
 
-use actix_web::error::ErrorInternalServerError;
-use actix_web::middleware::session::{CookieSessionBackend, RequestSession, SessionStorage};
-use actix_web::middleware::{Finished, Middleware, Response, Started};
-use actix_web::{AsyncResponder, Error};
-use blog::models::token::Token;
-//use blog::util::get_identity_and_web_context;
+extern crate clap;
+
+use actix::{Actor, Arbiter, SyncArbiter, System};
+//use actix_web::cookie::SameSite;
+use blog::api;
+use blog::cache::cron::Cron;
+use blog::cache::executor::VisitStatisticActor;
+use blog::util::cli::Opts;
 use blog::util::postgresql_pool::DataBase;
 use blog::util::redis_pool::Cache;
-use blog::{Admin, AdminArticle, AdminUser, AppState, ArticleWeb, Tag, Visitor, User};
-use futures::future::{ok, Future};
-use futures::sink::Sink;
-use std::sync::Arc;
-use tera::Context;
-use blog::util::get_identity_and_web_context;
-use time::Duration;
-
-pub struct Preprocess;
-
-impl Middleware<AppState> for Preprocess {
-    fn start(&self, mut req: &HttpRequest<AppState>) -> Result<Started> {
-        info!("middleware-start");
-        if let Some(token) = Token::get_token(&req.session()) {
-            info!("SESSION value: {:?}", token);
-            req.extensions_mut().insert(token);
-        } /*else {
-            let t = Token::new();
-            req.session().set("token", t.clone());
-            t
-        };*/
-        info!("path: {:?}", req.path());
-        info!("method: {:?}", req.method());
-
-        let ctx = get_identity_and_web_context(req);
-        req.extensions_mut().insert(ctx);
-
-
-        //        else {
-        //            info!("NO-SESSION");
-        //            let res = req.session().set("counter", 1);
-        //            match res {
-        //                Ok(_) => info!("success"),
-        //                Err(e) => info!("set-session failed: {:?}", e),
-        //            };
-        //        }
-        //        if let Some(token) = req.headers().get("x-token") {
-        //            info!("token: {:?}", token);
-        //            req.extensions_mut().insert();
-        //        }
-
-        Ok(Started::Done)
-    }
-
-    fn response(&self, _req: &HttpRequest<AppState>, resp: HttpResponse) -> Result<Response> {
-        info!("middleware-response");
-        Ok(Response::Done(resp))
-    }
-
-    fn finish(&self, req: &HttpRequest<AppState>, resp: &HttpResponse) -> Finished {
-        info!("middleware-finish");
-
-        if let Ok(Some(result)) = req.session().get::<String>("token") {
-            info!("session value new: {:?}", result);
-        } else {
-            info!("get session value new failed");
-        }
-
-        Finished::Done
-    }
-}
+// use blog::{AdminArticle, AdminUser, AppState, ChartData, Tag, UserApi, Visitor};
+use blog::AppState;
+use log::debug;
 
 fn main() {
-    ::std::env::set_var("RUST_LOG", "info");
-    // 获取环境变量
+    ::std::env::set_var("RUST_LOG", "debug,actix_web=debug");
+    // ::std::env::set_var("RUST_LOG", "debug");
+    // init env variable
     dotenv().ok();
     // init logger
     env_logger::init();
+    // show env variable
+    Env::get().print();
 
     // let mut static_file_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    // VSCode调试必须用绝对路径，这里获取不到该CARGO变量值
-    let mut static_file_dir = if cfg!(target_os = "macos") {
-        "/Users/iPersona/Documents/blog".to_owned()
-    } else {
-        "/home/omi/Documents/dev/blog".to_owned()
-    };
+    let opt = Opts::new();
+    let work_dir = opt.work_dir.clone();
+    let mut static_file_dir = opt.work_dir.clone();
     static_file_dir.push_str("/dist");
-    info!("static_file_dir: {}", static_file_dir);
+    debug!("static_file_dir: {}", static_file_dir);
 
-    let sys = System::new("example");
-//    let cache_addr = SyncArbiter::start(num_cpus::get(), move || Cache::new());
-//    let db_addr = SyncArbiter::start(1 /*num_cpus::get()*/, move || DataBase::new());
-//    let cache_addr = Cache::new();
-//    let db_addr = DataBase::new();
+    let sys = System::builder().stop_on_panic(true).name("blog").build();
+    let statistic_addr = SyncArbiter::start(1, move || VisitStatisticActor::default());
+    let statistic_cron_addr = statistic_addr.clone();
+    let corn_addr =
+        Cron::start_in_arbiter(&Arbiter::new(), move |_| Cron::new(statistic_cron_addr));
 
-    server::new(move || {
-        let mut app = App::with_state(AppState {
-//            db: db_addr,
-//            cache: cache_addr,
-            db: DataBase::new(),
-            cache: Cache::new(),
-        });
-        app = AdminArticle::configure(app);
-        app = Tag::configure(app);
-        app = AdminUser::configure(app);
-        app = User::configure(app);
-        app = Visitor::configure(app);
-        app = app
-            .middleware(SessionStorage::new(
-                CookieSessionBackend::signed(&[0; 32])
-                    .name("blog_session")
-                    .secure(false)
-                    .max_age(Duration::from_std(std::time::Duration::from_secs(24 * 60 * 60)).unwrap())
-            ))
-            .middleware(Preprocess);
-        app = app.handler(
-            "/static",
-            fs::StaticFiles::new(static_file_dir.as_str()).unwrap(),
-        );
-        app
+    //    System::new("example");
+    HttpServer::new(move || {
+        App::new()
+            .data(AppState {
+                db: DataBase::new(),
+                cache: Cache::new(Some(work_dir.as_str())),
+                visit_statistic: statistic_addr.clone(),
+                cron: corn_addr.clone(),
+            })
+            // TODO: 调试完成后屏蔽掉
+            .wrap(blog::util::debug_middleware::Debug)
+            .wrap(blog::models::token::PermissionControl)
+            .wrap(actix_web::middleware::Logger::default())
+            .configure(api::article_api::ArticleApi::configure)
+            .configure(api::comment_api::CommentApi::configure)
+            .configure(api::tag_api::TagApi::configure)
+            .configure(api::user_api::UserApi::configure)
+            .configure(api::dashboard_api::DashboardApi::configure)
+            // .wrap(
+            //     CookieSession::signed(&[0; 32])
+            //         .name("blog_session")
+            //         .secure(false)
+            //         .max_age(24 * 60 * 60),
+            // )
+            //            .wrap(
+            //                RedisSession::new(Env::get().redis_url.as_str(), &[0; 32])
+            //                    .cookie_name("blog_session")
+            //                    .ttl(7200) // 保存2小时的cookie数据
+            //                    //                .cookie_secure(true)  // TODO: 调试完成后开启
+            //                    .cookie_max_age(Duration::hours(24))
+            //                    .cookie_same_site(SameSite::Strict), // 禁止跨站传输cookie
+            //            )
+            .service(fs::Files::new("/", static_file_dir.as_str()).index_file("index.html"))
     })
-        .bind("0.0.0.0:8888")
-        .unwrap()
-        .start();
+    .bind("0.0.0.0:8888")
+    .unwrap()
+    .start();
+
     let _ = sys.run();
 }
