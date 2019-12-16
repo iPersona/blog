@@ -75,7 +75,9 @@
       class="container"
       align="left"
     >
-      <b>Tags:</b>
+      <span>
+        <b>Tags: </b>
+      </span>
       <BTaglist
         v-for="t in article.tags"
         :key="t"
@@ -153,6 +155,9 @@ export default {
     await this.getArticle();
     await this.listenEventBus();
   },
+  beforeDestroy() {
+    EventBus.$off(EVENT_RELOAD_ARTICLE)
+  },
   methods: {
     listenEventBus() {
       const self = this;
@@ -229,7 +234,7 @@ export default {
       }
       this.$getUi().toast.success(`delete article successfully!`)
       // redirect to article list
-      this.$router.replace({ name: 'article' })
+      this.$router.replace({ name: 'articles' })
     }
   }
 };

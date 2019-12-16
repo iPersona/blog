@@ -125,11 +125,16 @@ export default {
     await this.listenEventBus()
     // await this.reloadArticle()
   },
+  beforeDestroy() {
+    EventBus.$off(EVENT_RELOAD_ARTICLE_LIST)
+  },
   methods: {
     listenEventBus() {
       const self = this;
       EventBus.$on(EVENT_RELOAD_ARTICLE_LIST, async function () {
         console.log(`event-bus: ${EVENT_RELOAD_ARTICLE_LIST}`)
+        // Reset current page to load most recent articles
+        self.currentPage = 1;
         await self.reloadArticle()
       })
     },
@@ -138,11 +143,9 @@ export default {
       this.$getLog().debug(`isFilteredByTag: ${this.isFilteredByTag}, tagId: ${this.tagId}`)
       if (this.isFilteredByTag) {
         if (this.tagId !== undefined) {
-          // await this.getArticleNumberByTag()
           await this.getArticlesByTag($state)
         }
       } else {
-        // await this.getArticleNumber()
         await this.getArticles($state)
       }
     },
@@ -156,6 +159,8 @@ export default {
       }
 
       if ($state === undefined) {
+        // Not from infinite-scroll event, reset articles to data directly
+        this.articles = rsp.data
         return
       }
 
@@ -178,9 +183,9 @@ export default {
         return;
       }
 
-      console.log(`aaaaaaa.state: ${$state}`)
-
       if ($state === undefined) {
+        // Not from infinite-scroll event, reset articles to data directly
+        this.articles = rsp.data
         return
       }
 

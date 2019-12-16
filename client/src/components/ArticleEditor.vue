@@ -86,7 +86,7 @@
 import MarkdownEditor from './MarkdownEditor'
 
 import Api from '@/api.js'
-import { EventBus, EVENT_RELOAD_ARTICLE, EVENT_MARKDOWN_EDITOR_CONTENT_READY, EVENT_ARTICLE_EDITOR_CLOSED } from '@/event-bus.js';
+import { EventBus, EVENT_RELOAD_ARTICLE, EVENT_RELOAD_ARTICLE_LIST, EVENT_MARKDOWN_EDITOR_CONTENT_READY, EVENT_ARTICLE_EDITOR_CLOSED } from '@/event-bus.js';
 
 export default {
   name: 'ArticleEditor',
@@ -186,15 +186,17 @@ export default {
 
       this.$getUi().toast.success('Article is successfully published!')
 
-      // reload article to update
+      // reload article
       EventBus.$emit(EVENT_RELOAD_ARTICLE)
+      // reload article list
+      EventBus.$emit(EVENT_RELOAD_ARTICLE_LIST)
 
-      // // go back to previous view
-      // this.$router.go(-1)
+      // notify other markdown editor to reset content
+      EventBus.$emit(EVENT_ARTICLE_EDITOR_CLOSED)
       this.$parent.close()
     },
     cancel() {
-      console.log(`close editor`)
+      // notify other markdown editor to reset content
       EventBus.$emit(EVENT_ARTICLE_EDITOR_CLOSED)
       this.$parent.close()
     },

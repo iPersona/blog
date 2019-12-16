@@ -1,6 +1,7 @@
 #![macro_use]
 
 use crate::util::errors::ErrorCode;
+use serde_json::Value;
 
 #[derive(Debug, Serialize)]
 pub enum Status {
@@ -70,6 +71,18 @@ pub type JsonApiResult = actix_web::web::Json<ApiResult>;
 //     };
 // }
 
+macro_rules! token_check_error {
+    ($req:expr) => {
+        ok($req.into_response(HttpResponse::Forbidden().finish().into_body()))
+    };
+}
+
+macro_rules! token_expired_error {
+    ($req:expr) => {
+        ok($req.into_response(HttpResponse::Gone().finish().into_body()))
+    };
+}
+
 //#[macro_export]
 macro_rules! api_resp {
     ($api_ret:expr) => {
@@ -98,7 +111,7 @@ macro_rules! api_resp_err {
     };
 }
 
-#[macro_export]
+// #[macro_export]
 macro_rules! api_resp_err_with_code {
     ($code:expr, $detail:expr) => {
         api_resp!($crate::api::ApiResult::Error {
@@ -146,29 +159,9 @@ macro_rules! extract_form_data {
     };
 }
 
+pub mod article_api;
+pub mod comment_api;
+pub mod dashboard_api;
 pub mod recaptcha_api;
+pub mod tag_api;
 pub mod user_api;
-pub mod visitor_api;
-
-pub use self::user_api::User;
-pub use self::visitor_api::Visitor;
-
-pub mod admin_article_api;
-pub mod admin_tag_api;
-pub mod admin_user_api;
-
-pub use self::admin_article_api::AdminArticle;
-pub use self::admin_tag_api::Tag;
-pub use self::admin_user_api::AdminUser;
-
-pub mod admin_chart_data_api;
-
-pub use self::admin_chart_data_api::ChartData;
-use serde_json::Value;
-use tera::Context;
-
-#[derive(Debug, Clone, Serialize)]
-pub struct InnerContext {
-    pub permission: Option<i16>,
-    pub context: Context,
-}

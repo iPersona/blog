@@ -3,7 +3,7 @@ use super::super::users::dsl::users as all_users;
 
 use super::FormDataExtractor;
 use super::UserNotify;
-use chrono::{Local, NaiveDateTime};
+use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use serde_json;
@@ -14,9 +14,9 @@ use super::super::{
     /*get_github_primary_email, */ get_password, random_string, sha3_256_encode, RedisPool,
 };
 use super::token::Token;
+use crate::models::token::TokenExtension;
 use crate::AppState;
-use actix_session::Session;
-use log::{debug, error};
+use log::debug;
 use std::cell::Ref;
 use std::collections::HashMap;
 
@@ -133,28 +133,15 @@ impl NewUser {
     //     }
     // }
 
-    fn insert(&self, conn: &PgConnection, session: &Session) -> Result<(), String> {
+    fn insert(&self, state: &AppState) -> Result<(), String> {
+        let conn = state.db.connection();
         match diesel::insert_into(users::table)
             .values(self)
-            .get_result::<Users>(conn)
+            .get_result::<Users>(&conn)
         {
-            Ok(info) => Ok(self.set_cookies(session, info.into_user_info())),
+            Ok(_) => Ok(()),
             Err(err) => Err(format!("{}", err).to_string()),
         }
-    }
-
-    fn set_cookies(&self, session: &Session, info: UserInfo) {
-        let result = session.set("login_time", Local::now().timestamp());
-        if result.is_err() {
-            error!("set session value 'login_time' failed!");
-        }
-        let result = session.set("info", info);
-        if result.is_err() {
-            error!("set session value 'info' failed!");
-        }
-
-        // TODO: 设置超时时间
-        // redis_pool.expire(&cookie, 24 * 3600);
     }
 }
 
@@ -168,8 +155,8 @@ pub struct RegisteredUser {
 }
 
 impl RegisteredUser {
-    pub fn insert(self, conn: &PgConnection, session: &Session) -> Result<(), String> {
-        NewUser::new(self).insert(conn, session)
+    pub fn insert(self, state: &AppState) -> Result<(), String> {
+        NewUser::new(self).insert(state)
     }
 }
 
@@ -204,13 +191,6 @@ impl UserInfo {
             true
         } else {
             false
-        }
-    }
-
-    pub fn save_to_session(&self, session: &Session) {
-        let result = session.set("info", self.clone());
-        if result.is_err() {
-            error!("set session value 'info' failed!");
         }
     }
 
@@ -358,18 +338,27 @@ impl FormDataExtractor for EditUser {
         req: actix_web::HttpRequest,
         state: &crate::AppState,
     ) -> Result<(Self::Data), String> {
-        let ext = req.extensions();
-        let user_info = ext.get::<UserInfo>();
-        match user_info {
-            Some(u) => {
-                let pg_pool = &state.db.connection();
-                let user_id = u.id.clone();
-                match self.edit_user(pg_pool, user_id) {
-                    Ok(token) => Ok(token),
-                    Err(err) => Err(err),
+        let token_ext = TokenExtension::from_request(&req);
+        match token_ext {
+            Some(t) => {
+                // Only login user is permitted
+                if !t.is_login() {
+                    return Err("Permission denied, please login and try again!".to_string());
+                }
+
+                match t.user_info {
+                    Some(u) => {
+                        let pg_pool = &state.db.connection();
+                        let user_id = u.id.clone();
+                        match self.edit_user(pg_pool, user_id) {
+                            Ok(token) => Ok(token),
+                            Err(err) => Err(err),
+                        }
+                    }
+                    None => Err("Permission denied, please login and retry!".to_string()),
                 }
             }
-            None => Err("Permission denied, please login and retry!".to_string()),
+            None => Err("Permission denied, please login and try again!".to_string()),
         }
     }
 }
@@ -435,11 +424,6 @@ impl LoginUser {
 
     pub fn get_remember(&self) -> bool {
         self.remember
-    }
-
-    pub fn sign_out(session: &Session) -> bool {
-        session.purge();
-        true
     }
 
     //    pub fn login_with_github(
@@ -546,5 +530,31 @@ pub struct CheckUser {
 impl CheckUser {
     pub fn is_user_exist(self, conn: &PgConnection) -> bool {
         Users::is_user_exist(conn, self.email.as_str())
+    }
+}
+
+/// Represents various user types
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+pub enum UserType {
+    // Administrator
+    Admin,
+    // Common registered user
+    Registered,
+    // Visitor
+    Visitor,
+}
+
+impl UserType {
+    pub fn from_token(token: Option<&Token>) -> Self {
+        match token {
+            Some(t) => {
+                if t.user_type == 0 {
+                    Self::Admin
+                } else {
+                    Self::Registered
+                }
+            }
+            None => Self::Visitor,
+        }
     }
 }

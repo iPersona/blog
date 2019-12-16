@@ -16,6 +16,7 @@ use super::super::{article_with_tag, articles};
 use super::FormDataExtractor;
 use super::{RelationTag, Relations, UserNotify};
 use crate::cache::executor::IncreaseArticleVisitNum;
+use crate::models::token::TokenExtension;
 use log::error;
 use std::cell::Ref;
 
@@ -30,29 +31,6 @@ pub struct ArticlesWithTag {
     pub create_time: NaiveDateTime,
     pub modify_time: NaiveDateTime,
 }
-
-// TODO: 未使用的结构体（以下4个）
-// DeleteArticleTagRelation
-// struct DeleteArticleTagRelation {
-//     id: Uuid,
-//     method: String,
-// }
-
-// DeleteAllArticles
-// struct DeleteAllArticles {
-//     id: Uuid,
-// }
-
-// QueryWithoutArticle
-// struct QueryWithoutArticle {
-//     id: Uuid,
-//     admin: bool,
-// }
-
-// QueryRawArticle
-// struct QueryRawArticle {
-//     id: Uuid,
-// }
 
 impl ArticlesWithTag {
     pub fn delete_with_id(state: &AppState, id: Uuid) -> Result<usize, String> {
@@ -407,11 +385,12 @@ impl NewArticle {
 impl FormDataExtractor for NewArticle {
     type Data = ();
 
-    fn execute(
-        &self,
-        _req: actix_web::HttpRequest,
-        state: &AppState,
-    ) -> Result<Self::Data, String> {
+    fn execute(&self, req: actix_web::HttpRequest, state: &AppState) -> Result<Self::Data, String> {
+        // The API is only available for administrator
+        if !TokenExtension::is_admin(&req) {
+            return Err("Permission denied, this API is for administrator only".to_string());
+        }
+
         let conn = &state.db.connection();
         let r = self.insert(conn);
         if r {
@@ -465,11 +444,12 @@ impl EditArticle {
 impl FormDataExtractor for EditArticle {
     type Data = ();
 
-    fn execute(
-        &self,
-        _req: actix_web::HttpRequest,
-        state: &AppState,
-    ) -> Result<Self::Data, String> {
+    fn execute(&self, req: actix_web::HttpRequest, state: &AppState) -> Result<Self::Data, String> {
+        // The API is only available for administrator
+        if !TokenExtension::is_admin(&req) {
+            return Err("Permission denied, this API is for administrator only".to_string());
+        }
+
         let res = self.edit_article(state);
         match res {
             Ok(_) => Ok(()),
@@ -649,13 +629,6 @@ impl ViewArticle {
             None => None,
         }
     }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ListAllArticleFilterByTag {
-    pub tag_id: Uuid,
-    pub limit: i64,
-    pub offset: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

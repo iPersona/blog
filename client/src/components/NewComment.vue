@@ -72,6 +72,9 @@ export default {
     console.log('NewComment mounted')
     this.listenEvent()
   },
+  beforeDestroy() {
+    EventBus.$off(EVENT_ARTICLE_EDITOR_CLOSED)
+  },
   methods: {
     listenEvent() {
       const self = this;

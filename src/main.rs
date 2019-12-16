@@ -1,6 +1,5 @@
 extern crate actix;
 extern crate actix_files;
-extern crate actix_session;
 extern crate actix_web;
 extern crate base64;
 extern crate blog;
@@ -23,17 +22,19 @@ extern crate clap;
 
 use actix::{Actor, Arbiter, SyncArbiter, System};
 //use actix_web::cookie::SameSite;
+use blog::api;
 use blog::cache::cron::Cron;
 use blog::cache::executor::VisitStatisticActor;
 use blog::util::cli::Opts;
 use blog::util::postgresql_pool::DataBase;
 use blog::util::redis_pool::Cache;
-use blog::{AdminArticle, AdminUser, AppState, ChartData, Tag, User, Visitor};
+// use blog::{AdminArticle, AdminUser, AppState, ChartData, Tag, UserApi, Visitor};
+use blog::AppState;
 use log::debug;
 
 fn main() {
-    // ::std::env::set_var("RUST_LOG", "debug,actix_web=debug");
-    ::std::env::set_var("RUST_LOG", "debug");
+    ::std::env::set_var("RUST_LOG", "debug,actix_web=debug");
+    // ::std::env::set_var("RUST_LOG", "debug");
     // init env variable
     dotenv().ok();
     // init logger
@@ -67,12 +68,11 @@ fn main() {
             .wrap(blog::util::debug_middleware::Debug)
             .wrap(blog::models::token::PermissionControl)
             .wrap(actix_web::middleware::Logger::default())
-            .configure(Visitor::configure)
-            .configure(AdminArticle::configure)
-            .configure(Tag::configure)
-            .configure(AdminUser::configure)
-            .configure(User::configure)
-            .configure(ChartData::configure)
+            .configure(api::article_api::ArticleApi::configure)
+            .configure(api::comment_api::CommentApi::configure)
+            .configure(api::tag_api::TagApi::configure)
+            .configure(api::user_api::UserApi::configure)
+            .configure(api::dashboard_api::DashboardApi::configure)
             // .wrap(
             //     CookieSession::signed(&[0; 32])
             //         .name("blog_session")

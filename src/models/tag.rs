@@ -3,6 +3,7 @@ use super::super::tags::dsl::tags as all_tags;
 use super::Relations;
 
 use super::FormDataExtractor;
+use crate::models::token::TokenExtension;
 use crate::AppState;
 use diesel;
 use diesel::prelude::*;
@@ -230,9 +231,14 @@ impl FormDataExtractor for TagsData {
 
     fn execute(
         &self,
-        _req: actix_web::HttpRequest,
+        req: actix_web::HttpRequest,
         state: &AppState,
     ) -> Result<Self::Data, String> {
+        // The API is only available for administrator
+        if !TokenExtension::is_admin(&req) {
+            return Err("Permission denied, this API is for administrator only".to_string());
+        }
+
         let res = self.update(&state);
         match res {
             Ok(_) => Ok(()),

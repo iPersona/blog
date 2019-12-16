@@ -15,7 +15,6 @@ import { mapMutations } from 'vuex'
 import { SAVE_TAG } from '@/store/modules/mutation-types.js'
 import { TAG } from '@/store/modules/module-names'
 import { TAG_ID, TAG_NAME } from '@/store/modules/store-types'
-import { EventBus, EVENT_RELOAD_ARTICLE_LIST } from '@/event-bus'
 
 export default {
   name: 'ArticleListByTag',
@@ -37,15 +36,14 @@ export default {
     })
   },
   async mounted() {
-    console.log(`xxxxxxxx tagId: ${this.tagId}, tagName: ${this.tagName}`)
+    this.$getLog().debug(`xxxxxxxx tagId: ${this.tagId}, tagName: ${this.tagName}`)
     if (this.tagId !== undefined && this.tagName !== undefined) {
       let tag = {
         id: this.tagId,
         name: this.tagName,
       }
-      console.log(`yyyy tag: ${JSON.stringify(tag)}`)
+      this.$getLog().debug(`yyyy tag: ${JSON.stringify(tag)}`)
       await this.saveTag(tag)
-      EventBus.$emit(EVENT_RELOAD_ARTICLE_LIST)
     }
   },
   methods: {

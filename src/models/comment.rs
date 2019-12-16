@@ -3,6 +3,7 @@ use super::super::comments::dsl::comments as all_comments;
 
 use super::super::UserInfo;
 use super::FormDataExtractor;
+use crate::models::token::TokenExtension;
 use crate::{ArticlesWithTag, UserNotify};
 use chrono::NaiveDateTime;
 use diesel;
@@ -107,66 +108,77 @@ impl FormDataExtractor for NewComments {
         req: actix_web::HttpRequest,
         state: &crate::AppState,
     ) -> Result<Self::Data, String> {
-        let ext = req.extensions();
-        let user_or = ext.get::<UserInfo>();
-        match user_or {
-            Some(user) => {
-                let redis_pool = &state.cache.into_inner();
-                let pg_pool = &state.db.connection();
-
-                let admin = UserInfo::view_admin(pg_pool, redis_pool);
-                let article =
-                    ArticlesWithTag::query_without_article(&state, self.article_id(), false)
-                        .unwrap();
-                let reply_user_id = self.reply_user_id();
-                match reply_user_id {
-                    // Reply comment
-                    Some(reply_user_id) => {
-                        // Notification replyee
-                        let user_reply_notify = UserNotify {
-                            user_id: reply_user_id,
-                            send_user_name: user.nickname.clone(),
-                            article_id: article.id,
-                            article_title: article.title.clone(),
-                            notify_type: "reply".into(),
-                        };
-                        user_reply_notify.cache(&redis_pool);
-
-                        // If the sender is not an admin and also the responder is also not admin, notify admin
-                        if reply_user_id != admin.id && user.groups != 0 {
-                            let comment_notify = UserNotify {
-                                user_id: admin.id,
-                                send_user_name: user.nickname.clone(),
-                                article_id: article.id,
-                                article_title: article.title.clone(),
-                                notify_type: "comment".into(),
-                            };
-                            comment_notify.cache(&redis_pool);
-                        }
-                    }
-                    // Normal comment
-                    None => {
-                        if user.groups != 0 {
-                            let comment_notify = UserNotify {
-                                user_id: admin.id,
-                                send_user_name: user.nickname.clone(),
-                                article_id: article.id,
-                                article_title: article.title.clone(),
-                                notify_type: "comment".into(),
-                            };
-                            comment_notify.cache(&redis_pool);
-                        }
-                    }
+        let token_ext = TokenExtension::from_request(&req);
+        match token_ext {
+            Some(t) => {
+                if !t.is_login() {
+                    return Err("please login and try again!".to_string());
                 }
 
-                let res = self.insert(&pg_pool, user);
-                if res {
-                    Ok(())
-                } else {
-                    Err("new_comment failed!".to_string())
+                match t.user_info {
+                    Some(user) => {
+                        let redis_pool = &state.cache.into_inner();
+                        let pg_pool = &state.db.connection();
+
+                        let admin = UserInfo::view_admin(pg_pool, redis_pool);
+                        let article = ArticlesWithTag::query_without_article(
+                            &state,
+                            self.article_id(),
+                            false,
+                        )
+                        .unwrap();
+                        let reply_user_id = self.reply_user_id();
+                        match reply_user_id {
+                            // Reply comment
+                            Some(reply_user_id) => {
+                                // Notification resolve
+                                let user_reply_notify = UserNotify {
+                                    user_id: reply_user_id,
+                                    send_user_name: user.nickname.clone(),
+                                    article_id: article.id,
+                                    article_title: article.title.clone(),
+                                    notify_type: "reply".into(),
+                                };
+                                user_reply_notify.cache(&redis_pool);
+
+                                // If the sender is not an admin and also the responder is also not admin, notify admin
+                                if reply_user_id != admin.id && user.groups != 0 {
+                                    let comment_notify = UserNotify {
+                                        user_id: admin.id,
+                                        send_user_name: user.nickname.clone(),
+                                        article_id: article.id,
+                                        article_title: article.title.clone(),
+                                        notify_type: "comment".into(),
+                                    };
+                                    comment_notify.cache(&redis_pool);
+                                }
+                            }
+                            // Normal comment
+                            None => {
+                                if user.groups != 0 {
+                                    let comment_notify = UserNotify {
+                                        user_id: admin.id,
+                                        send_user_name: user.nickname.clone(),
+                                        article_id: article.id,
+                                        article_title: article.title.clone(),
+                                        notify_type: "comment".into(),
+                                    };
+                                    comment_notify.cache(&redis_pool);
+                                }
+                            }
+                        }
+
+                        let res = self.insert(&pg_pool, &user);
+                        if res {
+                            Ok(())
+                        } else {
+                            Err("new_comment failed!".to_string())
+                        }
+                    }
+                    None => Err("Permission denied, you need to login first!".to_string()),
                 }
             }
-            None => Err("Permission denied, you need to login first!".to_string()),
+            None => Err("failed to get token extension from request!".to_string()),
         }
     }
 }
@@ -198,19 +210,36 @@ impl FormDataExtractor for DeleteComment {
         req: actix_web::HttpRequest,
         state: &crate::AppState,
     ) -> Result<Self::Data, String> {
-        let ext = req.extensions();
-        let user_info = ext.get::<UserInfo>();
-        match user_info {
-            Some(user) => {
-                let pg_pool = &state.db.connection();
-                let res = self.delete(pg_pool, user);
-                if res {
-                    Ok(())
-                } else {
-                    Err("delete_comment failed!".to_string())
+        let token_ext = TokenExtension::from_request(&req);
+        match token_ext {
+            Some(t) => {
+                // Only login user is permitted to access this API
+                if !t.is_login() {
+                    return Err("Permission denied, please login and try again!".to_string());
+                }
+
+                match t.user_info {
+                    Some(user) => {
+                        // Only the comment creator and administrator are permitted to delete comment
+                        if !(user.id == self.user_id || user.is_admin()) {
+                            return Err(
+                                "Permission denied, you are not permitted to delete this comment!"
+                                    .to_string(),
+                            );
+                        }
+
+                        let pg_pool = &state.db.connection();
+                        let res = self.delete(pg_pool, &user);
+                        if res {
+                            Ok(())
+                        } else {
+                            Err("failed to delete comment!".to_string())
+                        }
+                    }
+                    None => Err("permission denied, please login and try again!".to_string()),
                 }
             }
-            None => Err("permission denied".to_string()),
+            None => Err("permission denied, please login and try again!".to_string()),
         }
     }
 }

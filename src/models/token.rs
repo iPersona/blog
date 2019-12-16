@@ -16,28 +16,16 @@ use crate::util::env::Env;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, errors::Result, Algorithm, Header, Validation};
 
+use crate::models::user::UserType;
 use actix_http::httpmessage::HttpMessage;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
-use actix_web::HttpResponse;
+use actix_web::{HttpRequest, HttpResponse};
 use chrono::NaiveDateTime;
 use futures::future::{ok, Either, FutureResult};
 use futures::Poll;
-use log::{error, info};
-use regex::Regex;
+use log::error;
 use typename::TypeName;
 use uuid::Uuid;
-
-macro_rules! token_check_error {
-    ($req:expr) => {
-        ok($req.into_response(HttpResponse::Forbidden().finish().into_body()))
-    };
-}
-
-macro_rules! token_expired_error {
-    ($req:expr) => {
-        ok($req.into_response(HttpResponse::Gone().finish().into_body()))
-    };
-}
 
 #[derive(Debug, Serialize, Deserialize, TypeName)]
 pub struct Token {
@@ -132,6 +120,10 @@ impl Token {
     pub fn is_admin(&self) -> bool {
         self.is_admin
     }
+
+    pub fn expired(&self) -> bool {
+        Utc::now().timestamp() > self.exp
+    }
 }
 
 pub struct PermissionControl;
@@ -172,7 +164,6 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = S::Error;
-    // type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error>>;
     type Future = Either<S::Future, FutureResult<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -180,218 +171,67 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        // TODO: 需要重写
-        let path = req.path();
-        info!("path: {:?}", path);
-        info!("method: {:?}", req.method());
-
         let token = req.headers().get("Authorization");
         match token {
+            // Registered user or admin
             Some(t) => {
                 let t = Token::decode(t.to_str().unwrap());
-                let mut user_info: Option<UserInfo> = None;
-                let result = match t {
+                match t {
                     Ok(t) => {
-                        user_info = Some(t.to_user_info());
-                        Permission::new(path, Some(&t)).check(Some(&t))
+                        let user_info = t.to_user_info();
+                        // Insert token extension for handler usage
+                        req.extensions_mut().insert(TokenExtension {
+                            user_info: Some(user_info),
+                            user_type: UserType::from_token(Some(&t)),
+                        });
+                        Either::A(self.service.call(req))
                     }
                     Err(e) => match e.kind() {
                         jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-                            // 重新登录
-                            Err("TokenExpired".to_string())
-                        }
-                        _ => Permission::new(path, None).check(None),
-                    },
-                };
-                match result {
-                    Ok(is_ok) => {
-                        if is_ok {
-                            // Save token info
-                            match user_info {
-                                Some(u) => req.extensions_mut().insert(u),
-                                None => {}
-                            }
-                            Either::A(self.service.call(req))
-                        } else {
-                            Either::B(token_check_error!(req))
-                        }
-                    }
-                    Err(e) => {
-                        if e.eq("TokenExpired") {
+                            // Need to login again
                             Either::B(token_expired_error!(req))
-                        } else {
-                            Either::B(token_check_error!(req))
                         }
-                    }
+                        _ => Either::B(token_check_error!(req)), // Invalid token data
+                    },
                 }
             }
+            // Visitor
             None => {
-                // TODO: 跳转到登录界面
-                let result = Permission::new(path, None).check(None);
-                match result {
-                    Ok(is_ok) => {
-                        if is_ok {
-                            Either::A(self.service.call(req))
-                        } else {
-                            Either::B(token_check_error!(req))
-                        }
-                    }
-                    Err(_e) => Either::B(token_check_error!(req)),
-                }
+                req.extensions_mut().insert(TokenExtension {
+                    user_info: None,
+                    user_type: UserType::Visitor,
+                });
+                Either::A(self.service.call(req))
             }
         }
     }
 }
 
-pub enum UserUrl {
-    ChangePassword,
-    View,
-    SignOut,
-    Edit,
-    NewComment,
-    DeleteComment,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TokenExtension {
+    pub user_info: Option<UserInfo>,
+    pub user_type: UserType,
 }
 
-impl UserUrl {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "/user/change_pwd" => Some(Self::ChangePassword),
-            "/user/view" => Some(Self::View),
-            "/user/sign_out" => Some(Self::SignOut),
-            "/user/edit" => Some(Self::Edit),
-            "/user/new_comment" => Some(Self::NewComment),
-            "/user/delete_comment" => Some(Self::DeleteComment),
-            _ => None,
-        }
-    }
-}
-
-pub enum VisitorUrl {
-    ListAllArticles,
-    ViewComment,
-    ViewArticle,
-    Login,
-    NewUser,
-    UserExist,
-    GetArticleCount,
-    GetTagsWithCount,
-    GetTagsWithoutCount,
-}
-
-impl VisitorUrl {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "/articles" => Some(Self::ListAllArticles),
-            //            "/article/view_comment" => Some(Self::ViewComment),
-            _ if Regex::new(
-                r"/article/[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}/comments",
-            )
-            .unwrap()
-            .is_match(s) =>
-            {
-                Some(Self::ViewComment)
-            }
-            // "/article/" => Some(Self::ViewArticle),
-            _ if Regex::new(
-                r"/article/[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12}",
-            )
-            .unwrap()
-            .is_match(s) =>
-            {
-                Some(Self::ViewArticle)
-            }
-            "/user/login" => Some(Self::Login),
-            "/user/new" => Some(Self::NewUser),
-            "/user/exist" => Some(Self::UserExist),
-            "/article/count" => Some(Self::GetArticleCount),
-            "/tag/view/count" => Some(Self::GetTagsWithCount),
-            "/tag/view" => Some(Self::GetTagsWithoutCount),
-            _ => None,
-        }
-    }
-}
-
-pub enum Url {
-    UserUrl(UserUrl),
-    VisitorUrl(VisitorUrl),
-}
-
-impl Url {
-    pub fn from_str(s: &str) -> Option<Url> {
-        let user_url = UserUrl::from_str(s);
-        if user_url.is_some() {
-            return Some(Self::UserUrl(user_url.unwrap()));
-        }
-
-        let visitor_url = VisitorUrl::from_str(s);
-        if visitor_url.is_some() {
-            return Some(Self::VisitorUrl(visitor_url.unwrap()));
-        }
-
-        None
-    }
-}
-
-pub struct Permission {
-    pub url: String,
-    pub permission_type: PermissionType,
-}
-
-impl Permission {
-    pub fn new(url: &str, token: Option<&Token>) -> Self {
-        match token {
-            Some(t) => Permission {
-                url: url.to_string(),
-                permission_type: if t.user_type == 0 {
-                    PermissionType::Admin
-                } else {
-                    PermissionType::Registered
-                },
-            },
-            None => Permission {
-                url: url.to_string(),
-                permission_type: PermissionType::Visitor,
-            },
+impl TokenExtension {
+    pub fn from_request(req: &HttpRequest) -> Option<Self> {
+        let ext = req.extensions();
+        let token_ext = ext.get::<TokenExtension>();
+        match token_ext {
+            Some(t) => Some(t.clone()),
+            None => None,
         }
     }
 
-    pub fn check(&self, token: Option<&Token>) -> std::result::Result<bool, String> {
-        // TODO: 检查jwt是否已经超时，若超时，让客户端重新登录，以获取token
-        match token {
-            Some(t) => {
-                if Utc::now().timestamp() > t.exp {
-                    // token expirated
-                    return Err("JWT expired!".to_string());
-                }
-                // 检查当前用户权限是否足够访问资源
-                match self.permission_type {
-                    PermissionType::Admin => Ok(true),
-                    PermissionType::Registered => Ok(self.is_user_permission()),
-                    PermissionType::Visitor => Ok(self.is_visitor_permission()),
-                }
-            }
-            None => Ok(self.is_visitor_permission()),
+    pub fn is_login(&self) -> bool {
+        self.user_type != UserType::Visitor
+    }
+
+    pub fn is_admin(req: &HttpRequest) -> bool {
+        let token_ext = Self::from_request(req);
+        match token_ext {
+            Some(t) => t.user_type == UserType::Admin,
+            None => false,
         }
     }
-
-    fn is_user_permission(&self) -> bool {
-        let user_url = UserUrl::from_str(self.url.as_str());
-        let visitor_url = VisitorUrl::from_str(self.url.as_str());
-        user_url.is_some() || visitor_url.is_some()
-    }
-
-    fn is_visitor_permission(&self) -> bool {
-        let visitor_url = VisitorUrl::from_str(&self.url.as_str());
-        visitor_url.is_some()
-    }
-}
-
-pub enum PermissionType {
-    Admin,
-    Registered,
-    Visitor,
-}
-
-pub struct SimpleToken {
-    pub is_admin: bool,
 }

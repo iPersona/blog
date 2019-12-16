@@ -30,42 +30,44 @@ export default class Api {
         }),
         (this.url = {
             // article
-            createArticle: `${this.host}/article/new`, // [admin] create article
-            deleteArticle: `${this.host}/article/delete`, // [admin] delete article
-            adminView: `${this.host}/article/admin/view`, // [admin] get article
-            adminViewRaw: `${this.host}/article/admin/view_raw`, // [admin] get article markdown
-            adminViewAll: `${this.host}/article/admin/view_all`, // [admin] get article list
-            editArticle: `${this.host}/article/edit`, // edit article
-            publishArticle: `${this.host}/article/publish`, // publish article
+            createArticle: `${this.host}/article`, // [admin] create article
+            deleteArticle: `${this.host}/article`, // [admin] delete article
+            // adminView: `${this.host}/article/admin/view`, // [admin] get article
+            // adminViewRaw: `${this.host}/article/admin/view_raw`, // [admin] get article markdown
+            // adminViewAll: `${this.host}/article/admin/view_all`, // [admin] get article list
+            editArticle: `${this.host}/article`, // edit article
+            publishArticle: `${this.host}/article`, // publish article
             visitorViewAll: `${this.host}/articles`, // get article list
             visitorViewArticle: `${this.host}/article`, // get article
-            articleNumber: `${this.host}/article/count`, // article count
-            articleNumberByTag: `${this.host}/article/tag/count`,
-            articleByTag: `${this.host}/article/tag`,
+            // articleNumber: `${this.host}/article/count`, // article count
+            // articleNumberByTag: `${this.host}/article/tag/count`,
+            articlesWithTag: function (tagId) {
+                return `${self.host}/tag/${tagId}/articles`
+            },
 
             // comment
             comments: function (articleId) {
-                return `${self.host}/article/${articleId}/comments`
+                return `${self.host}/comments/${articleId}`
             },
-            newComment: `${this.host}/user/comment/new`,
+            newComment: `${this.host}/comment`,
 
             // user
-            login: `${this.host}/user/login`, // login
-            signup: `${this.host}/user/new`, // register
-            userExist: `${this.host}/user/exist`, // check whether user exists
-            editProfile: `${this.host}/user/edit`, // edit user profile
-            updatePassword: `${this.host}/user/change_pwd`, // update password
+            login: `${this.host}/login`, // login
+            signup: `${this.host}/user`, // register
+            userExist: `${this.host}/user`, // check whether user exists
+            editProfile: `${this.host}/user`, // edit user profile
+            updatePassword: `${this.host}/user/password`, // update password
 
             // tag
-            getTags: `${this.host}/tag/view`,
-            getTagsWithCount: `${this.host}/tag/view/count`,
-            addTags: `${this.host}/tag/new`,
-            delTag: `${this.host}/tag/delete`,
-            editTag: `${this.host}/tag/edit`,
-            updateTags: `${this.host}/tag/update`,
+            getTags: `${this.host}/tag`,
+            getTagsWithCount: `${this.host}/tags/articles/count`,
+            addTags: `${this.host}/tag`,
+            delTag: `${this.host}/tag`,
+            editTag: `${this.host}/tag`,
+            updateTags: `${this.host}/tags`,
 
             // statistic
-            getDailyPeriod: `${this.host}/statistic/period`,
+            getDailyVisit: `${this.host}/dashboard/visit`,
 
         });
         // request拦截器
@@ -87,14 +89,14 @@ export default class Api {
     }
 
     async updatePassword(oldPassword, newPassword) {
-        return this.post(this.url.updatePassword, {
+        return this.patch(this.url.updatePassword, {
             old_password: oldPassword,
             new_password: newPassword,
         })
     }
 
     async editProfile(profile) {
-        return this.post(this.url.editProfile, {
+        return this.put(this.url.editProfile, {
             nickname: profile.nickname,
             say: profile.sign,
             email: profile.email,
@@ -102,7 +104,7 @@ export default class Api {
     }
 
     async getDailyPeriod(start, end) {
-        return this.get(this.url.getDailyPeriod, {
+        return this.get(this.url.getDailyVisit, {
             start,
             end
         })
@@ -124,15 +126,14 @@ export default class Api {
         })
     }
 
-    async getArticleNumberByTag(tagId) {
-        return this.get(this.url.articleNumberByTag, {
-            tag_id: tagId
-        })
-    }
+    // async getArticleNumberByTag(tagId) {
+    //     return this.get(this.url.articleNumberByTag, {
+    //         tag_id: tagId
+    //     })
+    // }
 
     async getArticlesByTag(tagId, limit, offset) {
-        return this.get(this.url.articleByTag, {
-            tag_id: tagId,
+        return this.get(this.url.articlesWithTag(tagId), {
             limit: limit,
             offset: offset,
         })
@@ -153,11 +154,11 @@ export default class Api {
         if (deletedTags !== undefined) {
             args.deleted_tags = deletedTags
         }
-        return this.post(this.url.updateTags, args)
+        return this.put(this.url.updateTags, args)
     }
 
     async editTag(tagObj) {
-        return this.post(this.url.editTag, tagObj)
+        return this.patch(this.url.editTag, tagObj)
     }
 
     async delTag(id) {
@@ -223,24 +224,24 @@ export default class Api {
         return this.delete(url);
     }
 
-    async adminView(id) {
-        return this.get(this.url.adminView, {
-            id: id
-        });
-    }
+    // async adminView(id) {
+    //     return this.get(this.url.adminView, {
+    //         id: id
+    //     });
+    // }
 
-    async adminViewRawArticle(id) {
-        return this.get(this.url.adminViewRaw, {
-            id: id
-        });
-    }
+    // async adminViewRawArticle(id) {
+    //     return this.get(this.url.adminViewRaw, {
+    //         id: id
+    //     });
+    // }
 
-    async adminViewAll(limit, offset) {
-        return this.get(this.url.adminViewAll, {
-            limit: limit,
-            offset: offset
-        });
-    }
+    // async adminViewAll(limit, offset) {
+    //     return this.get(this.url.adminViewAll, {
+    //         limit: limit,
+    //         offset: offset
+    //     });
+    // }
 
     async editArticle(
         id, title, rawContent, newChoiceAlreadyExistsTags, deselectTags,
@@ -259,11 +260,11 @@ export default class Api {
         if (newTags !== undefined) {
             args.new_tags = newTags;
         }
-        return this.post(this.url.editArticle, args);
+        return this.put(this.url.editArticle, args);
     }
 
     async publishArticle(id) {
-        return this.post(this.url.publishArticle, {
+        return this.patch(this.url.publishArticle, {
             id: id,
             publish: true,
         });
@@ -281,9 +282,9 @@ export default class Api {
         return this.get(url);
     }
 
-    async getArticleNumber() {
-        return this.get(this.url.articleNumber);
-    }
+    // async getArticleNumber() {
+    //     return this.get(this.url.articleNumber);
+    // }
 
     async getResults() {
         return this.get(this.url.results);
@@ -342,11 +343,11 @@ export default class Api {
     }
 
     async reloadCases() {
-        return this.post(this.url.reloadcases);
+        return this.post(this.url.reloadcases)
     }
 
     async post(url, args) {
-        return this.doRequest(url, 'post', args);
+        return this.doRequest(url, 'post', args)
     }
 
     async get(url, args) {
@@ -357,38 +358,30 @@ export default class Api {
         return this.doRequest(url, 'delete', args)
     }
 
+    async patch(url, args) {
+        return this.doRequest(url, 'patch', args)
+    }
+
+    async put(url, args) {
+        return this.doRequest(url, 'put', args)
+    }
+
     async doRequest(url, method, args) {
         try {
             console.log(
                 'url=' + url + ', method=' + method +
                 ', args: ' + JSON.stringify(args));
             var res;
-            if (method === 'post') {
-                // POST 方式
-                if (args === undefined) {
-                    res = await this.axios.post(url);
-                } else {
-                    console.log(`post-args: ${qs.stringify(args)}`)
-                    res = await this.axios.post(url, qs.stringify(args));
-                }
-            } else if (method === 'delete') {
-                // DELETE 方式
-                if (args === undefined) {
-                    res = await this.axios.delete(url);
-                } else {
-                    res = await this.axios.delete(url, qs.stringify(args));
-                }
+            if (args === undefined) {
+                res = await this.axios[method](url);
             } else {
-                // GET 方式
-                if (args === undefined) {
-                    res = await this.axios.get(url);
-                } else {
-                    res = await this.axios.get(url, {
+                console.log(`post-args: ${qs.stringify(args)}`)
+                let params = method === 'get' ? {
                         params: args
-                    });
-                }
+                    } :
+                    qs.stringify(args)
+                res = await this.axios[method](url, params);
             }
-
             res = res.data;
             return new Promise(resolve => {
                 resolve(res);

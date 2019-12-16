@@ -26,10 +26,7 @@ pub(crate) use self::articles::{
 pub(crate) use self::comment::{Comments, DeleteComment, NewComments};
 pub(crate) use self::notifys::UserNotify;
 pub(crate) use self::tag::{NewTag, TagCount, Tags};
-pub(crate) use self::user::{
-    ChangePassword, ChangePermission, DisabledUser, EditUser, LoginUser, RegisteredUser, UserInfo,
-    Users,
-};
+pub(crate) use self::user::{ChangePassword, EditUser, RegisteredUser, UserInfo};
 
 //use actix::MailboxError;
 //use std::fmt;

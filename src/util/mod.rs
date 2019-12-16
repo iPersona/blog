@@ -6,19 +6,13 @@ pub mod github_information;
 pub mod path;
 pub mod postgresql_pool;
 pub mod redis_pool;
-
-//pub use self::github_information::{get_github_account_nickname_address, get_github_primary_email,
-//                                   get_github_token};
 pub use self::redis_pool::RedisPool;
 
-use crate::api::InnerContext;
-use actix_web::dev::ServiceRequest;
 use ammonia::clean;
 use comrak::{markdown_to_html, ComrakOptions};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::fmt::Write;
-use tera::Context;
 use tiny_keccak::Keccak;
 
 /// Get random value
@@ -73,42 +67,42 @@ pub fn get_password(raw: &str) -> String {
 // `0` means Admin
 // `1` means User
 
-pub fn get_identity_and_web_context(_req: &mut ServiceRequest) -> InnerContext {
-    // TODO: 需要重写
-    InnerContext {
-        permission: None,
-        context: Context::new(),
-    }
-    //    let mut web = Context::new();
-    //    let state = req.app_data::<AppState>().unwrap();
-    //    let redis_pool = state.get_ref().cache.into_inner();
-    //    let token = Token::from_session(&req.get_session());
-    //    if token.is_none() {
-    //        return InnerContext {
-    //            permission: None,
-    //            context: web,
-    //        };
-    //    }
-    //    let token = token.unwrap().into_inner();
-    //    if redis_pool.exists(token.as_str()) {
-    //        let info =
-    //            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(token.as_str(), "info"))
-    //                .unwrap();
-    //        let group = (&info).groups;
-    //        let notifys = UserNotify::get_notifys(info.id, &redis_pool);
-    //        web.insert("user", &info);
-    //        web.insert("notifys", &notifys);
-    //        InnerContext {
-    //            permission: Some(group),
-    //            context: web,
-    //        }
-    //    } else {
-    //        InnerContext {
-    //            permission: None,
-    //            context: web,
-    //        }
-    //    }
-}
+//pub fn get_identity_and_web_context(_req: &mut ServiceRequest) -> InnerContext {
+//    // TODO: 需要重写
+//    InnerContext {
+//        permission: None,
+//        context: Context::new(),
+//    }
+//    //    let mut web = Context::new();
+//    //    let state = req.app_data::<AppState>().unwrap();
+//    //    let redis_pool = state.get_ref().cache.into_inner();
+//    //    let token = Token::from_session(&req.get_session());
+//    //    if token.is_none() {
+//    //        return InnerContext {
+//    //            permission: None,
+//    //            context: web,
+//    //        };
+//    //    }
+//    //    let token = token.unwrap().into_inner();
+//    //    if redis_pool.exists(token.as_str()) {
+//    //        let info =
+//    //            serde_json::from_str::<UserInfo>(&redis_pool.hget::<String>(token.as_str(), "info"))
+//    //                .unwrap();
+//    //        let group = (&info).groups;
+//    //        let notifys = UserNotify::get_notifys(info.id, &redis_pool);
+//    //        web.insert("user", &info);
+//    //        web.insert("notifys", &notifys);
+//    //        InnerContext {
+//    //            permission: Some(group),
+//    //            context: web,
+//    //        }
+//    //    } else {
+//    //        InnerContext {
+//    //            permission: None,
+//    //            context: web,
+//    //        }
+//    //    }
+//}
 
 // Get visitor ip information and access time, and then push it to redis key `visitor_log`
 //#[inline]
