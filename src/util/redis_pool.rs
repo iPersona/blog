@@ -245,8 +245,8 @@ pub enum RedisKeys {
 impl RedisKeys {
     pub fn to_string(&self) -> String {
         match self {
-            Self::VisitCache => "visit-cache".to_string(),
-            Self::PersistTime => "visit-cache-persist-time".to_string(),
+            Self::VisitCache => "visit-cron".to_string(),
+            Self::PersistTime => "visit-cron-persist-time".to_string(),
         }
     }
 }

@@ -5,6 +5,7 @@
   >
     <NavHeader />
     <RouterView class="router-view" />
+    <br><br>
     <NavFooter />
   </div>
 </template>

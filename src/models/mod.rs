@@ -7,7 +7,7 @@ pub trait FormDataExtractor {
         &self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> Result<(Self::Data), String>;
+    ) -> Result<Self::Data, String>;
 }
 pub mod article_tag_relation;
 pub mod articles;

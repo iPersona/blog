@@ -71,6 +71,7 @@ table! {
         disabled -> Int2,
         create_time -> Timestamp,
         github -> Nullable<Varchar>,
+        is_active -> Bool,
     }
 }
 

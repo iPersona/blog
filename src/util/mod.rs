@@ -1,11 +1,13 @@
 pub mod cli;
 pub mod debug_middleware;
+pub mod email;
 pub mod env;
 pub mod errors;
 pub mod github_information;
 pub mod path;
 pub mod postgresql_pool;
 pub mod redis_pool;
+pub mod result;
 pub use self::redis_pool::RedisPool;
 
 use ammonia::clean;
@@ -75,7 +77,7 @@ pub fn get_password(raw: &str) -> String {
 //    }
 //    //    let mut web = Context::new();
 //    //    let state = req.app_data::<AppState>().unwrap();
-//    //    let redis_pool = state.get_ref().cache.into_inner();
+//    //    let redis_pool = state.get_ref().cron.into_inner();
 //    //    let token = Token::from_session(&req.get_session());
 //    //    if token.is_none() {
 //    //        return InnerContext {

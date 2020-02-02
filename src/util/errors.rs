@@ -1,14 +1,27 @@
 #[derive(Debug, Serialize)]
 pub enum ErrorCode {
-    UserExist,
+    // User not exist
+    UserNotExist,
+    // Invalid token
+    InvalidToken,
+    // Token expired
+    TokenExpired,
+    // Permission denied
     PermissionDenied,
+    // Email is not verified
+    EmailNotVerified,
+    // Login failed,
+    LoginFailed,
+    // Parse error
+    ParseError,
+    // Unknow error
     Unknown,
 }
 
 #[derive(Debug, Serialize)]
 pub struct Error {
-    code: ErrorCode,
-    detail: String,
+    pub code: ErrorCode,
+    pub detail: String,
 }
 
 impl std::error::Error for Error {}

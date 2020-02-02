@@ -19,12 +19,13 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate lettre;
 extern crate serde_urlencoded;
 extern crate tiny_keccak;
 extern crate uuid;
 
 pub mod api;
-pub mod cache;
+pub mod cron;
 pub mod models;
 pub mod schema;
 pub mod util;
@@ -48,6 +49,5 @@ pub use web::{Admin, ArticleWeb};
 pub struct AppState {
     pub db: crate::util::postgresql_pool::DataBase,
     pub cache: crate::util::redis_pool::Cache,
-    pub visit_statistic: actix::Addr<crate::cache::executor::VisitStatisticActor>,
-    pub cron: actix::Addr<crate::cache::cron::Cron>,
+    pub cache_worker_addr: actix::Addr<crate::cron::cache::CacheActor>,
 }

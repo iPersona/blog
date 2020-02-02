@@ -16,7 +16,9 @@ use crate::util::env::Env;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, errors::Result, Algorithm, Header, Validation};
 
-use crate::models::user::UserType;
+use crate::models::user::{UserType, Users};
+use crate::util::errors::{Error, ErrorCode};
+use crate::util::result::InternalStdResult;
 use actix_http::httpmessage::HttpMessage;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::{HttpRequest, HttpResponse};
@@ -53,15 +55,17 @@ pub struct Token {
     pub email: String,
     // is admin
     pub is_admin: bool,
+    // is active
+    pub is_active: Option<bool>,
 }
 
 impl Token {
-    pub fn new(user: &UserInfo) -> Self {
+    pub fn new(user: &UserInfo, is_active: bool) -> Self {
         Token {
-            iss: "https://www.coimioc.com".to_string(),
+            iss: Env::get().domain,
             sub: "Register".to_string(),
             iat: Utc::now().timestamp(),
-            exp: (Utc::now() + Duration::hours(24)).timestamp(),
+            exp: (Utc::now() + Duration::hours(Env::get().login_token_expired)).timestamp(),
             user_id: user.id.to_hyphenated().to_string(),
             user_type: user.groups,
             user_name: user.account.clone(),
@@ -73,6 +77,26 @@ impl Token {
             },
             email: user.email.clone(),
             is_admin: user.is_admin(),
+            is_active: if is_active { None } else { Some(false) },
+        }
+    }
+
+    pub fn from_user(user: Users) -> Token {
+        let now = Utc::now();
+        Token {
+            iss: Env::get().domain,
+            sub: "Register".to_string(),
+            iat: now.timestamp(),
+            exp: (now + Duration::hours(Env::get().verify_token_expired)).timestamp(),
+            user_id: user.id.to_hyphenated().to_string(),
+            user_type: 1, // 0: admin, other: common user
+            user_name: user.account.clone(),
+            user_nickname: user.nickname.clone(),
+            user_create_time: user.create_time,
+            user_sign: user.say,
+            email: user.email.clone(),
+            is_admin: false,
+            is_active: Some(false),
         }
     }
 
@@ -123,6 +147,16 @@ impl Token {
 
     pub fn expired(&self) -> bool {
         Utc::now().timestamp() > self.exp
+    }
+
+    pub fn user_id(&self) -> InternalStdResult<Uuid> {
+        match Uuid::parse_str(self.user_id.as_str()) {
+            Ok(id) => Ok(id),
+            Err(e) => Err(Error {
+                code: ErrorCode::ParseError,
+                detail: format!("parse uuid from token failed: {:?}", e),
+            }),
+        }
     }
 }
 
@@ -183,6 +217,7 @@ where
                         req.extensions_mut().insert(TokenExtension {
                             user_info: Some(user_info),
                             user_type: UserType::from_token(Some(&t)),
+                            is_active: t.is_active.is_none(),
                         });
                         Either::A(self.service.call(req))
                     }
@@ -200,6 +235,7 @@ where
                 req.extensions_mut().insert(TokenExtension {
                     user_info: None,
                     user_type: UserType::Visitor,
+                    is_active: false,
                 });
                 Either::A(self.service.call(req))
             }
@@ -211,6 +247,7 @@ where
 pub struct TokenExtension {
     pub user_info: Option<UserInfo>,
     pub user_type: UserType,
+    pub is_active: bool,
 }
 
 impl TokenExtension {
@@ -224,7 +261,7 @@ impl TokenExtension {
     }
 
     pub fn is_login(&self) -> bool {
-        self.user_type != UserType::Visitor
+        self.is_active && self.user_type != UserType::Visitor
     }
 
     pub fn is_admin(req: &HttpRequest) -> bool {

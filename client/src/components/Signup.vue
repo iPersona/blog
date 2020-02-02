@@ -137,7 +137,7 @@ export default {
 
       console.log("signup-resp: " + JSON.stringify(rsp));
       if (Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.success('Congratulation! You have successfully create an account!')
+        this.$getUi().toast.success(`An verification email is send to ${this.email}. Please verify your email to active your account!`)
       } else {
         this.$getUi().toast.fail('Sorry! We are failed to create an account for you now, please try again later.');
       }

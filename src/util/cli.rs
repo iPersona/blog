@@ -1,4 +1,4 @@
-use clap::{crate_version, App, Arg};
+use clap::{crate_authors, crate_version, App, Arg};
 
 #[derive(Debug, Clone)]
 pub enum OptNames {
@@ -21,7 +21,7 @@ impl Opts {
     pub fn new() -> Self {
         let matches = App::new("My Blog")
             .version(crate_version!())
-            .author("coimioc. <cocoaffee@gmail.com>")
+            .author(crate_authors!())
             .about("My blog CLI")
             .arg(
                 Arg::with_name(OptNames::WorkDir.to_str())

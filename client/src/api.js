@@ -383,15 +383,19 @@ export default class Api {
                 res = await this.axios[method](url, params);
             }
             res = res.data;
+
+            // error handler
+            Api.errorHandler(res);
+
             return new Promise(resolve => {
                 resolve(res);
             });
         } catch (error) {
             console.error(`server error: ${error}`);
-            if (error.response.status === 410) {
-                // need to login again
-                store.commit(`${USER}/${LOGOUT}`)
-            }
+            // if (error.response.status === 410) {
+            //     // need to login again
+            //     store.commit(`${USER}/${LOGOUT}`)
+            // }
 
             if (error.response) {
                 // The request was made and the server responded with a status code
@@ -415,5 +419,32 @@ export default class Api {
     static isSuccessResponse(rsp) {
         return rsp.hasOwnProperty('data') ||
             rsp.hasOwnProperty('status') && rsp.status === 'Ok';
+    }
+
+    static isKindOfError(rsp, code) {
+        return rsp.hasOwnProperty('status') &&
+            rsp.status === 'Err' &&
+            rsp.code === code
+    }
+
+    static isTokenExpired(rsp) {
+        return
+    }
+
+    static isEmailNotVerified(rsp) {
+        return
+    }
+
+    static errorHandler(rsp) {
+        if (Api.isKindOfError(rsp, 'TokenExpired')) {
+            // need to login again
+            store.commit(`${USER}/${LOGOUT}`)
+        } else if (Api.isKindOfError(rsp, 'EmailNotVerified')) {
+            // redirect to error page
+            let url = `/error?title=Email 未验证&detail=请先验证 Email 激活账户！`
+            let encodedUri = encodeURIComponent(url)
+            console.log(`encoded uri: ${encodedUri}`)
+            window.location.replace(encodedUri)
+        }
     }
 }

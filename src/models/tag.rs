@@ -229,11 +229,7 @@ impl TagsData {
 impl FormDataExtractor for TagsData {
     type Data = ();
 
-    fn execute(
-        &self,
-        req: actix_web::HttpRequest,
-        state: &AppState,
-    ) -> Result<Self::Data, String> {
+    fn execute(&self, req: actix_web::HttpRequest, state: &AppState) -> Result<Self::Data, String> {
         // The API is only available for administrator
         if !TokenExtension::is_admin(&req) {
             return Err("Permission denied, this API is for administrator only".to_string());

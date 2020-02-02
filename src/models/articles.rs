@@ -15,7 +15,7 @@ use super::super::markdown_render;
 use super::super::{article_with_tag, articles};
 use super::FormDataExtractor;
 use super::{RelationTag, Relations, UserNotify};
-use crate::cache::executor::IncreaseArticleVisitNum;
+use crate::cron::cache::IncreaseArticleVisitNum;
 use crate::models::token::TokenExtension;
 use log::error;
 use std::cell::Ref;
@@ -53,7 +53,7 @@ impl ArticlesWithTag {
         admin: bool,
     ) -> Result<ArticlesWithTag, String> {
         // statistic visitor number
-        state.visit_statistic.do_send(IncreaseArticleVisitNum {
+        state.cache_worker_addr.do_send(IncreaseArticleVisitNum {
             article_id: id.clone(),
         });
 

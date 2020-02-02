@@ -28,6 +28,15 @@ services:
       - ./redis/data:/data:rw
       # 若需要自定义配置的话，取消下面一行的注释
     #   - ./redis.conf:/usr/local/etc/redis/redis.conf
+
+  smtp:
+    image: namshi/smtp
+    container_name: SMTP
+    restart: always
+    ports:
+      - "10025:25"
+    environment:
+      RELAY_NETWORKS: :0.0.0.0/0
 #networks:
 #  default:
 #    external:

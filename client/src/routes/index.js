@@ -27,6 +27,7 @@ import ArticleListByTag from '@/components/ArticleListByTag'
 import Profile from '@/components/settings/Profile'
 import PersonalSettings from '@/components/settings/PersonalSettings'
 import Security from '@/components/settings/Security'
+import ErrorPage from '@/components/ErrorPage'
 
 Vue.use(Router)
 
@@ -121,6 +122,11 @@ export default new Router({
                     component: Security,
                 },
             ]
+        },
+        {
+            path: '/error',
+            name: 'error',
+            component: ErrorPage,
         },
         {
             path: '*',

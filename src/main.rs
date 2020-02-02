@@ -23,13 +23,15 @@ extern crate clap;
 use actix::{Actor, Arbiter, SyncArbiter, System};
 //use actix_web::cookie::SameSite;
 use blog::api;
-use blog::cache::cron::Cron;
-use blog::cache::executor::VisitStatisticActor;
+use blog::cron::cache::CacheActor;
+use blog::cron::cron::Cron;
 use blog::util::cli::Opts;
 use blog::util::postgresql_pool::DataBase;
 use blog::util::redis_pool::Cache;
 // use blog::{AdminArticle, AdminUser, AppState, ChartData, Tag, UserApi, Visitor};
+use blog::cron::clear::ClearActor;
 use blog::AppState;
+use chrono::Utc;
 use log::debug;
 
 fn main() {
@@ -40,7 +42,7 @@ fn main() {
     // init logger
     env_logger::init();
     // show env variable
-    Env::get().print();
+    Env::get().print(true);
 
     // let mut static_file_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let opt = Opts::new();
@@ -49,20 +51,27 @@ fn main() {
     static_file_dir.push_str("/dist");
     debug!("static_file_dir: {}", static_file_dir);
 
+    // Background workers
     let sys = System::builder().stop_on_panic(true).name("blog").build();
-    let statistic_addr = SyncArbiter::start(1, move || VisitStatisticActor::default());
-    let statistic_cron_addr = statistic_addr.clone();
-    let corn_addr =
-        Cron::start_in_arbiter(&Arbiter::new(), move |_| Cron::new(statistic_cron_addr));
+
+    // statistic actor
+    let cache_addr = SyncArbiter::start(1, move || CacheActor::default());
+    let cache_cron_addr = cache_addr.clone();
+    // clear actor
+    let clear_addr = SyncArbiter::start(1, move || ClearActor::default());
+    let _corn_addr = Cron::start_in_arbiter(&Arbiter::new(), move |_| Cron {
+        cache: cache_cron_addr.clone(),
+        clear: clear_addr.clone(),
+        start_time: Utc::now(),
+    });
 
     //    System::new("example");
     HttpServer::new(move || {
         App::new()
             .data(AppState {
-                db: DataBase::new(),
+                db: DataBase::default(),
                 cache: Cache::new(Some(work_dir.as_str())),
-                visit_statistic: statistic_addr.clone(),
-                cron: corn_addr.clone(),
+                cache_worker_addr: cache_addr.clone(),
             })
             // TODO: 调试完成后屏蔽掉
             .wrap(blog::util::debug_middleware::Debug)

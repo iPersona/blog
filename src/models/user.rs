@@ -3,7 +3,8 @@ use super::super::users::dsl::users as all_users;
 
 use super::FormDataExtractor;
 use super::UserNotify;
-use chrono::NaiveDateTime;
+use crate::util::errors;
+use chrono::{NaiveDateTime, Utc};
 use diesel;
 use diesel::prelude::*;
 use serde_json;
@@ -15,10 +16,13 @@ use super::super::{
 };
 use super::token::Token;
 use crate::models::token::TokenExtension;
+use crate::util::env::Env;
+use crate::util::errors::{Error, ErrorCode};
+use crate::util::result::InternalStdResult;
 use crate::AppState;
-use log::debug;
 use std::cell::Ref;
 use std::collections::HashMap;
+use time::Duration;
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize)]
 pub struct Users {
@@ -33,6 +37,7 @@ pub struct Users {
     pub disabled: i16,
     pub create_time: NaiveDateTime,
     pub github: Option<String>,
+    pub is_active: bool,
 }
 
 impl Users {
@@ -91,6 +96,48 @@ impl Users {
             .expect("Error loading users");
         res.len() > 0
     }
+
+    pub fn user(conn: &PgConnection, id: &Uuid) -> Option<Self> {
+        let res = all_users.filter(users::id.eq(id)).first::<Users>(conn);
+        match res {
+            Ok(u) => Some(u),
+            Err(_) => None,
+        }
+    }
+
+    pub fn active_account(conn: &PgConnection, user_id: &Uuid) -> bool {
+        let res = diesel::update(all_users.filter(users::id.eq(user_id)))
+            .set(users::is_active.eq(true))
+            .execute(conn);
+        match res {
+            Ok(data) => {
+                if data == 1 {
+                    true
+                } else {
+                    false
+                }
+            }
+            Err(_) => false,
+        }
+    }
+
+    pub fn clear_unverified(conn: &PgConnection) -> InternalStdResult<()> {
+        let expect_create_time =
+            (Utc::now() - Duration::hours(Env::get().verify_token_expired)).naive_utc();
+        let res = diesel::delete(
+            all_users
+                .filter(users::is_active.eq(false))
+                .filter(users::create_time.lt(expect_create_time)),
+        )
+        .execute(conn);
+        match res {
+            Ok(_) => Ok(()),
+            Err(err) => Err(Error {
+                code: ErrorCode::Unknown,
+                detail: format!("failed to delete unverified user: {}", err),
+            }),
+        }
+    }
 }
 
 #[derive(Insertable, Debug, Clone, Deserialize, Serialize)]
@@ -133,13 +180,13 @@ impl NewUser {
     //     }
     // }
 
-    fn insert(&self, state: &AppState) -> Result<(), String> {
+    fn insert(&self, state: &AppState) -> Result<Users, String> {
         let conn = state.db.connection();
         match diesel::insert_into(users::table)
             .values(self)
             .get_result::<Users>(&conn)
         {
-            Ok(_) => Ok(()),
+            Ok(user) => Ok(user),
             Err(err) => Err(format!("{}", err).to_string()),
         }
     }
@@ -155,7 +202,7 @@ pub struct RegisteredUser {
 }
 
 impl RegisteredUser {
-    pub fn insert(self, state: &AppState) -> Result<(), String> {
+    pub fn insert(self, state: &AppState) -> Result<Users, String> {
         NewUser::new(self).insert(state)
     }
 }
@@ -237,7 +284,7 @@ impl UserInfo {
         }
     }
 
-    /// Get admin information, cache on redis
+    /// Get admin information, cron on redis
     /// key is `admin_info`
     pub fn view_admin(conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Self {
         if redis_pool.exists("admin_info") {
@@ -319,7 +366,7 @@ impl EditUser {
             .get_result::<Users>(conn);
         match res {
             Ok(user) => {
-                let token = Token::new(&user.into_user_info()).encode();
+                let token = Token::new(&user.into_user_info(), true).encode();
                 match token {
                     Ok(t) => Ok(t),
                     Err(e) => Err(format!("{}", e)),
@@ -337,7 +384,7 @@ impl FormDataExtractor for EditUser {
         &self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> Result<(Self::Data), String> {
+    ) -> Result<Self::Data, String> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
@@ -382,39 +429,35 @@ impl LoginUser {
         &self,
         conn: &PgConnection,
         _max_age: &Option<i64>,
-    ) -> Result<UserInfo, String> {
+    ) -> Result<UserInfo, errors::Error> {
         let res = all_users
             .filter(users::disabled.eq(0))
             .filter(users::account.eq(self.account.to_owned()))
             .get_result::<Users>(conn);
         match res {
             Ok(data) => {
-                let pwd = get_password(&self.password);
-                debug!("pwd: {:?}", pwd);
-                let curpwd = sha3_256_encode(get_password(&self.password) + &data.salt);
-                debug!("curpwd: {:?}", curpwd);
+                // check whether user email is verified
+                if !data.is_active {
+                    return Err(errors::Error {
+                        code: errors::ErrorCode::EmailNotVerified,
+                        detail: "Email is not verified!".to_string(),
+                    });
+                }
+
                 if data.password == sha3_256_encode(get_password(&self.password) + &data.salt) {
-                    // TODO: 优化 session 保存时间
-                    //                    let ttl = match *max_age {
-                    //                        Some(t) => t * 3600,    // 90 days
-                    //                        None => 24 * 60 * 60,       // 1 day
-                    //                    };
                     let user_info = data.into_user_info();
-                    // let r = session.set("login_time", Local::now().timestamp());
-                    // if r.is_err() {
-                    //     error!("set session value 'login_time' failed!");
-                    // }
-                    // let r = session.set("info", json!(user_info).to_string());
-                    // if r.is_err() {
-                    //     error!("set session value 'login_time' failed!");
-                    // }
-                    //                    redis_pool.expire(&cookie, ttl);
                     Ok(user_info)
                 } else {
-                    Err(String::from("用户或密码错误"))
+                    Err(errors::Error {
+                        code: errors::ErrorCode::LoginFailed,
+                        detail: "Invalid user name or password!".to_string(),
+                    })
                 }
             }
-            Err(err) => Err(format!("{}", err)),
+            Err(err) => Err(errors::Error {
+                code: errors::ErrorCode::Unknown,
+                detail: format!("{}", err),
+            }),
         }
     }
 

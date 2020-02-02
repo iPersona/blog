@@ -80,7 +80,7 @@ impl DailyStatistic {
             // saved to db, just read from db
             Self::get_today_from_db(conn)
         } else {
-            // still in cache state, read from cache
+            // still in cron state, read from cron
             Self::get_today_from_cache(redis)
         }
     }

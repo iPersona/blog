@@ -124,4 +124,4 @@ use init.sh script under docker folder to automatically add the view as table in
 
 [X] use [reCAPTCHA](https://www.google.com/recaptcha/intro/v3.html) to implement login verification
 
-[] use [vue-element-loading](https://biigpongsatorn.github.io/#/vue-element-loading) to implement loading animation
+[] lettre in crates.io is not updated for now, when it's updated replace the git repo specify

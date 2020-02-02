@@ -1,6 +1,6 @@
 use crate::models::articles::UpdateArticleVisitNum;
 use crate::models::daily_statistic::InsertDailyStatistic;
-use crate::util::postgresql_pool::DataBase;
+use crate::util::postgresql_pool::{DataBase, DataBaseConfig};
 use crate::util::redis_pool::{Cache, RedisKeys};
 use actix::{Actor, Handler, Message, SyncContext};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -13,23 +13,23 @@ pub struct IncreaseArticleVisitNum {
     pub article_id: Uuid,
 }
 
-pub struct VisitStatisticActor {
+pub struct CacheActor {
     pub db: DataBase,
     pub cache: Cache,
     pub start_time: DateTime<Utc>,
 }
 
-impl Default for VisitStatisticActor {
+impl Default for CacheActor {
     fn default() -> Self {
         Self {
-            db: DataBase::new(),
+            db: DataBase::new(DataBaseConfig { max_size: 10 }),
             cache: Cache::new(None),
             start_time: Utc::now(),
         }
     }
 }
 
-impl VisitStatisticActor {
+impl CacheActor {
     pub fn save_visit_num_to_db(&self, time: NaiveDateTime) {
         let conn = self.db.connection();
         let redis = self.cache.into_inner();
@@ -60,7 +60,7 @@ impl VisitStatisticActor {
     }
 
     /// Save the persist time,
-    /// used for persist visit cache data into database when the server exist unexpected
+    /// used for persist visit cron data into database when the server exist unexpected
     pub fn save_persist_time(&self) {
         let redis = self.cache.into_inner();
         redis.set(
@@ -87,15 +87,15 @@ impl VisitStatisticActor {
     }
 }
 
-impl Actor for VisitStatisticActor {
+impl Actor for CacheActor {
     type Context = SyncContext<Self>;
 
     fn started(&mut self, _: &mut SyncContext<Self>) {
-        info!("visit statistic task actor started up")
+        info!("Cache actor started up")
     }
 }
 
-impl Handler<IncreaseArticleVisitNum> for VisitStatisticActor {
+impl Handler<IncreaseArticleVisitNum> for CacheActor {
     type Result = ();
 
     fn handle(&mut self, msg: IncreaseArticleVisitNum, _: &mut SyncContext<Self>) {
@@ -111,7 +111,7 @@ impl Handler<IncreaseArticleVisitNum> for VisitStatisticActor {
 #[derive(Message)]
 pub struct PersistCache;
 
-impl Handler<PersistCache> for VisitStatisticActor {
+impl Handler<PersistCache> for CacheActor {
     type Result = ();
 
     fn handle(&mut self, _msg: PersistCache, _: &mut SyncContext<Self>) {
@@ -124,7 +124,7 @@ impl Handler<PersistCache> for VisitStatisticActor {
 #[derive(Message)]
 pub struct PersistUncached;
 
-impl Handler<PersistUncached> for VisitStatisticActor {
+impl Handler<PersistUncached> for CacheActor {
     type Result = ();
 
     fn handle(&mut self, _msg: PersistUncached, _: &mut SyncContext<Self>) {
@@ -137,7 +137,7 @@ impl Handler<PersistUncached> for VisitStatisticActor {
             Some(t) => {
                 let yestoday = t + Duration::days(1); // store to next day,
 
-                // save cache into database and clear cache
+                // save cron into database and clear cron
                 self.save_visit_num_to_db(yestoday);
                 self.save_persist_time();
                 self.clear_visit_cache();
