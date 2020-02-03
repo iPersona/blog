@@ -17,11 +17,6 @@ Vue.use(Buefy)
 import HighLight from './components/utils/highlight';
 Vue.use(HighLight);
 
-// permission control
-// import abilitiesPlugin from '@casl/vue';
-// import ability from './components/utils/ability';
-// Vue.use(abilitiesPlugin, ability);
-
 // localstorage
 import VueLocalStorage from 'vue-localstorage';
 Vue.use(VueLocalStorage);
