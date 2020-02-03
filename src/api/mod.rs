@@ -184,6 +184,16 @@ macro_rules! extract_form_data {
     };
 }
 
+/// redirect to specified url
+// macro_rules! redirect_to_url {
+//     ($url: expr) => {
+//         futures::future::ok(
+//             actix_web::HttpResponse::Found()
+//                 .header(http::header::LOCATION, $url)
+//                 .finish(),
+//         )
+//     };
+// }
 pub mod article_api;
 pub mod comment_api;
 pub mod dashboard_api;

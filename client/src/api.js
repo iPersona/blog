@@ -57,6 +57,7 @@ export default class Api {
             userExist: `${this.host}/user`, // check whether user exists
             editProfile: `${this.host}/user`, // edit user profile
             updatePassword: `${this.host}/user/password`, // update password
+            verify: `${this.host}/verify`, // verify user
 
             // tag
             getTags: `${this.host}/tag`,
@@ -73,12 +74,11 @@ export default class Api {
         // request拦截器
         this.axios.interceptors.request.use(req => {
             // Do something before request is sent
-            // console.log(`store: ${store}`)
-            // console.log(`STORE_KEY: ${STORE_KEY}`)
+            // console.log(`localStorage: ${JSON.stringify(localStorage[STORE_KEY])}`)
             if (localStorage[STORE_KEY] !== undefined) {
                 // add token into headers
                 req.headers.Authorization = store.getters[`user/${TOKEN}`];
-                // console.log(`token: ${store.getters[TOKEN]}`)
+                // console.log(`token: ${JSON.stringify(req.headers.Authorization)}`)
             }
             return req
         }, error => {
@@ -196,6 +196,13 @@ export default class Api {
                 remember: remember,
                 token: token,
             });
+    }
+
+    async verify(token) {
+        return this.post(
+            this.url.verify, {
+                token: token,
+            })
     }
 
     async createArticle(title, rawContent, existTags, newTags, publish) {

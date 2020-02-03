@@ -28,6 +28,7 @@ import Profile from '@/components/settings/Profile'
 import PersonalSettings from '@/components/settings/PersonalSettings'
 import Security from '@/components/settings/Security'
 import ErrorPage from '@/components/ErrorPage'
+import Verify from '@/components/EmailVerify'
 
 Vue.use(Router)
 
@@ -73,6 +74,11 @@ export default new Router({
             path: '/login',
             name: 'login',
             component: Login
+        },
+        {
+            path: '/verify/:token',
+            name: 'verify',
+            component: Verify
         },
         {
             path: '/management',

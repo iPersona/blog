@@ -29,7 +29,7 @@ use log::error;
 use typename::TypeName;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize, TypeName)]
+#[derive(Debug, Serialize, Deserialize, TypeName, Clone)]
 pub struct Token {
     // issuer
     pub iss: String,
@@ -50,12 +50,15 @@ pub struct Token {
     // user create time
     pub user_create_time: NaiveDateTime,
     // user signature
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // remove this field if the value is none. see https://stackoverflow.com/a/53900684
     pub user_sign: Option<String>,
     // email
     pub email: String,
     // is admin
     pub is_admin: bool,
     // is active
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_active: Option<bool>,
 }
 
@@ -157,6 +160,11 @@ impl Token {
                 detail: format!("parse uuid from token failed: {:?}", e),
             }),
         }
+    }
+
+    /// active account
+    pub fn active(&mut self) {
+        self.is_active = None;
     }
 }
 

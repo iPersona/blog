@@ -48,7 +48,11 @@ impl SignUpVerify {
 
     fn html_content(token: &str) -> String {
         let template = include_str!("verify_email.html");
-        let url = format!(r#"https://{}/verify/{}"#, Env::get().domain.as_str(), token);
+        let url = format!(
+            r#"https://{}/#/verify/{}"#,
+            Env::get().domain.as_str(),
+            token
+        );
         // replace
         let template = template.replace("{{verify_link}}", url.as_str());
         debug!("url: {:?}", url);

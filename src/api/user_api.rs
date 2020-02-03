@@ -1,10 +1,10 @@
 use crate::api::recaptcha_api::verify_recaptcha;
 use crate::models::token::{Token, TokenExtension};
-use crate::models::user::{CheckUser, LoginUser, Users};
+use crate::models::user::{CheckUser, LoginUser, Users, Verify};
 use crate::util::email::SignUpVerify;
 use crate::util::errors::ErrorCode;
 use crate::{AppState, ChangePassword, EditUser, RegisteredUser};
-use actix_web::web::{Data, Form, Path};
+use actix_web::web::{Data, Form};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use futures::stream::Stream;
 use futures::Future;
@@ -138,12 +138,12 @@ impl UserApi {
     pub fn verify(
         state: Data<AppState>,
         _req: HttpRequest,
-        token: Path<String>,
+        params: Form<Verify>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        debug!("get_daily_statistic");
+        debug!("verify token");
 
         // decode token
-        let token = Token::decode(token.into_inner().as_str());
+        let token = Token::decode(params.into_inner().token.as_str());
         match token {
             Ok(t) => {
                 // verify token
@@ -153,7 +153,16 @@ impl UserApi {
                     Ok(_) => {
                         // activate account
                         if Users::active_account(conn, &t.user_id().unwrap()) {
-                            api_resp_ok!()
+                            // return activated token
+                            let mut new_token = t.clone();
+                            new_token.active();
+                            match new_token.encode() {
+                                Ok(t) => api_resp_data!(t),
+                                Err(e) => api_resp_err_with_code!(
+                                    ErrorCode::TokenError,
+                                    format!("Failed to encode token: {:?}!", e)
+                                ),
+                            }
                         } else {
                             api_resp_err_with_code!(
                                 ErrorCode::Unknown,
@@ -179,7 +188,7 @@ impl UserApi {
                     .route(web::post().to_async(Self::create_user))
                     .route(web::get().to_async(Self::is_user_exist)),
             )
-            .service(web::resource("/verify/{token}").route(web::get().to_async(Self::verify)))
+            .service(web::resource("/verify").route(web::post().to_async(Self::verify)))
             .service(web::resource("/login").route(web::post().to_async(Self::login)))
             .service(web::resource("/logout").route(web::get().to_async(Self::sign_out)));
     }

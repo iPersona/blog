@@ -75,7 +75,6 @@ function updateToken(state, token) {
   state[TOKEN] = token
   state[USER_NAME] = decoded.payload.user_name
   state[USER_ID] = decoded.payload.user_id
-  console.log(`login user-id: ${state[USER_ID]}`)
   state[IS_ADMIN] = decoded.payload.is_admin
   saveState(state)
 }

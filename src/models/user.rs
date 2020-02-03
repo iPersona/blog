@@ -601,3 +601,8 @@ impl UserType {
         }
     }
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Verify {
+    pub token: String,
+}

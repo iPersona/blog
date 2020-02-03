@@ -6,6 +6,8 @@ pub enum ErrorCode {
     InvalidToken,
     // Token expired
     TokenExpired,
+    // Token associated errors
+    TokenError,
     // Permission denied
     PermissionDenied,
     // Email is not verified

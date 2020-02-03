@@ -120,7 +120,7 @@ export default {
   },
   methods: {
     async signup() {
-      this.username = "user-1";
+      this.username = "user-4";
       this.password = "123456";
       this.nickname = "user-1-nickname";
       this.email = "freedom5598@gmail.com";
