@@ -104,7 +104,10 @@
       />
     </BModal>
     <hr>
-    <NewComment :article-id="articleId" />
+    <NewComment
+      v-if="isLogin"
+      :article-id="articleId"
+    />
     <section class="container">
       <Comments :article-id="articleId" />
     </section>
@@ -117,7 +120,7 @@ import marked from "marked";
 import hljs from "highlight.js";
 import "highlight.js/styles/monokai-sublime.css";
 import { mapGetters } from "vuex";
-import { IS_ADMIN } from "@/store/modules/store-types.js";
+import { IS_ADMIN, IS_LOGIN } from "@/store/modules/store-types.js";
 import { USER } from "@/store/modules/module-names";
 import ArticleEditor from "./ArticleEditor";
 import Comments from "./Comments";
@@ -148,7 +151,8 @@ export default {
       return marked(this.article.content);
     },
     ...mapGetters(USER, {
-      isAdmin: IS_ADMIN
+      isAdmin: IS_ADMIN,
+      isLogin: IS_LOGIN,
     })
   },
   async mounted() {
