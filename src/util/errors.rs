@@ -2,6 +2,8 @@
 pub enum ErrorCode {
     // User not exist
     UserNotExist,
+    // User not activated
+    UserNotActivated,
     // Invalid token
     InvalidToken,
     // Token expired
@@ -16,7 +18,7 @@ pub enum ErrorCode {
     LoginFailed,
     // Parse error
     ParseError,
-    // Unknow error
+    // Unknown error
     Unknown,
 }
 

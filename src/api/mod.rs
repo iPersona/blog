@@ -71,33 +71,14 @@ pub type JsonApiResult = actix_web::web::Json<ApiResult>;
 //     };
 // }
 
-macro_rules! token_check_error {
-    //    ($req:expr) => {
-    //        ok($req.into_response(HttpResponse::Forbidden().finish().into_body()))
-    //    };
-    ($req:expr) => {
+macro_rules! middleware_resp_err {
+    ($req:expr, $code:expr, $msg:expr) => {
         into_fut_service_response!(
             $req,
             $crate::api::ApiResult::Error {
                 status: $crate::api::Status::Err,
-                code: $crate::util::errors::ErrorCode::InvalidToken,
-                detail: "invalid token".to_string()
-            }
-        )
-    };
-}
-
-macro_rules! token_expired_error {
-    //    ($req:expr) => {
-    //        ok($req.into_response(HttpResponse::Gone().finish().into_body()))
-    //    };
-    ($req:expr) => {
-        into_fut_service_response!(
-            $req,
-            $crate::api::ApiResult::Error {
-                status: $crate::api::Status::Err,
-                code: $crate::util::errors::ErrorCode::TokenExpired,
-                detail: "Token expired".to_string(),
+                code: $code,
+                detail: $msg.to_string()
             }
         )
     };

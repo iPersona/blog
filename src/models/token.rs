@@ -232,9 +232,9 @@ where
                     Err(e) => match e.kind() {
                         jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
                             // Need to login again
-                            Either::B(token_expired_error!(req))
+                            Either::B(middleware_resp_err!(req, crate::util::errors::ErrorCode::TokenExpired, "token expired!"))
                         }
-                        _ => Either::B(token_check_error!(req)), // Invalid token data
+                        _ => Either::B(middleware_resp_err!(req, crate::util::errors::ErrorCode::InvalidToken, "invalid token!")), // Invalid token data
                     },
                 }
             }
