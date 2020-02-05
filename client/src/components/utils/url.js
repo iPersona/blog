@@ -6,7 +6,7 @@ export default class Url {
   static getUrls() {
     return {
       user: function (userId) {
-        return `${Url.getHostUrl()}/#/user/${userId}`
+        return `/#/user/${userId}`
       }
     }
   }
