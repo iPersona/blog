@@ -158,4 +158,10 @@ export default {
 .editor >>> .editor-toolbar button i {
   font-size: initial;
 }
+
+.editor >>> blockquote {
+  padding: 10px 20px;
+  margin: 0 0 20px;
+  border-left: 5px solid #eee;
+}
 </style>

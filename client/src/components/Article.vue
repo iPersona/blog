@@ -74,6 +74,7 @@
     <section
       class="container"
       align="left"
+      style="float: left;"
     >
       <span>
         <b>Tags: </b>
@@ -91,6 +92,7 @@
         </BTag>
       </BTaglist>
     </section>
+    <br>
 
     <BModal
       :active.sync="isEditArticle"
@@ -104,8 +106,11 @@
       />
     </BModal>
     <hr>
+
+    <!-- Comments -->
     <NewComment
       v-if="isLogin"
+      id="commentEditor"
       :article-id="articleId"
     />
     <section class="container">
@@ -124,8 +129,9 @@ import { IS_ADMIN, IS_LOGIN } from "@/store/modules/store-types.js";
 import { USER } from "@/store/modules/module-names";
 import ArticleEditor from "./ArticleEditor";
 import Comments from "./Comments";
-import { EventBus, EVENT_RELOAD_ARTICLE } from "@/event-bus.js";
+import { EventBus, EVENT_RELOAD_ARTICLE, EVENT_SCROLL_TO_COMMENT_EDITOR } from "@/event-bus.js";
 import NewComment from "./NewComment";
+import VueScrollTo from 'vue-scrollto'
 
 export default {
   name: "Article",
@@ -161,14 +167,24 @@ export default {
   },
   beforeDestroy() {
     EventBus.$off(EVENT_RELOAD_ARTICLE)
+    EventBus.$off(EVENT_SCROLL_TO_COMMENT_EDITOR)
   },
   methods: {
     listenEventBus() {
-      const self = this;
+      const self = this
+      // reload article
       EventBus.$on(EVENT_RELOAD_ARTICLE, async function () {
-        console.log(`event-bus: ${EVENT_RELOAD_ARTICLE}`);
-        await self.getArticle();
-      });
+        console.log(`event-bus: ${EVENT_RELOAD_ARTICLE}`)
+        await self.getArticle()
+      })
+      // scroll to comment article
+      EventBus.$on(EVENT_SCROLL_TO_COMMENT_EDITOR, function () {
+        console.log(`event-bus: ${EVENT_RELOAD_ARTICLE}`)
+        self.scrollToCommentEditor()
+      })
+    },
+    async scrollToCommentEditor() {
+      VueScrollTo.scrollTo('#commentEditor', 500)
     },
     async getArticle() {
       let api = new Api();

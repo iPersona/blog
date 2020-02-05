@@ -60,6 +60,14 @@ Vue.use(Ui)
 import Log from './components/utils/log'
 Vue.use(Log)
 
+// scroll to element
+import VueScrollTo from 'vue-scrollto'
+Vue.use(VueScrollTo)
+
+// clicpboard
+import VueClipboard from 'vue-clipboard2'
+Vue.use(VueClipboard)
+
 // global css
 import '@/assets/css/page.css'
 import '@/assets/css/avatar.css'

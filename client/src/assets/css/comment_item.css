@@ -19,7 +19,7 @@
   /* border-color: transparent #f6f8fa; */
   border-color: transparent white;
   border-width: 6px 6px 6px 0;
-  top: 10%;
+  top: 30px;
   left: -6px;
   margin-top: -6px;
 }
@@ -32,7 +32,7 @@
   border-style: solid;
   border-color: transparent #e7eaed;
   border-width: 7px 7px 7px 0;
-  top: 10%;
+  top: 30px;
   left: -7px;
   margin-top: -7px;
   display: block;

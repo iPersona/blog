@@ -29,6 +29,7 @@ import PersonalSettings from '@/components/settings/PersonalSettings'
 import Security from '@/components/settings/Security'
 import ErrorPage from '@/components/ErrorPage'
 import Verify from '@/components/EmailVerify'
+import User from '@/components/User'
 
 Vue.use(Router)
 
@@ -64,6 +65,11 @@ export default new Router({
             path: '/article',
             name: 'new_post',
             component: ArticleEditor
+        },
+        {
+            path: '/user/:id',
+            name: 'user',
+            component: User
         },
         {
             path: '/about',

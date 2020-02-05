@@ -37,7 +37,7 @@
 import { mapGetters } from 'vuex'
 import MarkdownEditor from './MarkdownEditor'
 import Avatar from "./Avatar"
-import { EventBus, EVENT_ARTICLE_EDITOR_CLOSED, EVENT_RELOAD_COMMENTS } from '@/event-bus.js';
+import { EventBus, EVENT_ARTICLE_EDITOR_CLOSED, EVENT_RELOAD_COMMENTS, EVENT_SET_COMMENT_EDITOR_CONTENT } from '@/event-bus.js';
 import Api from '@/api.js'
 import { USER_ID } from '@/store/modules/store-types.js'
 import { USER } from '@/store/modules/module-names'
@@ -74,6 +74,7 @@ export default {
   },
   beforeDestroy() {
     EventBus.$off(EVENT_ARTICLE_EDITOR_CLOSED)
+    EventBus.$off(EVENT_SET_COMMENT_EDITOR_CONTENT)
   },
   methods: {
     listenEvent() {
@@ -81,6 +82,11 @@ export default {
       EventBus.$on(EVENT_ARTICLE_EDITOR_CLOSED, async function () {
         console.log(`event-bus: ${EVENT_ARTICLE_EDITOR_CLOSED}`)
         await self.$refs.editor.setContent('')
+      })
+
+      EventBus.$on(EVENT_SET_COMMENT_EDITOR_CONTENT, async function (content) {
+        console.log(`event-bus: ${EVENT_SET_COMMENT_EDITOR_CONTENT}`)
+        await self.$refs.editor.setContent(content)
       })
     },
     async newComment() {

@@ -41,6 +41,13 @@ export default {
 </script>
 
 <style scoped>
+.preview {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
 .preview >>> ul {
   margin: 10px;
   padding: 10px;
@@ -67,5 +74,11 @@ export default {
 
 .preview >>> .editor-toolbar button i {
   font-size: initial;
+}
+
+.preview >>> blockquote {
+  padding: 10px 20px;
+  margin: 0 0 20px;
+  border-left: 5px solid #eee;
 }
 </style>

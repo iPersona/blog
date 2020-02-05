@@ -22,7 +22,6 @@
 </template>
 
 <script>
-// TODO: 评论树制作：https://bulma.io/documentation/layout/media-object/
 import InfiniteLoading from 'vue-infinite-loading'
 import CommentEntity from './CommentEntity'
 import Api from '@/api'

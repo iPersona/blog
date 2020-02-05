@@ -15,62 +15,72 @@ import {
 } from '@/store/modules/module-names'
 
 export default class Api {
-    constructor(vue) {
-        this.axios = Vue.axios;
-        // this.host = document.location.host;
-        this.host = 'http://localhost:8880/api/v1';
-        console.log('host: ' + this.host);
-        this.vue = vue;
-        let self = this;
-        (this.config = {
-            Accept: 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': true
-        }),
-        (this.url = {
+    static api_base_url() {
+        // url = document.location.host;
+        let url = 'http://localhost:8880/api/v1'
+        console.log('host: ' + url);
+        return url
+    }
+
+    static api_urls() {
+        let host = Api.api_base_url()
+        return {
             // article
-            createArticle: `${this.host}/article`, // [admin] create article
-            deleteArticle: `${this.host}/article`, // [admin] delete article
-            // adminView: `${this.host}/article/admin/view`, // [admin] get article
-            // adminViewRaw: `${this.host}/article/admin/view_raw`, // [admin] get article markdown
-            // adminViewAll: `${this.host}/article/admin/view_all`, // [admin] get article list
-            editArticle: `${this.host}/article`, // edit article
-            publishArticle: `${this.host}/article`, // publish article
-            visitorViewAll: `${this.host}/articles`, // get article list
-            visitorViewArticle: `${this.host}/article`, // get article
-            // articleNumber: `${this.host}/article/count`, // article count
-            // articleNumberByTag: `${this.host}/article/tag/count`,
+            createArticle: `${host}/article`, // [admin] create article
+            deleteArticle: `${host}/article`, // [admin] delete article
+            // adminView: `${host}/article/admin/view`, // [admin] get article
+            // adminViewRaw: `${host}/article/admin/view_raw`, // [admin] get article markdown
+            // adminViewAll: `${host}/article/admin/view_all`, // [admin] get article list
+            editArticle: `${host}/article`, // edit article
+            publishArticle: `${host}/article`, // publish article
+            visitorViewAll: `${host}/articles`, // get article list
+            visitorViewArticle: `${host}/article`, // get article
+            // articleNumber: `${host}/article/count`, // article count
+            // articleNumberByTag: `${host}/article/tag/count`,
             articlesWithTag: function (tagId) {
-                return `${self.host}/tag/${tagId}/articles`
+                return `${host}/tag/${tagId}/articles`
             },
 
             // comment
             comments: function (articleId) {
-                return `${self.host}/comments/${articleId}`
+                return `${host}/comments/${articleId}`
             },
-            newComment: `${this.host}/comment`,
+            newComment: `${host}/comment`,
 
             // user
-            login: `${this.host}/login`, // login
-            signup: `${this.host}/user`, // register
-            userExist: `${this.host}/user`, // check whether user exists
-            editProfile: `${this.host}/user`, // edit user profile
-            updatePassword: `${this.host}/user/password`, // update password
-            verify: `${this.host}/verify`, // verify user
+            user: function (user_id) {
+                return `${host}/user/${user_id}`
+            }, // user page
+            login: `${host}/login`, // login
+            signup: `${host}/user`, // register
+            userExist: `${host}/user`, // check whether user exists
+            editProfile: `${host}/user`, // edit user profile
+            updatePassword: `${host}/user/password`, // update password
+            verify: `${host}/verify`, // verify user
 
             // tag
-            getTags: `${this.host}/tag`,
-            getTagsWithCount: `${this.host}/tags/articles/count`,
-            addTags: `${this.host}/tag`,
-            delTag: `${this.host}/tag`,
-            editTag: `${this.host}/tag`,
-            updateTags: `${this.host}/tags`,
+            getTags: `${host}/tag`,
+            getTagsWithCount: `${host}/tags/articles/count`,
+            addTags: `${host}/tag`,
+            delTag: `${host}/tag`,
+            editTag: `${host}/tag`,
+            updateTags: `${host}/tags`,
 
             // statistic
-            getDailyVisit: `${this.host}/dashboard/visit`,
+            getDailyVisit: `${host}/dashboard/visit`,
+        }
+    }
 
-        });
+    constructor(vue) {
+        this.axios = Vue.axios;
+        this.vue = vue;
+        this.config = {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': true
+        }
+        this.url = Api.api_urls()
         // request拦截器
         this.axios.interceptors.request.use(req => {
             // Do something before request is sent
@@ -85,7 +95,7 @@ export default class Api {
             // Do something with request error
             console.log(error) // for debug
             Promise.reject(error)
-        });
+        })
     }
 
     async updatePassword(oldPassword, newPassword) {
@@ -432,14 +442,6 @@ export default class Api {
         return rsp.hasOwnProperty('status') &&
             rsp.status === 'Err' &&
             rsp.code === code
-    }
-
-    static isTokenExpired(rsp) {
-        return
-    }
-
-    static isEmailNotVerified(rsp) {
-        return
     }
 
     static errorHandler(rsp) {
