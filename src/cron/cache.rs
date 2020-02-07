@@ -73,9 +73,7 @@ impl CacheActor {
         let redis = self.cache.into_inner();
         let time = redis.get(RedisKeys::PersistTime.to_string().as_str());
         match time {
-            Some(t) => {
-                Some(NaiveDateTime::parse_from_str(t.as_str(), "%Y-%m-%d %H:%M:%S%.f").unwrap())
-            }
+            Some(t) => Some(NaiveDateTime::parse_from_str(t.as_str(), "%Y-%m-%d %H:%M:%S%.f").unwrap()),
             None => None,
         }
     }
@@ -135,14 +133,21 @@ impl Handler<PersistUncached> for CacheActor {
         let persist_time = self.persist_time();
         match persist_time {
             Some(t) => {
-                let yestoday = t + Duration::days(1); // store to next day,
+                let yesterday = t + Duration::days(1); // store to next day,
 
-                // save cron into database and clear cron
-                self.save_visit_num_to_db(yestoday);
+                // Save cache data into database then clear the cache data
+                self.save_visit_num_to_db(yesterday);
                 self.save_persist_time();
                 self.clear_visit_cache();
             }
-            None => {}
+            None => {
+                let t = Utc::now().naive_utc();
+
+                // Save cache data into database then clear the cache data
+                self.save_visit_num_to_db(t);
+                self.save_persist_time();
+                self.clear_visit_cache();
+            }
         }
     }
 }

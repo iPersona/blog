@@ -49,6 +49,12 @@ impl Comments {
             .execute(conn)
             .is_ok()
     }
+
+    pub fn delete_with_article_id(conn: &PgConnection, id: Uuid) -> bool {
+        diesel::delete(all_comments.filter(comments::article_id.eq(id)))
+            .execute(conn)
+            .is_ok()
+    }
 }
 
 #[derive(Insertable, Debug, Clone)]
@@ -76,7 +82,7 @@ pub struct NewComments {
 }
 
 impl NewComments {
-    fn into_insert_comments(&self, user_id: Uuid) -> InsertComments {
+    fn convert_to_insert_comments(&self, user_id: Uuid) -> InsertComments {
         InsertComments {
             comment: self.comment.clone(),
             article_id: self.article_id,
@@ -85,7 +91,7 @@ impl NewComments {
     }
 
     pub fn insert(&self, conn: &PgConnection, user_info: &UserInfo) -> bool {
-        self.into_insert_comments(user_info.id).insert(conn)
+        self.convert_to_insert_comments(user_info.id).insert(conn)
     }
 
     pub fn reply_user_id(&self) -> Option<Uuid> {

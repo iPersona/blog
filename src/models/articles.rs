@@ -36,11 +36,16 @@ impl ArticlesWithTag {
     pub fn delete_with_id(state: &AppState, id: Uuid) -> Result<usize, String> {
         let conn = &state.db.connection();
         let redis_pool = &state.cache.into_inner();
+        // Delete from table `article_tag_relation`
         Relations::delete_all(conn, id, "article");
+        // Delete from table `articles`
         let res = diesel::delete(all_articles.filter(articles::id.eq(&id))).execute(conn);
         match res {
             Ok(data) => {
+                // Delete from redis cache
                 UserNotify::remove_with_article(id, redis_pool);
+                // Delete all comments of the article table ``
+                Comments::delete_with_article_id(conn, id);
                 Ok(data)
             }
             Err(err) => Err(format!("{}", err)),
