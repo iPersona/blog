@@ -4,7 +4,7 @@
     align="left"
     class="editor"
   >
-    <textarea id="editor" />
+    <textarea ref="editor" />
     <!-- 可能是vscode格式化插件的问题，div老是被缩进4个空格，不能和起始div对齐 -->
     <!-- eslint-disable-next-line -->
   </div>
@@ -86,6 +86,7 @@ export default {
     };
   },
   mounted() {
+    console.log('markdown-edit-init!!')
     this.initEditor();
     this.listenEvent();
   },
@@ -101,8 +102,9 @@ export default {
       });
     },
     initEditor() {
+      let target = this.$refs.editor
       this.editor = new EasyMDE({
-        element: document.getElementById("editor"),
+        element: target,
         minHeight: `${this.minHeight}px`,
         placeholder: this.placeholder,
         status: false,
