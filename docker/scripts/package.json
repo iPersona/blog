@@ -9,8 +9,9 @@
   "author": "coimioc",
   "license": "MIT",
   "dependencies": {
-    "inquirer": "^7.0.0",
-    "pg": "^7.12.1",
+    "inquirer": "^7.0.4",
+    "log4js": "^6.1.1",
+    "pg": "^7.18.1",
     "pg-format": "^1.0.4"
   }
 }

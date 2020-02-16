@@ -3,6 +3,7 @@
     <ul class="comment-list">
       <CommentEntity
         v-for="comment in comments"
+        :id="comment.id"
         :key="comment.id"
         :comment="comment"
         class="comment-entity"
@@ -37,7 +38,11 @@ export default {
     articleId: {
       type: String,
       default: ''
-    }
+    },
+    userId: {
+      type: String,
+      default: ''
+    },
   },
   data() {
     return {
@@ -56,9 +61,11 @@ export default {
   methods: {
     listenEventBus() {
       const self = this;
-      EventBus.$on(EVENT_RELOAD_COMMENTS, async function () {
+      EventBus.$on(EVENT_RELOAD_COMMENTS, async function (opt) {
         console.log(`event-bus: ${EVENT_RELOAD_COMMENTS}`)
-        await self.loadComments()
+        if (opt === undefined || opt.forceReload || self.comments.length <= 0) {
+          await self.loadComments()
+        }
         // self.$refs.infiniteLoading.stateChanger.reset()
       })
     },
@@ -66,7 +73,7 @@ export default {
       console.log(`load-comments: ${$state}`)
       let api = new Api()
       let currentPage = $state === undefined ? 1 : this.currentPage
-      let rsp = await api.getComments(this.articleId, this.pageSize, (currentPage - 1) * this.pageSize)
+      let rsp = await api.getComments(this.articleId, this.pageSize, (currentPage - 1) * this.pageSize, this.userId === '' ? undefined : this.userId)
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`)
       if (!Api.isSuccessResponse(rsp)) {
         this.$getUi().toast.fail(`get comments failed: ${rsp.detail}`)
@@ -97,7 +104,7 @@ export default {
     },
     async infiniteHandler($state) {
       this.loadComments($state)
-    }
+    },
   },
 }
 </script>
@@ -109,6 +116,6 @@ export default {
 }
 
 .comment-entity {
-  margin-top: 30px;
+  margin-bottom: 30px;
 }
 </style>

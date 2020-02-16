@@ -114,6 +114,26 @@
       :article-id="articleId"
     />
     <section class="container">
+      <!-- <b-tabs
+        v-if="isLogin"
+        v-model="activeTab"
+        position="is-centered"
+        class="block"
+      >
+        <b-tab-item label="All comments">
+          <Comments :article-id="articleId" />
+        </b-tab-item>
+        <b-tab-item label="Yours">
+          <Comments
+            :article-id="articleId"
+            :user-id="userId"
+          />
+        </b-tab-item>
+      </b-tabs>
+      <Comments
+        v-else
+        :article-id="articleId"
+      /> -->
       <Comments :article-id="articleId" />
     </section>
   </div>
@@ -125,12 +145,12 @@ import marked from "marked";
 import hljs from "highlight.js";
 import "highlight.js/styles/monokai-sublime.css";
 import { mapGetters } from "vuex";
-import { IS_ADMIN, IS_LOGIN } from "@/store/modules/store-types.js";
+import { IS_ADMIN, IS_LOGIN, USER_ID } from "@/store/modules/store-types.js";
 import { USER } from "@/store/modules/module-names";
 import ArticleEditor from "./ArticleEditor";
 import Comments from "./Comments";
-import { EventBus, EVENT_RELOAD_ARTICLE, EVENT_SCROLL_TO_COMMENT_EDITOR } from "@/event-bus.js";
-import NewComment from "./NewComment";
+import { EventBus, EVENT_RELOAD_ARTICLE, EVENT_SCROLL_TO_COMMENT_EDITOR, EVENT_RELOAD_COMMENTS } from "@/event-bus.js";
+import NewComment from "./NewComment"
 import VueScrollTo from 'vue-scrollto'
 
 export default {
@@ -144,9 +164,15 @@ export default {
   data() {
     return {
       articleId: this.$route.params.id,
+      // set focused comment tab, 
+      // undefined: All comments, 
+      // 'all': as 'undefined',
+      // 'user': Yours
+      focus: this.$route.query.focus,
       article: {},
-      isEditArticle: false
-    };
+      isEditArticle: false,
+      activeTab: (this.$route.query.focus === undefined || this.$route.query.focus === 'all') ? 0 : 1,
+    }
   },
   computed: {
     compiledMarkdown: function () {
@@ -159,7 +185,13 @@ export default {
     ...mapGetters(USER, {
       isAdmin: IS_ADMIN,
       isLogin: IS_LOGIN,
+      userId: USER_ID,
     })
+  },
+  watch: {
+    activeTab(newVal, oldVal) {
+      EventBus.$emit(EVENT_RELOAD_COMMENTS, { forceReload: false })
+    }
   },
   async mounted() {
     await this.getArticle();

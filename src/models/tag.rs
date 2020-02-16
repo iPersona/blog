@@ -4,10 +4,12 @@ use super::Relations;
 
 use super::FormDataExtractor;
 use crate::models::token::TokenExtension;
+use crate::util::errors::{Error, ErrorCode};
+use crate::util::result::InternalStdResult;
 use crate::AppState;
 use diesel;
 use diesel::prelude::*;
-use diesel::result::Error;
+use diesel::result::Error as DieselError;
 use diesel::sql_types::{BigInt, Text, Uuid as sql_uuid};
 use std::cell::Ref;
 use std::collections::HashMap;
@@ -194,7 +196,7 @@ impl TagsData {
             if let Some(tags) = &self.modified_tags {
                 let res = Tags::edit_tags(&tags, state);
                 if let Err(_) = res {
-                    return Err(Error::RollbackTransaction);
+                    return Err(DieselError::RollbackTransaction);
                 }
             }
 
@@ -211,7 +213,7 @@ impl TagsData {
                 for t in tags.into_iter() {
                     let res = Tags::delete_tag(state, t.id);
                     if let Err(_) = res {
-                        return Err(Error::RollbackTransaction);
+                        return Err(DieselError::RollbackTransaction);
                     }
                 }
             }
@@ -229,16 +231,26 @@ impl TagsData {
 impl FormDataExtractor for TagsData {
     type Data = ();
 
-    fn execute(&self, req: actix_web::HttpRequest, state: &AppState) -> Result<Self::Data, String> {
+    fn execute(
+        &self,
+        req: actix_web::HttpRequest,
+        state: &AppState,
+    ) -> InternalStdResult<Self::Data> {
         // The API is only available for administrator
         if !TokenExtension::is_admin(&req) {
-            return Err("Permission denied, this API is for administrator only".to_string());
+            return Err(Error {
+                code: ErrorCode::PermissionDenied,
+                detail: format!("Permission denied, this API is for administrator only!"),
+            });
         }
 
         let res = self.update(&state);
         match res {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("edit_article failed: {:?}", e).to_string()),
+            Err(e) => Err(Error {
+                code: ErrorCode::DbError,
+                detail: format!("edit_article failed: {:?}", e),
+            }),
         }
     }
 }

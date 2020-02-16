@@ -17,6 +17,8 @@ use super::FormDataExtractor;
 use super::{RelationTag, Relations, UserNotify};
 use crate::cron::cache::IncreaseArticleVisitNum;
 use crate::models::token::TokenExtension;
+use crate::util::errors::{Error, ErrorCode};
+use crate::util::result::InternalStdResult;
 use log::error;
 use std::cell::Ref;
 
@@ -390,10 +392,17 @@ impl NewArticle {
 impl FormDataExtractor for NewArticle {
     type Data = ();
 
-    fn execute(&self, req: actix_web::HttpRequest, state: &AppState) -> Result<Self::Data, String> {
+    fn execute(
+        &self,
+        req: actix_web::HttpRequest,
+        state: &AppState,
+    ) -> InternalStdResult<Self::Data> {
         // The API is only available for administrator
         if !TokenExtension::is_admin(&req) {
-            return Err("Permission denied, this API is for administrator only".to_string());
+            return Err(Error {
+                code: ErrorCode::PermissionDenied,
+                detail: format!("Permission denied, this API is for administrator only!"),
+            });
         }
 
         let conn = &state.db.connection();
@@ -401,7 +410,10 @@ impl FormDataExtractor for NewArticle {
         if r {
             Ok(())
         } else {
-            Err("create article failed!".to_string())
+            Err(Error {
+                code: ErrorCode::DbError,
+                detail: format!("create article failed!"),
+            })
         }
     }
 }
@@ -449,16 +461,26 @@ impl EditArticle {
 impl FormDataExtractor for EditArticle {
     type Data = ();
 
-    fn execute(&self, req: actix_web::HttpRequest, state: &AppState) -> Result<Self::Data, String> {
+    fn execute(
+        &self,
+        req: actix_web::HttpRequest,
+        state: &AppState,
+    ) -> InternalStdResult<Self::Data> {
         // The API is only available for administrator
         if !TokenExtension::is_admin(&req) {
-            return Err("Permission denied, this API is for administrator only".to_string());
+            return Err(Error {
+                code: ErrorCode::PermissionDenied,
+                detail: format!("Permission denied, this API is for administrator only!"),
+            });
         }
 
         let res = self.edit_article(state);
         match res {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("edit_article failed: {:?}", e).to_string()),
+            Err(e) => Err(Error {
+                code: ErrorCode::DbError,
+                detail: format!("edit_article failed: {:?}", e),
+            }),
         }
     }
 }

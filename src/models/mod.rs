@@ -7,12 +7,13 @@ pub trait FormDataExtractor {
         &self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> Result<Self::Data, String>;
+    ) -> InternalStdResult<Self::Data>;
 }
 pub mod article_tag_relation;
 pub mod articles;
 pub mod comment;
 pub mod daily_statistic;
+pub mod mailbox;
 pub mod notifys;
 pub mod tag;
 pub mod token;
@@ -27,6 +28,7 @@ pub(crate) use self::comment::{Comments, DeleteComment, NewComments};
 pub(crate) use self::notifys::UserNotify;
 pub(crate) use self::tag::{NewTag, TagCount, Tags};
 pub(crate) use self::user::{ChangePassword, EditUser, RegisteredUser, UserInfo};
+use crate::util::result::InternalStdResult;
 
 //use actix::MailboxError;
 //use std::fmt;

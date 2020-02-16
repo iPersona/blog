@@ -13,6 +13,10 @@ pub struct UserNotify {
     pub notify_type: String,
 }
 
+/// Represents an user reply notification
+/// - All reply to admin, or mention to admin is cached into redis and saved into database
+/// - All reply to other user, or mention to admin is only saved into database
+///
 impl UserNotify {
     /// Cache user's comment notify to redis
     pub fn cache(&self, redis_pool: &Arc<RedisPool>) {
@@ -26,28 +30,28 @@ impl UserNotify {
         redis_pool.lrem(&notify_key, 0, &content);
         // put new value to list top
         redis_pool.lpush(&notify_key, &content);
-        // set expire time 15 day or increase expire time to 15 day
+        // set expire time 5 day or increase expire time to 5 day
         const EXPIRE_TIME: i64 = 5 * 24 * 3600;
         redis_pool.expire(&notify_key, EXPIRE_TIME);
-        // limit list size to 100
+        // limit list size to 10
         redis_pool.ltrim(&notify_key, 0, 10);
     }
 
     /// Get all the notifications about the user
-    pub fn get_notifys(user_id: Uuid, redis_pool: &RedisPool) -> Option<Vec<UserNotify>> {
+    pub fn get_notifies(user_id: Uuid, redis_pool: &RedisPool) -> Option<Vec<UserNotify>> {
         let pattern = format!("notify:*:{}", user_id.to_hyphenated().to_string());
         let mut notify = Vec::new();
 
         for notify_key in redis_pool.keys(&pattern) {
-            let notifys: Vec<String> = redis_pool.lrange(&notify_key, 0, -1);
-            let notifys: Vec<UserNotify> = notifys
+            let notifies: Vec<String> = redis_pool.lrange(&notify_key, 0, -1);
+            let notifies: Vec<UserNotify> = notifies
                 .iter()
                 .map(|notify_string| {
                     let user_notify: UserNotify = serde_json::from_str(&notify_string).unwrap();
                     user_notify
                 })
                 .collect();
-            notify.extend(notifys);
+            notify.extend(notifies);
         }
 
         if notify.is_empty() {
@@ -58,7 +62,7 @@ impl UserNotify {
     }
 
     /// Remove the notification of the specified article specified user
-    pub fn remove_notifys_with_article_and_user(
+    pub fn remove_notifies_with_article_and_user(
         user_id: Uuid,
         article_id: Uuid,
         redis_pool: &RedisPool,

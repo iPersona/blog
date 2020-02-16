@@ -18,6 +18,8 @@ pub enum ErrorCode {
     LoginFailed,
     // Parse error
     ParseError,
+    // Database error
+    DbError,
     // Unknown error
     Unknown,
 }

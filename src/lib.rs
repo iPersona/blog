@@ -20,6 +20,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate lettre;
+extern crate regex;
 extern crate serde_urlencoded;
 extern crate tiny_keccak;
 extern crate uuid;
@@ -31,7 +32,7 @@ pub mod schema;
 pub mod util;
 pub mod web;
 
-pub(crate) use models::UserNotify;
+//pub(crate) use models::UserNotify;
 pub(crate) use models::{
     ArticleList, ArticlesWithTag, EditArticle,
     /*ModifyPublish,*/ NewArticle, /*PublishedStatistics,*/

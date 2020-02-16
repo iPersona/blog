@@ -38,6 +38,8 @@ pub struct Users {
     pub create_time: NaiveDateTime,
     pub github: Option<String>,
     pub is_active: bool,
+    // Subscribe to comment with email notification
+    pub subscribe: bool,
 }
 
 impl Users {
@@ -384,13 +386,16 @@ impl FormDataExtractor for EditUser {
         &self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> Result<Self::Data, String> {
+    ) -> InternalStdResult<Self::Data> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
                 // Only login user is permitted
                 if !t.is_login() {
-                    return Err("Permission denied, please login and try again!".to_string());
+                    return Err(Error {
+                        code: ErrorCode::PermissionDenied,
+                        detail: format!("Permission denied, please login and try again!"),
+                    });
                 }
 
                 match t.user_info {
@@ -399,13 +404,22 @@ impl FormDataExtractor for EditUser {
                         let user_id = u.id.clone();
                         match self.edit_user(pg_pool, user_id) {
                             Ok(token) => Ok(token),
-                            Err(err) => Err(err),
+                            Err(err) => Err(Error {
+                                code: ErrorCode::DbError,
+                                detail: format!("failed to edit user info: {:?}", err),
+                            }),
                         }
                     }
-                    None => Err("Permission denied, please login and retry!".to_string()),
+                    None => Err(Error {
+                        code: ErrorCode::PermissionDenied,
+                        detail: format!("Permission denied, please login and retry!"),
+                    }),
                 }
             }
-            None => Err("Permission denied, please login and try again!".to_string()),
+            None => Err(Error {
+                code: ErrorCode::PermissionDenied,
+                detail: format!("Permission denied, please login and try again!"),
+            }),
         }
     }
 }

@@ -159,7 +159,7 @@ macro_rules! extract_form_data {
                             api_resp_data!(data)
                         }
                     }
-                    Err(e) => api_resp_err!(e.as_str()),
+                    Err(e) => api_resp_err_with_code!(e.code, e.detail),
                 }
             })
     };

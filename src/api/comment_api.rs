@@ -1,4 +1,5 @@
 use crate::models::articles::QuerySlice;
+use crate::models::comment::CommentQueryOption;
 use crate::{AppState, Comments, DeleteComment, NewComments};
 use actix_web::web::{Data, Path, Query};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
@@ -32,16 +33,26 @@ impl CommentApi {
         state: Data<AppState>,
         _req: HttpRequest,
         article_id: Path<Uuid>,
-        params: Query<QuerySlice>,
+        params: Query<CommentQueryOption>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("list_comments");
         let pg_pool = state.get_ref().db.connection();
-        match Comments::query(
-            &pg_pool,
-            params.limit,
-            params.offset,
-            article_id.into_inner(),
-        ) {
+        let res = match params.user_id {
+            Some(uid) => Comments::query_with_user(
+                &pg_pool,
+                params.limit,
+                params.offset,
+                article_id.into_inner(),
+                uid.clone(),
+            ),
+            None => Comments::query(
+                &pg_pool,
+                params.limit,
+                params.offset,
+                article_id.into_inner(),
+            ),
+        };
+        match res {
             Ok(data) => api_resp_data!(data),
             Err(err) => api_resp_err!(&*err),
         }

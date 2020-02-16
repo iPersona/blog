@@ -73,7 +73,9 @@ impl CacheActor {
         let redis = self.cache.into_inner();
         let time = redis.get(RedisKeys::PersistTime.to_string().as_str());
         match time {
-            Some(t) => Some(NaiveDateTime::parse_from_str(t.as_str(), "%Y-%m-%d %H:%M:%S%.f").unwrap()),
+            Some(t) => {
+                Some(NaiveDateTime::parse_from_str(t.as_str(), "%Y-%m-%d %H:%M:%S%.f").unwrap())
+            }
             None => None,
         }
     }

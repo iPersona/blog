@@ -40,6 +40,7 @@ table! {
         article_id -> Uuid,
         user_id -> Uuid,
         create_time -> Timestamp,
+        mentioned_users -> Nullable<Array<Uuid>>,
     }
 }
 
@@ -72,6 +73,7 @@ table! {
         create_time -> Timestamp,
         github -> Nullable<Varchar>,
         is_active -> Bool,
+        subscribe -> Bool,
     }
 }
 

@@ -37,7 +37,7 @@
 import { mapGetters } from 'vuex'
 import MarkdownEditor from './MarkdownEditor'
 import Avatar from "./Avatar"
-import { EventBus, EVENT_ARTICLE_EDITOR_CLOSED, EVENT_RELOAD_COMMENTS, EVENT_SET_COMMENT_EDITOR_CONTENT } from '@/event-bus.js';
+import { EventBus, EVENT_ARTICLE_EDITOR_CLOSED, EVENT_RELOAD_COMMENTS, EVENT_SET_COMMENT_EDITOR_CONTENT, EVENT_CLOSE_COMMENT_REPLY_VIEW } from '@/event-bus.js';
 import Api from '@/api.js'
 import { USER_ID } from '@/store/modules/store-types.js'
 import { USER } from '@/store/modules/module-names'
@@ -54,6 +54,10 @@ export default {
       default: ''
     },
     nickName: {
+      type: String,
+      default: ''
+    },
+    commentId: {
       type: String,
       default: ''
     }
@@ -97,11 +101,15 @@ export default {
         return
       }
       // reload comments
-      EventBus.$emit(EVENT_RELOAD_COMMENTS)
+      EventBus.$emit(EVENT_RELOAD_COMMENTS, { forceReload: true })
       // clear old content
       this.$refs.editor.setContent('')
       // confirm to user
       this.$getUi().toast.success('You have successfully submit a comment!', true)
+      // close reply window, NOT new comment component!
+      if (this.commentId !== '') {
+        EventBus.$emit(EVENT_CLOSE_COMMENT_REPLY_VIEW, this.commentId)
+      }
     }
   },
 }

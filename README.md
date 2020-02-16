@@ -33,7 +33,7 @@ you need to install Postgresql database, and then configure postgresql by follow
 
 #### Install the corresponding version of contrib
 
-``` bash
+```bash
 yum install postgresql96-contrib
 ```
 
@@ -115,10 +115,11 @@ use init.sh script under docker folder to automatically add the view as table in
 ## Useful Documents
 
 - [Postgres & Diesel types](https://kotiri.com/2018/01/31/postgresql-diesel-rust-types.html)
+- [How to implement Email verify](https://segmentfault.com/a/1190000014522351)
 
 ## TODO
 
-[] use [argon2](https://crates.io/crates/rust-argon2)  to rewrite encryption
+[] use [argon2](https://crates.io/crates/rust-argon2) to rewrite encryption
 
 [X] use [chrono](https://crates.io/crates/chrono) to rewrite datetime
 

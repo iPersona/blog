@@ -9,20 +9,19 @@
       <div class="media-content">
         <div class="bubble">
           <BField>
+            <!-- left header -->
             <div class="comment-header">
               <div
                 align="left"
                 class="comment-header-left"
               >
-                <b-dropdown
-                  hoverable
-                  aria-role="list"
-                >
+                <!-- nick name -->
+                <b-dropdown aria-role="list">
                   <b-button
                     slot="trigger"
                     type="is-text"
                     size="is-small"
-                    style="text-decoration: none; color: gray;"
+                    style="text-decoration: none; color: gray; padding-left: 5px"
                   >
                     <span class="comment-nickname">{{ comment.nickname }}</span>
                   </b-button>
@@ -33,16 +32,19 @@
                     Copy user info
                   </b-dropdown-item>
                 </b-dropdown>
-                <!-- <span class="comment-nickname">{{ comment.nickname }}</span> -->
                 <span class="comment-info">commented {{ createTime }}</span>
               </div>
+
+              <!-- right header -->
               <div class="comment-header-right">
                 <b-button
+                  slot="trigger"
                   type="is-text"
                   size="is-small"
                   icon-pack="mdi"
                   icon-left="reply"
                   style="text-decoration: none; color: gray;"
+                  aria-controls="replyComment"
                   @click="quoteReply"
                 >
                   Reply
@@ -58,6 +60,19 @@
               <MarkdownPreview :content="comment.comment" />
             </div>
           </BField>
+
+          <!-- reply component -->
+          <b-collapse
+            :open="isReply"
+            position="is-bottom"
+            aria-id="replyComment"
+          >
+            <div
+              :is="replyComponent"
+              v-if="isLogin"
+              v-bind="{articleId: comment.article_id, commentId: comment.id}"
+            />
+          </b-collapse>
         </div>
       </div>
     </article>
@@ -66,16 +81,23 @@
 
 <script>
 import MarkdownPreview from './MarkdownPreview'
+import NewComment from './NewComment'
+import Empty from './Empty'
 import Avatar from "./Avatar"
 import DatetimeUtil from "./utils/datetime"
-import { EventBus, EVENT_SET_COMMENT_EDITOR_CONTENT, EVENT_SCROLL_TO_COMMENT_EDITOR } from '@/event-bus.js'
+import { EventBus, EVENT_SET_COMMENT_EDITOR_CONTENT, EVENT_SCROLL_TO_COMMENT_EDITOR, EVENT_CLOSE_COMMENT_REPLY_VIEW } from '@/event-bus.js'
 import Url from './utils/url'
+import { mapGetters } from "vuex";
+import { IS_LOGIN, USER_ID } from "@/store/modules/store-types.js";
+import { USER } from "@/store/modules/module-names";
 
 export default {
   name: "CommentEntity",
   components: {
     MarkdownPreview,
     Avatar,
+    NewComment,
+    Empty,
   },
   props: {
     comment: {
@@ -84,23 +106,51 @@ export default {
     }
   },
   data() {
-    return {}
+    return {
+      replyComponent: 'Empty',
+      isReply: false,
+    }
   },
   computed: {
     createTime: function () {
       return DatetimeUtil.toTimeAgo(this.comment.create_time)
-    }
+    },
+    ...mapGetters(USER, {
+      isLogin: IS_LOGIN,
+      userId: USER_ID,
+    })
   },
   mounted() {
     console.log(`comments: ${JSON.stringify(this.comment)}`)
+    this.listenEvents()
+  },
+  beforeDestroy() {
+    EventBus.$off(EVENT_CLOSE_COMMENT_REPLY_VIEW)
   },
   methods: {
+    listenEvents() {
+      const self = this;
+      EventBus.$on(EVENT_CLOSE_COMMENT_REPLY_VIEW, function (commentId) {
+        console.log(`event-bus: ${EVENT_CLOSE_COMMENT_REPLY_VIEW}`)
+        // Close comment reply window after finish commenting
+        if (commentId === self.comment.id) {
+          self.toggleReplyCommentView()
+        }
+      })
+    },
     quoteReply() {
-      // save backquote to comment editor
-      let content = `> ${this.comment.comment}`
-      EventBus.$emit(EVENT_SET_COMMENT_EDITOR_CONTENT, content)
-      // scroll to comment editor
-      EventBus.$emit(EVENT_SCROLL_TO_COMMENT_EDITOR)
+      // // save backquote to comment editor
+      // let content = `> ${this.comment.comment}`
+      // EventBus.$emit(EVENT_SET_COMMENT_EDITOR_CONTENT, content)
+      // // scroll to comment editor
+      // EventBus.$emit(EVENT_SCROLL_TO_COMMENT_EDITOR)
+
+
+      this.toggleReplyCommentView()
+    },
+    toggleReplyCommentView() {
+      this.isReply = !this.isReply;
+      this.replyComponent = this.isReply ? 'NewComment' : 'Empty'
     },
     copyUserInfo() {
       let self = this

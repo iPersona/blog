@@ -48,6 +48,11 @@
         </button>
       </footer>
     </div>
+    <b-loading
+      :is-full-page="true"
+      :active.sync="isLoading"
+      :can-cancel="false"
+    />
   </form>
 </template>
 
@@ -66,6 +71,7 @@ export default {
       username: '',
       password: '',
       remember: true,
+      isLoading: false,
     };
   },
   async mounted() {
@@ -82,6 +88,9 @@ export default {
       updateToken: LOGIN
     }),
     async login() {
+      // show loading indicator
+      this.isLoading = true
+
       // reCHAPTCHA verification
       let rechaptchaToken = await this.recaptcha()
       console.log(`rechaptchaToken: ${rechaptchaToken}`)
@@ -89,10 +98,12 @@ export default {
       let api = new Api();
       // let rsp = await api.login(this.username, Util.password(this.password), this.remember);
       let rsp = await api.login("admin", Util.password("123456"), true, rechaptchaToken);
+      // let rsp = await api.login("user-4", Util.password("123456"), true, rechaptchaToken);
       // let rsp = await api.login("user-1", Util.password("123456"), true);
       this.$getLog().debug("rsp: " + JSON.stringify(rsp));
       if (!Api.isSuccessResponse(rsp)) {
         this.$getUi().toast.fail(`${rsp.detail}`)
+        this.isLoading = false  // Stop loading indicator
         return
       }
 
@@ -100,6 +111,9 @@ export default {
       let token = rsp.data;
       this.$getLog().debug(`token: ${token}`)
       this.updateToken(token)
+
+      // Stop loading indicator
+      this.isLoading = false
 
       // refresh page to make other components loading data
       window.location.reload()

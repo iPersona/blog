@@ -103,6 +103,8 @@ const mutations = {
     state[USER_NAME] = ''
     state[IS_ADMIN] = false
     clearState()
+    // refresh page to reset component
+    window.location.reload()
   },
   [LOGIN](state, token) {
     updateToken(state, token)

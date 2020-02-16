@@ -4,11 +4,13 @@ use super::super::comments::dsl::comments as all_comments;
 use super::super::UserInfo;
 use super::FormDataExtractor;
 use crate::models::token::TokenExtension;
-use crate::{ArticlesWithTag, UserNotify};
+use crate::util::errors::{Error, ErrorCode};
+use crate::util::result::InternalStdResult;
 use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::Text;
+use regex::Regex;
 use uuid::Uuid;
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
@@ -30,7 +32,37 @@ impl Comments {
         offset: i64,
         id: Uuid,
     ) -> Result<Vec<Self>, String> {
-        let raw_sql = format!("select a.id, a.comment, a.article_id, a.user_id, b.nickname, a.create_time from comments a join users b on a.user_id=b.id where a.article_id='{}' order by a.create_time desc limit {} offset {};", id, limit, offset);
+        let raw_sql = format!(
+            "select a.id, a.comment, a.article_id, a.user_id, b.nickname, a.create_time \
+            from comments a join users b on a.user_id=b.id \
+            where a.article_id='{}' \
+            order by a.create_time desc \
+            limit {} offset {};",
+            id, limit, offset
+        );
+        let res = diesel::sql_query(raw_sql).get_results::<Self>(conn);
+        match res {
+            Ok(data) => Ok(data),
+            Err(err) => Err(format!("{}", err)),
+        }
+    }
+
+    pub fn query_with_user(
+        conn: &PgConnection,
+        limit: i64,
+        offset: i64,
+        article_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Vec<Self>, String> {
+        let raw_sql = format!(
+            "select a.id, a.comment, a.article_id, a.user_id, b.nickname, a.create_time \
+            from comments a join users b on a.user_id=b.id \
+            where a.article_id ='{}' \
+            and (a.user_id = '{}' or '{}' = any(a.mentioned_users)) \
+            order by a.create_time desc \
+            limit {} offset {};",
+            article_id, user_id, user_id, limit, offset
+        );
         let res = diesel::sql_query(raw_sql).get_results::<Self>(conn);
         match res {
             Ok(data) => Ok(data),
@@ -57,20 +89,35 @@ impl Comments {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommentQueryOption {
+    pub limit: i64,
+    pub offset: i64,
+    pub user_id: Option<Uuid>,
+}
+
 #[derive(Insertable, Debug, Clone)]
 #[table_name = "comments"]
 struct InsertComments {
     comment: String,
     article_id: Uuid,
     user_id: Uuid,
+    mentioned_users: Option<Vec<Uuid>>,
 }
 
 impl InsertComments {
-    fn insert(self, conn: &PgConnection) -> bool {
-        diesel::insert_into(comments::table)
+    fn insert(self, conn: &PgConnection) -> InternalStdResult<Uuid> {
+        let res = diesel::insert_into(comments::table)
             .values(&self)
-            .execute(conn)
-            .is_ok()
+            .returning(comments::id)
+            .get_result(conn);
+        match res {
+            Ok(id) => Ok(id),
+            Err(e) => Err(Error {
+                code: ErrorCode::DbError,
+                detail: format!("failed to insert comment: {:?}", e),
+            }),
+        }
     }
 }
 
@@ -82,16 +129,20 @@ pub struct NewComments {
 }
 
 impl NewComments {
-    fn convert_to_insert_comments(&self, user_id: Uuid) -> InsertComments {
-        InsertComments {
-            comment: self.comment.clone(),
-            article_id: self.article_id,
-            user_id,
+    fn convert_to_insert_comments(&self, user_id: Uuid) -> InternalStdResult<InsertComments> {
+        match Self::parse_mentioned_users(&user_id, self.comment.as_str()) {
+            Ok(users) => Ok(InsertComments {
+                comment: self.comment.clone(),
+                article_id: self.article_id,
+                user_id,
+                mentioned_users: users,
+            }),
+            Err(e) => Err(e),
         }
     }
 
-    pub fn insert(&self, conn: &PgConnection, user_info: &UserInfo) -> bool {
-        self.convert_to_insert_comments(user_info.id).insert(conn)
+    pub fn insert(&self, conn: &PgConnection, user_info: &UserInfo) -> InternalStdResult<Uuid> {
+        self.convert_to_insert_comments(user_info.id)?.insert(conn)
     }
 
     pub fn reply_user_id(&self) -> Option<Uuid> {
@@ -104,6 +155,73 @@ impl NewComments {
     pub fn article_id(&self) -> Uuid {
         self.article_id
     }
+
+    pub fn parse_mentioned_users(
+        user_id: &Uuid,
+        content: &str,
+    ) -> InternalStdResult<Option<Vec<Uuid>>> {
+        // since rust regex crate does not support `look-around`, we need to remove blockquote lines first
+        // to avoid re-including in mentioned users
+        //        let mut non_quote_content = self.comment.clone();
+        //        non_quote_content.lines().into_iter()
+        //            .filter(|&line| !line.contains("> "))
+        //            .map(|line| {
+        //                self.parse_uuid(line)
+        //            })
+        //            // merge uuid arrays
+        //            .flat_map(|users| {
+        //                match users {
+        //                    Ok(v) => if v.is_empty() {
+        //                        Ok(None)
+        //                    } else {
+        //                        Ok(Some(v))
+        //                    },
+        //                    Err(e) => Err(e),
+        //                }
+        //            })
+        //            .collect::<InternalStdResult<Option<Vec<Uuid>>>>()
+
+        let mut non_quote_content = String::from(content);
+        non_quote_content = non_quote_content
+            .lines()
+            .into_iter()
+            .filter(|&line| !line.contains("> "))
+            .collect::<Vec<&str>>()
+            .join("");
+        let res = Self::parse_uuid(user_id, non_quote_content.as_str());
+        match res {
+            Ok(v) => {
+                if v.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(v))
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn parse_uuid(user_id: &Uuid, content: &str) -> InternalStdResult<Vec<Uuid>> {
+        let mut users: Vec<Uuid> = Vec::new();
+        let re = Regex::new(r#"]\(/#/user/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\)"#).unwrap();
+        for cap in re.captures_iter(content) {
+            match Uuid::parse_str(cap[1].trim()) {
+                Ok(id) => {
+                    // Not owner of this comment and current list doesn't contain the user
+                    if !id.eq(user_id) && !users.contains(&id) {
+                        users.push(id.clone())
+                    }
+                }
+                Err(e) => {
+                    return Err(Error {
+                        code: ErrorCode::ParseError,
+                        detail: format!("failed to parse uuid in comment: {:?}", e),
+                    })
+                }
+            }
+        }
+        Ok(users)
+    }
 }
 
 impl FormDataExtractor for NewComments {
@@ -113,78 +231,35 @@ impl FormDataExtractor for NewComments {
         &self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> Result<Self::Data, String> {
+    ) -> InternalStdResult<Self::Data> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
                 if !t.is_login() {
-                    return Err("please login and try again!".to_string());
+                    return Err(Error {
+                        code: ErrorCode::PermissionDenied,
+                        detail: format!("please login and try again!"),
+                    });
                 }
-
+                let conn = &state.db.connection();
                 match t.user_info {
-                    Some(user) => {
-                        let redis_pool = &state.cache.into_inner();
-                        let pg_pool = &state.db.connection();
-
-                        let admin = UserInfo::view_admin(pg_pool, redis_pool);
-                        let article = ArticlesWithTag::query_without_article(
-                            &state,
-                            self.article_id(),
-                            false,
-                        )
-                        .unwrap();
-                        let reply_user_id = self.reply_user_id();
-                        match reply_user_id {
-                            // Reply comment
-                            Some(reply_user_id) => {
-                                // Notification resolve
-                                let user_reply_notify = UserNotify {
-                                    user_id: reply_user_id,
-                                    send_user_name: user.nickname.clone(),
-                                    article_id: article.id,
-                                    article_title: article.title.clone(),
-                                    notify_type: "reply".into(),
-                                };
-                                user_reply_notify.cache(&redis_pool);
-
-                                // If the sender is not an admin and also the responder is also not admin, notify admin
-                                if reply_user_id != admin.id && user.groups != 0 {
-                                    let comment_notify = UserNotify {
-                                        user_id: admin.id,
-                                        send_user_name: user.nickname.clone(),
-                                        article_id: article.id,
-                                        article_title: article.title.clone(),
-                                        notify_type: "comment".into(),
-                                    };
-                                    comment_notify.cache(&redis_pool);
-                                }
-                            }
-                            // Normal comment
-                            None => {
-                                if user.groups != 0 {
-                                    let comment_notify = UserNotify {
-                                        user_id: admin.id,
-                                        send_user_name: user.nickname.clone(),
-                                        article_id: article.id,
-                                        article_title: article.title.clone(),
-                                        notify_type: "comment".into(),
-                                    };
-                                    comment_notify.cache(&redis_pool);
-                                }
-                            }
-                        }
-
-                        let res = self.insert(&pg_pool, &user);
-                        if res {
-                            Ok(())
-                        } else {
-                            Err("new_comment failed!".to_string())
-                        }
-                    }
-                    None => Err("Permission denied, you need to login first!".to_string()),
+                    Some(user) => match self.insert(&conn, &user) {
+                        Ok(_) => Ok(()),
+                        Err(_) => Err(Error {
+                            code: ErrorCode::DbError,
+                            detail: format!("new_comment failed!"),
+                        }),
+                    },
+                    None => Err(Error {
+                        code: ErrorCode::PermissionDenied,
+                        detail: format!("failed to get token extension from request!"),
+                    }),
                 }
             }
-            None => Err("failed to get token extension from request!".to_string()),
+            None => Err(Error {
+                code: ErrorCode::PermissionDenied,
+                detail: format!("failed to get token extension from request!"),
+            }),
         }
     }
 }
@@ -215,13 +290,16 @@ impl FormDataExtractor for DeleteComment {
         &self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> Result<Self::Data, String> {
+    ) -> InternalStdResult<Self::Data> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
                 // Only login user is permitted to access this API
                 if !t.is_login() {
-                    return Err("Permission denied, please login and try again!".to_string());
+                    return Err(Error {
+                        code: ErrorCode::PermissionDenied,
+                        detail: format!("Permission denied, please login and try again!"),
+                    });
                 }
 
                 match t.user_info {
@@ -229,8 +307,10 @@ impl FormDataExtractor for DeleteComment {
                         // Only the comment creator and administrator are permitted to delete comment
                         if !(user.id == self.user_id || user.is_admin()) {
                             return Err(
-                                "Permission denied, you are not permitted to delete this comment!"
-                                    .to_string(),
+                                Error {
+                                    code: ErrorCode::PermissionDenied,
+                                    detail: format!("Permission denied, you are not permitted to delete this comment!")
+                                }
                             );
                         }
 
@@ -239,13 +319,22 @@ impl FormDataExtractor for DeleteComment {
                         if res {
                             Ok(())
                         } else {
-                            Err("failed to delete comment!".to_string())
+                            Err(Error {
+                                code: ErrorCode::DbError,
+                                detail: format!("failed to delete comment!"),
+                            })
                         }
                     }
-                    None => Err("permission denied, please login and try again!".to_string()),
+                    None => Err(Error {
+                        code: ErrorCode::PermissionDenied,
+                        detail: format!("permission denied, please login and try again!"),
+                    }),
                 }
             }
-            None => Err("permission denied, please login and try again!".to_string()),
+            None => Err(Error {
+                code: ErrorCode::PermissionDenied,
+                detail: format!("permission denied, please login and try again!"),
+            }),
         }
     }
 }

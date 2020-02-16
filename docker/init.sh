@@ -58,12 +58,14 @@ revert_migration() {
     cd ..
     diesel migration revert
     cd docker
+    insert_view_definition # fix view definition missing
 }
 
 redo_migration() {
     cd ..
     diesel migration redo
     cd docker
+    insert_view_definition # fix view definition missing
 }
 
 # run shell

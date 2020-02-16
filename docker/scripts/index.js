@@ -3,6 +3,7 @@ const {
 } = require('pg')
 const format = require('pg-format')
 const inquirer = require('inquirer')
+const logger = require('./log')
 
 var connect = async function () {
   // postgres://YourUserName:YourPassword@localhost:5432/YourDatabase
@@ -84,17 +85,16 @@ const ACTIONS_INSERT_TAGS = 'insert tags'
 const ACTIONS_PUBLISH_ARTICLES = 'publish articles'
 
 let menu = async function () {
-  let action = await inquirer
-    .prompt([{
-      type: 'list',
-      name: 'action',
-      message: 'What action to take?',
-      choices: [
-        ACTIONS_INSERT_ARTICLES,
-        ACTIONS_INSERT_TAGS,
-        ACTIONS_PUBLISH_ARTICLES
-      ]
-    }])
+  let action = await inquirer.prompt([{
+    type: 'list',
+    name: 'action',
+    message: 'What action to take?',
+    choices: [
+      ACTIONS_INSERT_ARTICLES,
+      ACTIONS_INSERT_TAGS,
+      ACTIONS_PUBLISH_ARTICLES
+    ]
+  }])
   return action.action
 }
 
@@ -108,9 +108,10 @@ let doAction = async function (client, action) {
 }
 
 var main = async function () {
+  logger.debug("aaaaa")
   let client = await connect()
   let action = await menu()
-  console.log(`action: ${action}`)
+  logger.debug(`action: ${action}`)
   // let action = ACTIONS_INSERT_TAGS
   await doAction(client, action)
   disconnect(client)
