@@ -128,16 +128,8 @@ export default class Api {
         })
     }
 
-    async getComments(articleId, limit, offset, userId) {
+    async getComments(articleId, args) {
         let url = this.url.comments(articleId)
-        let args = userId === undefined ? {
-            limit: limit,
-            offset: offset
-        } : {
-            limit: limit,
-            offset: offset,
-            user_id: userId,
-        }
         return this.get(url, args)
     }
 

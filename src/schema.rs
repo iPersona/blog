@@ -38,9 +38,11 @@ table! {
         id -> Uuid,
         comment -> Text,
         article_id -> Uuid,
-        user_id -> Uuid,
+        from_user -> Uuid,
         create_time -> Timestamp,
         mentioned_users -> Nullable<Array<Uuid>>,
+        to_user -> Nullable<Uuid>,
+        parent_comment -> Nullable<Uuid>,
     }
 }
 
@@ -80,7 +82,6 @@ table! {
 joinable!(article_tag_relation -> articles (article_id));
 joinable!(article_tag_relation -> tags (tag_id));
 joinable!(comments -> articles (article_id));
-joinable!(comments -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(
     article_tag_relation,

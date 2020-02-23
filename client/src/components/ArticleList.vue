@@ -52,8 +52,6 @@
           </div>
         </b-field>
       </section>
-      <hr class="short">
-
       <br><br>
     </div>
 
@@ -212,11 +210,6 @@ export default {
 </script>
 
 <style scoped>
-hr.short {
-  align-content: left;
-  width: 20%;
-}
-
 .article-list {
   align-content: left;
 }

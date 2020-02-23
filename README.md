@@ -117,6 +117,16 @@ use init.sh script under docker folder to automatically add the view as table in
 - [Postgres & Diesel types](https://kotiri.com/2018/01/31/postgresql-diesel-rust-types.html)
 - [How to implement Email verify](https://segmentfault.com/a/1190000014522351)
 
+###  the trait bound `diesel::query_builder::SqlQuery: diesel::query_dsl::LoadQuery<_, models::comment::Comments>` is not satisfied
+
+#### REASON
+
+The definition of the structure is not the same as which defined in the `schema.rs`
+
+#### HOW TO FIX
+
+Find and change the incorrect field type to that defined in `schema.rs`
+
 ## TODO
 
 [] use [argon2](https://crates.io/crates/rust-argon2) to rewrite encryption

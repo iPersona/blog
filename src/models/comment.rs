@@ -9,63 +9,144 @@ use crate::util::result::InternalStdResult;
 use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
-use diesel::sql_types::Text;
+use diesel::sql_types::{BigInt, Nullable, Text};
 use regex::Regex;
 use uuid::Uuid;
 
+/// Represent comment query result
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
+#[table_name = "comments"]
+pub struct CommentResult {
+    id: Uuid,
+    comment: String,
+    article_id: Uuid,
+    from_user: Uuid,
+    #[sql_type = "Text"]
+    nickname: String,
+    create_time: NaiveDateTime,
+    to_user: Option<Uuid>,
+    #[sql_type = "BigInt"]
+    total: i64,
+    #[sql_type = "Nullable<BigInt>"]
+    sub_comments_num: Option<i64>,
+}
+
+/// Represent comment query response data of request
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommentSlice<T> {
+    pub total: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comments: Option<Vec<T>>,
+}
+
+impl<T> CommentSlice<T>
+where
+    T: Clone,
+{
+    pub fn from_comment_results<U>(comment_results: Vec<U>, total: i64) -> Self
+    where
+        U: Clone + Into<T>,
+    {
+        let comments = if comment_results.is_empty() {
+            None
+        } else {
+            Some(comment_results.into_iter().map(|c| c.into()).collect())
+        };
+        CommentSlice { total, comments }
+    }
+}
+
+/// Represent comments of the response data
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
 #[table_name = "comments"]
 pub struct Comments {
     id: Uuid,
     comment: String,
     article_id: Uuid,
-    user_id: Uuid,
+    from_user: Uuid,
     #[sql_type = "Text"]
     nickname: String,
     create_time: NaiveDateTime,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to_user: Option<Uuid>,
+    #[sql_type = "Nullable<BigInt>"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sub_comments_num: Option<i64>,
+}
+
+impl From<CommentResult> for Comments {
+    fn from(c: CommentResult) -> Self {
+        Self {
+            id: c.id,
+            comment: c.comment,
+            article_id: c.article_id,
+            from_user: c.from_user,
+            nickname: c.nickname,
+            create_time: c.create_time,
+            to_user: c.to_user,
+            sub_comments_num: c.sub_comments_num,
+        }
+    }
 }
 
 impl Comments {
-    pub fn query(
+    pub fn first_class_comments(
         conn: &PgConnection,
         limit: i64,
         offset: i64,
-        id: Uuid,
-    ) -> Result<Vec<Self>, String> {
+        article_id: Uuid,
+    ) -> Result<CommentSlice<Self>, String> {
         let raw_sql = format!(
-            "select a.id, a.comment, a.article_id, a.user_id, b.nickname, a.create_time \
-            from comments a join users b on a.user_id=b.id \
-            where a.article_id='{}' \
-            order by a.create_time desc \
+            "with sub_comments as (
+                select distinct parent_comment, count(*) over(partition by parent_comment) as sub_comments_num
+                from comments
+                where article_id='{}'
+                and parent_comment is not null
+            ),
+            parent_comments as (
+                select a.id, a.comment, a.article_id, a.from_user, b.nickname, a.create_time, a.to_user, count(*) over() as total
+                from comments a join users b on a.from_user=b.id
+                where a.article_id='{}'
+                and a.parent_comment is null
+            )
+            select *
+            from parent_comments p left join sub_comments s on p.id=s.parent_comment
+            order by p.create_time desc
             limit {} offset {};",
-            id, limit, offset
+            article_id, article_id, limit, offset
         );
-        let res = diesel::sql_query(raw_sql).get_results::<Self>(conn);
+        let res = diesel::sql_query(raw_sql).get_results::<CommentResult>(conn);
         match res {
-            Ok(data) => Ok(data),
+            Ok(data) => {
+                let total = if data.is_empty() { 0 } else { data[0].total };
+                Ok(CommentSlice::from_comment_results(data, total))
+            }
             Err(err) => Err(format!("{}", err)),
         }
     }
 
-    pub fn query_with_user(
+    pub fn user_comments(
         conn: &PgConnection,
         limit: i64,
         offset: i64,
         article_id: Uuid,
         user_id: Uuid,
-    ) -> Result<Vec<Self>, String> {
+    ) -> Result<CommentSlice<Self>, String> {
         let raw_sql = format!(
-            "select a.id, a.comment, a.article_id, a.user_id, b.nickname, a.create_time \
-            from comments a join users b on a.user_id=b.id \
+            "select a.id, a.comment, a.article_id, a.from_user, b.nickname, a.create_time, a.to_user, count(*) over() as total \
+            from comments a join users b on a.from_user=b.id \
             where a.article_id ='{}' \
-            and (a.user_id = '{}' or '{}' = any(a.mentioned_users)) \
+            and (a.from_user = '{}' or '{}' = any(a.mentioned_users)) \
             order by a.create_time desc \
             limit {} offset {};",
             article_id, user_id, user_id, limit, offset
         );
-        let res = diesel::sql_query(raw_sql).get_results::<Self>(conn);
+        let res = diesel::sql_query(raw_sql).get_results::<CommentResult>(conn);
         match res {
-            Ok(data) => Ok(data),
+            Ok(data) => {
+                let total = if data.is_empty() { 0 } else { data[0].total };
+                Ok(CommentSlice::from_comment_results(data, total))
+            }
             Err(err) => Err(format!("{}", err)),
         }
     }
@@ -77,7 +158,7 @@ impl Comments {
     }
 
     pub fn delete_with_user_id(conn: &PgConnection, id: Uuid) -> bool {
-        diesel::delete(all_comments.filter(comments::user_id.eq(id)))
+        diesel::delete(all_comments.filter(comments::from_user.eq(id)))
             .execute(conn)
             .is_ok()
     }
@@ -94,6 +175,58 @@ pub struct CommentQueryOption {
     pub limit: i64,
     pub offset: i64,
     pub user_id: Option<Uuid>,
+    pub parent_comment: Option<Uuid>,
+}
+
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
+#[table_name = "comments"]
+pub struct SubComment {
+    id: Uuid,
+    comment: String,
+    article_id: Uuid,
+    from_user: Uuid,
+    #[sql_type = "Text"]
+    from_nickname: String,
+    create_time: NaiveDateTime,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to_user: Option<Uuid>,
+    #[sql_type = "Nullable<Text>"]
+    to_nickname: Option<String>,
+}
+
+impl SubComment {
+    pub fn comments(
+        conn: &PgConnection,
+        limit: i64,
+        offset: i64,
+        article_id: Uuid,
+        parent_comment_id: Uuid,
+    ) -> Result<CommentSlice<Self>, String> {
+        let raw_sql = format!(
+            "with from_user as (    \
+                select a.id, a.comment, a.article_id, a.from_user, b.nickname, a.create_time, a.to_user \
+                from comments a join users b on a.from_user=b.id \
+                where a.article_id='{}' \
+                    and a.parent_comment='{}' \
+            ) \
+            select a.id, a.comment, a.article_id, a.from_user, a.nickname as from_nickname, a.create_time, a.to_user, b.nickname as to_nickname \
+                from from_user a left join users b on a.to_user=b.id \
+                order by a.create_time desc \
+                limit {} offset {};",
+            article_id, parent_comment_id, limit, offset
+        );
+        let res = diesel::sql_query(raw_sql).get_results::<Self>(conn);
+        match res {
+            Ok(data) => {
+                let total = if data.is_empty() { 0 } else { data.len() };
+                Ok(CommentSlice::<Self> {
+                    total: total as i64,
+                    comments: Some(data),
+                })
+            }
+            Err(err) => Err(format!("{}", err)),
+        }
+    }
 }
 
 #[derive(Insertable, Debug, Clone)]
@@ -101,7 +234,9 @@ pub struct CommentQueryOption {
 struct InsertComments {
     comment: String,
     article_id: Uuid,
-    user_id: Uuid,
+    from_user: Uuid,
+    to_user: Option<Uuid>,
+    parent_comment: Option<Uuid>,
     mentioned_users: Option<Vec<Uuid>>,
 }
 
@@ -125,7 +260,8 @@ impl InsertComments {
 pub struct NewComments {
     comment: String,
     article_id: Uuid,
-    reply_user_id: Option<Uuid>,
+    to_user: Option<Uuid>,
+    parent_comment: Option<Uuid>,
 }
 
 impl NewComments {
@@ -134,19 +270,28 @@ impl NewComments {
             Ok(users) => Ok(InsertComments {
                 comment: self.comment.clone(),
                 article_id: self.article_id,
-                user_id,
+                from_user: user_id,
+                to_user: self.to_user,
                 mentioned_users: users,
+                parent_comment: self.parent_comment,
             }),
             Err(e) => Err(e),
         }
     }
 
     pub fn insert(&self, conn: &PgConnection, user_info: &UserInfo) -> InternalStdResult<Uuid> {
+        if self.comment.is_empty() {
+            return Err(Error {
+                code: ErrorCode::InvalidContent,
+                detail: format!("comment content can not be empty!"),
+            });
+        }
+
         self.convert_to_insert_comments(user_info.id)?.insert(conn)
     }
 
     pub fn reply_user_id(&self) -> Option<Uuid> {
-        match self.reply_user_id {
+        match self.to_user {
             Some(id) => Some(id.clone()),
             None => None,
         }
@@ -245,9 +390,9 @@ impl FormDataExtractor for NewComments {
                 match t.user_info {
                     Some(user) => match self.insert(&conn, &user) {
                         Ok(_) => Ok(()),
-                        Err(_) => Err(Error {
-                            code: ErrorCode::DbError,
-                            detail: format!("new_comment failed!"),
+                        Err(e) => Err(Error {
+                            code: e.code,
+                            detail: format!("new_comment failed: {:?}", e.detail),
                         }),
                     },
                     None => Err(Error {

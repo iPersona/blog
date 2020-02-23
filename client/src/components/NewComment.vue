@@ -6,12 +6,12 @@
       </p>
     </figure>
     <div class="media-content">
-      <div class="bubble">
+      <div>
         <BField>
           <MarkdownEditor
             ref="editor"
             :min-height="100"
-            placeholder="Leave a comment"
+            :placeholder="placeholder"
             toolbar-style="Comment"
           />
         </BField>
@@ -23,7 +23,7 @@
                 class="is-primary"
                 @click="newComment"
               >
-                Comment
+                {{ buttonText }}
               </BButton>
             </div>
           </div>
@@ -37,7 +37,7 @@
 import { mapGetters } from 'vuex'
 import MarkdownEditor from './MarkdownEditor'
 import Avatar from "./Avatar"
-import { EventBus, EVENT_ARTICLE_EDITOR_CLOSED, EVENT_RELOAD_COMMENTS, EVENT_SET_COMMENT_EDITOR_CONTENT, EVENT_CLOSE_COMMENT_REPLY_VIEW } from '@/event-bus.js';
+import { EventBus, EVENT_ARTICLE_EDITOR_CLOSED, EVENT_RELOAD_COMMENTS, EVENT_SET_COMMENT_EDITOR_CONTENT, EVENT_CLOSE_COMMENT_REPLY_VIEW, EVENT_CLOSE_SUB_COMMENT_REPLY_VIEW } from '@/event-bus.js';
 import Api from '@/api.js'
 import { USER_ID } from '@/store/modules/store-types.js'
 import { USER } from '@/store/modules/module-names'
@@ -64,7 +64,8 @@ export default {
   },
   data() {
     return {
-
+      buttonText: this.commentId === '' ? 'Comment' : 'Reply',
+      placeholder: this.commentId === '' ? 'Leave a comment' : 'Reply this comment'
     }
   },
   computed: {
@@ -94,6 +95,12 @@ export default {
       })
     },
     async newComment() {
+      console.log(`comment-content: ${this.$refs.editor.content()}`)
+      if (this.$refs.editor.content() === '') {
+        this.$getUi().toast.warning(`Comment can not be empty!`)
+        return
+      }
+
       let api = new Api()
       let rsp = await api.newComment(this.articleId, this.$refs.editor.content(), this.userId)
       if (!Api.isSuccessResponse(rsp)) {
@@ -109,6 +116,7 @@ export default {
       // close reply window, NOT new comment component!
       if (this.commentId !== '') {
         EventBus.$emit(EVENT_CLOSE_COMMENT_REPLY_VIEW, this.commentId)
+        EventBus.$emit(EVENT_CLOSE_SUB_COMMENT_REPLY_VIEW, this.commentId)
       }
     }
   },

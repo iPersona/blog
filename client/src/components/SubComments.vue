@@ -1,20 +1,18 @@
 <template>
   <div class="container">
     <ul class="comment-list">
-      <CommentEntity
-        v-for="(comment, idx) in comments"
+      <SubCommentEntity
+        v-for="comment in comments"
         :id="comment.id"
         :key="comment.id"
         :comment="comment"
-        :show-separator="idx !== 0"
-        class="comment-entity"
       />
     </ul>
     <b-pagination
+      size="is-small"
       :total="totalPages"
       :current.sync="currentPage"
       :per-page="pageSize"
-      order="is-centered"
       aria-next-label="Next page"
       aria-previous-label="Previous page"
       aria-page-label="Page"
@@ -25,23 +23,21 @@
 </template>
 
 <script>
-import CommentEntity from './CommentEntity'
+import SubCommentEntity from './SubCommentEntity'
 import Api from '@/api'
-import { EventBus, EVENT_RELOAD_COMMENTS } from '@/event-bus.js'
-// import BlinkFocus from './BlinkFocus'
+import { EventBus, EVENT_RELOAD_SUB_COMMENTS } from '@/event-bus.js'
 
 export default {
-  name: "Comments",
+  name: "SubComments",
   components: {
-    CommentEntity,
-    // BlinkFocus,
+    SubCommentEntity,
   },
   props: {
     articleId: {
       type: String,
       default: ''
     },
-    userId: {
+    parentCommentId: {
       type: String,
       default: ''
     },
@@ -61,26 +57,26 @@ export default {
     this.listenEventBus()
   },
   beforeDestroy() {
-    EventBus.$off(EVENT_RELOAD_COMMENTS)
+    EventBus.$off(EVENT_RELOAD_SUB_COMMENTS)
   },
   methods: {
     listenEventBus() {
       const self = this;
-      EventBus.$on(EVENT_RELOAD_COMMENTS, async function (opt) {
-        console.log(`event-bus: ${EVENT_RELOAD_COMMENTS}`)
+      EventBus.$on(EVENT_RELOAD_SUB_COMMENTS, async function (opt) {
+        console.log(`event-bus: ${EVENT_RELOAD_SUB_COMMENTS}`)
         if (opt === undefined || opt.forceReload || self.comments.length <= 0) {
           await self.loadComments(true)
         }
       })
     },
     async loadComments(isReload) {
-      console.log(`load-comments`)
+      console.log(`load-subcomments`)
       // request comments
       let api = new Api()
       let args = {
         limit: this.pageSize,
         offset: (this.currentPage - 1) * this.pageSize,
-        userId: this.userId === '' ? undefined : this.userId,
+        parent_comment: this.parentCommentId,
       }
       let rsp = await api.getComments(this.articleId, args)
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`)
@@ -99,25 +95,6 @@ export default {
       // update comment data
       this.comments = rsp.data.comments
     },
-    async loadSubComments(parentCommentId) {
-      console.log(`load-subcomments`)
-      let api = new Api()
-      let currentPage = this.currentPage
-      let args = {
-        limit: this.pageSize,
-        offset: (currentPage - 1) * this.pageSize,
-        userId: this.userId === '' ? undefined : this.userId,
-        parent_comment_id: parentCommentId,
-      }
-      let rsp = await api.getComments(this.articleId, args)
-      this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`)
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`failed to load sub comments: ${rsp.detail}`)
-        return
-      }
-
-
-    },
     pageChanged(currentPage) {
       // update current page
       this.currentPage = currentPage
@@ -134,6 +111,6 @@ export default {
 }
 
 .comment-entity {
-  margin-bottom: 0.75rem;
+  margin-bottom: 30px;
 }
 </style>

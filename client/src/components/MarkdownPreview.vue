@@ -42,8 +42,6 @@ export default {
 
 <style scoped>
 .preview {
-  margin-top: 10px;
-  margin-bottom: 10px;
   margin-left: 5px;
   margin-right: 5px;
 }

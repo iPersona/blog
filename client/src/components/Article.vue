@@ -2,7 +2,7 @@
   <div>
     <nav
       v-if="isAdmin"
-      class="container"
+      class="container admin-toolbar"
     >
       <b-field
         expanded
@@ -52,7 +52,7 @@
     </nav>
     <section class="container">
       <div class="container">
-        <h1 class="title">
+        <h1 class="title title-fix">
           {{ article.title }}
         </h1>
       </div>
@@ -113,6 +113,11 @@
       id="commentEditor"
       :article-id="articleId"
     />
+    <hr
+      v-if="isLogin"
+      class="separator"
+    >
+
     <section class="container">
       <!-- <b-tabs
         v-if="isLogin"
@@ -292,6 +297,19 @@ export default {
 };
 </script>
 <style scoped>
+.separator {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
+}
+
+.admin-toolbar {
+  margin-bottom: 0.75rem;
+}
+
+.title-fix {
+  margin-bottom: 0.75rem;
+}
+
 .article-tags {
   font-size: small;
   display: inline;

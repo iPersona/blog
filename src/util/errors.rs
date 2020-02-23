@@ -4,6 +4,8 @@ pub enum ErrorCode {
     UserNotExist,
     // User not activated
     UserNotActivated,
+    // Invalid content data
+    InvalidContent,
     // Invalid token
     InvalidToken,
     // Token expired

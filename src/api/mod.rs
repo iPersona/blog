@@ -1,6 +1,7 @@
 #![macro_use]
 
 use crate::util::errors::ErrorCode;
+use serde::Serialize;
 use serde_json::Value;
 
 #[derive(Debug, Serialize)]
@@ -23,6 +24,17 @@ pub enum ApiResult {
     Data {
         data: Value,
     },
+}
+
+impl ApiResult {
+    pub fn from_data<T>(val: T) -> Self
+    where
+        T: Serialize,
+    {
+        ApiResult::Data {
+            data: serde_json::to_value(val).unwrap(),
+        }
+    }
 }
 
 // use actix_web::Error;

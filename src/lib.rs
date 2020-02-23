@@ -38,7 +38,7 @@ pub(crate) use models::{
     /*ModifyPublish,*/ NewArticle, /*PublishedStatistics,*/
 };
 pub(crate) use models::{ChangePassword, EditUser, RegisteredUser, UserInfo};
-pub(crate) use models::{Comments, DeleteComment, NewComments};
+pub(crate) use models::{Comments, DeleteComment, NewComments, SubComment};
 pub(crate) use models::{NewTag, TagCount, Tags};
 pub(crate) use schema::{article_tag_relation, article_with_tag, articles, comments, tags, users};
 pub use util::RedisPool;

@@ -1,8 +1,11 @@
-use crate::models::articles::QuerySlice;
+use crate::api::ApiResult;
 use crate::models::comment::CommentQueryOption;
-use crate::{AppState, Comments, DeleteComment, NewComments};
+use crate::util::errors::ErrorCode;
+use crate::util::result::InternalStdResult;
+use crate::{AppState, Comments, DeleteComment, NewComments, SubComment};
 use actix_web::web::{Data, Path, Query};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
+use diesel::PgConnection;
 use futures::stream::Stream;
 use futures::Future;
 use log::{debug, info};
@@ -36,25 +39,59 @@ impl CommentApi {
         params: Query<CommentQueryOption>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
         info!("list_comments");
-        let pg_pool = state.get_ref().db.connection();
-        let res = match params.user_id {
-            Some(uid) => Comments::query_with_user(
-                &pg_pool,
-                params.limit,
-                params.offset,
-                article_id.into_inner(),
-                uid.clone(),
-            ),
-            None => Comments::query(
-                &pg_pool,
-                params.limit,
-                params.offset,
-                article_id.into_inner(),
-            ),
+        let conn = state.get_ref().db.connection();
+        let is_top_comment = params.parent_comment.is_none();
+        let res = if is_top_comment {
+            // request top level comments
+            Self::top_level_comments(&conn, article_id.into_inner(), &params)
+        } else {
+            // request sub comments
+            Self::sub_comments(&conn, article_id.into_inner(), &params)
         };
         match res {
-            Ok(data) => api_resp_data!(data),
-            Err(err) => api_resp_err!(&*err),
+            Ok(data) => api_resp!(data),
+            Err(e) => api_resp_err_with_code!(e.code, e.detail),
+        }
+    }
+
+    fn top_level_comments(
+        conn: &PgConnection,
+        article_id: Uuid,
+        params: &Query<CommentQueryOption>,
+    ) -> InternalStdResult<ApiResult> {
+        let res = match params.user_id {
+            Some(uid) => {
+                Comments::user_comments(conn, params.limit, params.offset, article_id, uid.clone())
+            }
+            None => Comments::first_class_comments(conn, params.limit, params.offset, article_id),
+        };
+        match res {
+            Ok(data) => Ok(ApiResult::from_data(data)),
+            Err(err) => Err(crate::util::errors::Error {
+                code: ErrorCode::DbError,
+                detail: err.clone(),
+            }),
+        }
+    }
+
+    fn sub_comments(
+        conn: &PgConnection,
+        article_id: Uuid,
+        params: &Query<CommentQueryOption>,
+    ) -> InternalStdResult<ApiResult> {
+        let res = SubComment::comments(
+            conn,
+            params.limit,
+            params.offset,
+            article_id,
+            params.parent_comment.unwrap(),
+        );
+        match res {
+            Ok(data) => Ok(ApiResult::from_data(data)),
+            Err(err) => Err(crate::util::errors::Error {
+                code: ErrorCode::DbError,
+                detail: err.clone(),
+            }),
         }
     }
 
