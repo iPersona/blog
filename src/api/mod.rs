@@ -35,6 +35,10 @@ impl ApiResult {
             data: serde_json::to_value(val).unwrap(),
         }
     }
+
+    pub fn from_raw_data(val: serde_json::Value) -> Self {
+        ApiResult::Data { data: val }
+    }
 }
 
 // use actix_web::Error;
@@ -190,6 +194,7 @@ macro_rules! extract_form_data {
 pub mod article_api;
 pub mod comment_api;
 pub mod dashboard_api;
+pub mod mail_box_api;
 pub mod recaptcha_api;
 pub mod tag_api;
 pub mod user_api;

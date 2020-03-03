@@ -1,7 +1,6 @@
 use crate::models::user::Users;
 use crate::util::postgresql_pool::{DataBase, DataBaseConfig};
 use actix::{Actor, Handler, Message, SyncContext};
-use log::{error, info};
 
 #[derive(Message)]
 pub struct ClearUnverifiedUser;

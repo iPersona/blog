@@ -1,9 +1,9 @@
+use super::cache::LoadUserCache;
 use crate::cron::cache::{CacheActor, PersistCache, PersistUncached};
 use crate::cron::clear::{ClearActor, ClearUnverifiedUser};
 use crate::util::env::Env;
 use actix::{Actor, Addr, AsyncContext, Context};
 use chrono::{DateTime, Utc};
-use log::info;
 use std::time::Duration;
 
 pub struct Cron {
@@ -19,8 +19,8 @@ impl Actor for Cron {
         info!("Starting cron process...");
 
         // persist uncached visit cron into database
-        //        self.units.do_send(PersistUncached);
         self.cache.do_send(PersistUncached);
+        self.cache.do_send(LoadUserCache);
         self.clear.do_send(ClearUnverifiedUser);
 
         // scheme a task to persist visit cron into database every day
@@ -28,6 +28,7 @@ impl Actor for Cron {
             Duration::new(Env::get().persist_cache_interval * 3600, 0),
             persist_cache,
         );
+        // scheme a task to clear unverified users
         ctx.run_interval(
             Duration::new(Env::get().clear_unverified_user_interval * 3600, 0),
             clear_unverified_user,

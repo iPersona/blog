@@ -1,10 +1,9 @@
 use crate::models::articles::UpdateArticleVisitNum;
-use crate::models::daily_statistic::InsertDailyStatistic;
+use crate::models::{daily_statistic::InsertDailyStatistic, user::UserSettings};
 use crate::util::postgresql_pool::{DataBase, DataBaseConfig};
 use crate::util::redis_pool::{Cache, RedisKeys};
 use actix::{Actor, Handler, Message, SyncContext};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use log::{debug, error, info};
 use time::Duration;
 use uuid::Uuid;
 
@@ -53,10 +52,7 @@ impl CacheActor {
 
     pub fn clear_visit_cache(&self) {
         let redis = self.cache.into_inner();
-        let is_ok = redis.del(RedisKeys::VisitCache.to_string().as_str());
-        if !is_ok {
-            error!("del {} failed!", RedisKeys::VisitCache.to_string().as_str());
-        }
+        redis.del(RedisKeys::VisitCache.to_string().as_str());
     }
 
     /// Save the persist time,
@@ -150,6 +146,24 @@ impl Handler<PersistUncached> for CacheActor {
                 self.save_persist_time();
                 self.clear_visit_cache();
             }
+        }
+    }
+}
+
+#[derive(Message)]
+pub struct LoadUserCache;
+
+impl Handler<LoadUserCache> for CacheActor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: LoadUserCache, _: &mut SyncContext<Self>) {
+        // load new data
+        let redis_pool = self.cache.into_inner();
+        let conn = self.db.connection();
+        let res = UserSettings::load(&conn, &redis_pool);
+        match res {
+            Ok(_) => {}
+            Err(e) => error!("{}", e),
         }
     }
 }

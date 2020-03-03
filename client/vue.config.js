@@ -1,6 +1,9 @@
 module.exports = {
     outputDir: '../dist',
     assetsDir: 'assets',
+    configureWebpack: {
+        devtool: 'source-map'
+    },
 
     chainWebpack: config => {
         config.module.rule('md')

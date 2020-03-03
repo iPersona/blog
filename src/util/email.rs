@@ -7,7 +7,6 @@ use crate::util::errors::{Error, ErrorCode};
 use crate::util::result::InternalStdResult;
 use diesel::PgConnection;
 use lettre::builder::EmailBuilder;
-use log::{debug, error};
 
 pub struct SignUpVerify {
     pub email: String,

@@ -1,8 +1,8 @@
 <template>
-  <li>
+  <li ref="comment">
     <hr class="comment-spliter">
     <article
-      class="media"
+      :class="{media: true, blink: true, overlay: showOverlay}"
       style="border-top: 0px;"
     >
       <figure
@@ -93,6 +93,8 @@ import Url from './utils/url'
 import { mapGetters } from "vuex";
 import { IS_LOGIN, USER_ID } from "@/store/modules/store-types.js";
 import { USER } from "@/store/modules/module-names";
+import Utils from '@/utils'
+import VueScrollTo from 'vue-scrollto'
 
 export default {
   name: "SubCommentEntity",
@@ -106,12 +108,17 @@ export default {
     comment: {
       type: Object,
       default: () => { return {} }
+    },
+    focus: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
     return {
       replyComponent: 'Empty',
       isReply: false,
+      showOverlay: false,
     }
   },
   computed: {
@@ -124,13 +131,28 @@ export default {
     })
   },
   mounted() {
-    console.log(`sub-comment-entity: ${JSON.stringify(this.comment)}`)
-    // this.listenEvents()
+    this.listenEvents()
+    if (this.focus) {
+      this.locateComment()
+    }
   },
   beforeDestroy() {
     EventBus.$off(EVENT_CLOSE_SUB_COMMENT_REPLY_VIEW)
   },
   methods: {
+    locateComment() {
+      // scroll to comment
+      // the target element need some time to be mounted
+      setTimeout(() => {
+        // blink
+        Utils.blink(() => {
+          this.showOverlay = !this.showOverlay
+        }, 800, 3)
+
+        // scroll to target comment
+        VueScrollTo.scrollTo(this.$refs.comment, 500)
+      }, 2000)
+    },
     listenEvents() {
       const self = this;
       EventBus.$on(EVENT_CLOSE_SUB_COMMENT_REPLY_VIEW, function (commentId) {
@@ -153,6 +175,16 @@ export default {
 </script>
 
 <style scoped>
+.blink {
+  transition: background 0.3s;
+}
+
+.overlay {
+  background-color: #d5c7fc;
+  opacity: 0.8;
+  border-radius: 0.3rem;
+}
+
 .comment-spliter {
   height: 1px;
   width: 80%;

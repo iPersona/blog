@@ -6,7 +6,6 @@ use actix_web::web;
 use actix_web::web::{Data, HttpRequest, HttpResponse, Query};
 use actix_web::Error;
 use futures::Future;
-use log::debug;
 
 pub struct DashboardApi;
 

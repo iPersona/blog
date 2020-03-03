@@ -1,4 +1,3 @@
-use log::{debug, error};
 use reqwest;
 
 pub struct Recaptcha {

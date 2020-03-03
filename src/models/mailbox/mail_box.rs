@@ -1,91 +1,59 @@
-use lettre::{ClientSecurity, SmtpClient, Transport};
-
-use crate::models::token::Token;
-use crate::models::user::Users;
-use crate::util::env::Env;
-use crate::util::errors::{Error, ErrorCode};
-use crate::util::result::InternalStdResult;
+use crate::{
+    comment_notify,
+    comment_notify::dsl::comment_notify as all_comment_notify,
+    util::{
+        errors::{Error, ErrorCode},
+        result::InternalStdResult,
+    },
+};
+use diesel::prelude::*;
 use diesel::PgConnection;
-use lettre::builder::EmailBuilder;
-use log::{debug, error};
+use uuid::Uuid;
 
-pub struct EmailNotify {
-    pub email: String,
-    pub user_name: String,
+#[derive(Insertable, Debug, Clone, Deserialize, Serialize)]
+#[table_name = "comment_notify"]
+pub struct NewCommentNotify {
+    pub user_id: Uuid,
+    pub comment_id: Uuid,
 }
 
-impl EmailNotify {
-    pub fn send_verify_mail(&self, token: &str) -> bool {
-        let email = EmailBuilder::new()
-            .to((self.email.as_str(), self.user_name.as_str()))
-            .from(Env::get().email.as_str())
-            .subject("Sign Up Verification")
-            .html(Self::html_content(token))
-            .build()
-            .unwrap();
-
-        // Open a local connection on port 25
-        // let mut mailer = SmtpClient::new(("localhost", 10025), ClientSecurity::None).unwrap().transport();
-        let mut mailer = SmtpClient::new(
-            (Env::get().smtp_server.as_str(), 10025),
-            ClientSecurity::None,
-        )
-        .unwrap()
-        .transport();
-        // Send the email
-        let result = mailer.send(email);
-        match result {
-            Ok(_) => {
-                debug!("Email sent");
-                true
-            }
-            Err(e) => {
-                error!("Could not send email: {:?}", e);
-                false
-            }
-        }
-    }
-
-    fn html_content(token: &str) -> String {
-        let template = include_str!("comment_notify_email.html");
-        let url = format!(
-            r#"https://{}/#/verify/{}"#,
-            Env::get().domain.as_str(),
-            token
-        );
-        // replace
-        let template = template.replace("{{verify_link}}", url.as_str());
-        debug!("url: {:?}", url);
-        debug!("template: {:?}", template.as_str());
-        template
-    }
-
-    pub fn verify_token(token: &Token, conn: &PgConnection) -> InternalStdResult<()> {
-        let user_id = token.user_id()?;
-        let user = Users::user(conn, &user_id);
-        match user {
-            Some(u) => {
-                if token.expired() {
-                    // Token expired
-                    Err(Error {
-                        code: ErrorCode::TokenExpired,
-                        detail: format!("Token expired!"),
-                    })
-                } else if u.id == user_id && token.user_name == u.account && token.email == u.email
-                {
-                    // Token is valid
-                    Ok(())
-                } else {
-                    Err(Error {
-                        code: ErrorCode::InvalidToken,
-                        detail: format!("Invalid token detected!"),
-                    })
-                }
-            }
-            None => Err(Error {
-                code: ErrorCode::UserNotExist,
-                detail: format!("User not exist"),
+impl NewCommentNotify {
+    pub fn save_all(conn: &PgConnection, notifies: Vec<Self>) -> InternalStdResult<()> {
+        match diesel::insert_into(comment_notify::table)
+            .values(&notifies)
+            .execute(conn)
+        {
+            Ok(_) => Ok(()),
+            Err(e) => Err(Error {
+                code: ErrorCode::DbError,
+                detail: format!("failed to insert into mail_box: {:?}", e),
             }),
         }
     }
+}
+
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
+#[table_name = "comment_notify"]
+pub struct CommentNotify {
+    pub id: i32,
+    pub user_id: Uuid,
+    pub comment_id: Uuid,
+    pub is_read: bool,
+}
+
+impl CommentNotify {
+    pub fn user_notifies(user_id: Uuid, conn: &PgConnection) -> InternalStdResult<Vec<Self>> {
+        all_comment_notify
+            .filter(comment_notify::user_id.eq(user_id))
+            .load::<Self>(conn)
+            .map_err(|e| Error {
+                code: ErrorCode::DbError,
+                detail: format!("failed to insert into mail_box: {:?}", e),
+            })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommentNotifyParam {
+    pub user_id: Uuid,
 }

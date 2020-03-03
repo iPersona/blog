@@ -18,6 +18,7 @@ use super::token::Token;
 use crate::models::token::TokenExtension;
 use crate::util::env::Env;
 use crate::util::errors::{Error, ErrorCode};
+use crate::util::redis_pool::RedisKeys;
 use crate::util::result::InternalStdResult;
 use crate::AppState;
 use std::cell::Ref;
@@ -142,6 +143,94 @@ impl Users {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserSettingVal {
+    pub subscribe: bool,
+}
+
+impl From<UserSettingResult> for UserSettingVal {
+    fn from(val: UserSettingResult) -> Self {
+        Self {
+            subscribe: val.subscribe,
+        }
+    }
+}
+
+impl UserSettingVal {
+    pub fn to_string(self) -> String {
+        serde_json::to_string(&self).unwrap()
+    }
+}
+
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
+#[table_name = "users"]
+pub struct UserSettingResult {
+    pub id: Uuid,
+    pub subscribe: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserSettings {
+    pub id: Uuid,
+    pub settings: UserSettingVal,
+}
+
+impl UserSettings {
+    pub fn from_str(s: &str) -> InternalStdResult<Self> {
+        serde_json::from_str::<Self>(s).map_err(|e| Error {
+            code: ErrorCode::ParseError,
+            detail: format!("parse UserSettings from string failed: {:?}", e),
+        })
+    }
+
+    pub fn load(conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> InternalStdResult<()> {
+        // get user settings
+        let res = all_users
+            .select((users::id, users::subscribe))
+            .get_results::<UserSettingResult>(conn);
+        match res {
+            Ok(user_settings) => {
+                let redis_key = RedisKeys::Users.to_string();
+                // delete old data
+                redis_pool.del(redis_key.as_str());
+
+                // load new data
+                let kv = user_settings
+                    .into_iter()
+                    .map(|s| {
+                        Self {
+                            id: s.id,
+                            settings: UserSettingVal {
+                                subscribe: s.subscribe,
+                            },
+                        }
+                        .to_kv()
+                    })
+                    .collect::<Vec<(String, String)>>();
+                redis_pool.hmset(redis_key.as_str(), kv);
+                Ok(())
+            }
+            Err(e) => Err(Error {
+                code: ErrorCode::DbError,
+                detail: format!("failed to get user settings from db: {:?}", e),
+            }),
+        }
+    }
+
+    pub fn to_kv(self) -> (String, String) {
+        (
+            self.id.to_hyphenated().to_string(),
+            serde_json::to_value(self.settings).unwrap().to_string(),
+        )
+    }
+
+    pub fn get(redis: &Arc<RedisPool>, user_id: &Uuid) -> InternalStdResult<Self> {
+        let key = RedisPool::get_redis_key(RedisKeys::Users);
+        let s = redis.hget::<String>(key.as_str(), user_id.to_hyphenated().to_string().as_str())?;
+        Self::from_str(s.as_str())
+    }
+}
+
 #[derive(Insertable, Debug, Clone, Deserialize, Serialize)]
 #[table_name = "users"]
 struct NewUser {
@@ -222,6 +311,13 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
+    pub fn from_str(s: &str) -> InternalStdResult<Self> {
+        serde_json::from_str::<Self>(s).map_err(|e| Error {
+            code: ErrorCode::ParseError,
+            detail: format!("failed to parse UserInfo from string: {:?}", e),
+        })
+    }
+
     pub fn from_token(token: &Token) -> Self {
         UserInfo {
             id: Uuid::parse_str(token.user_id.as_str()).unwrap(),
@@ -290,7 +386,7 @@ impl UserInfo {
     /// key is `admin_info`
     pub fn view_admin(conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> Self {
         if redis_pool.exists("admin_info") {
-            serde_json::from_str::<UserInfo>(&redis_pool.get("admin_info").unwrap()).unwrap()
+            UserInfo::from_str(&redis_pool.get("admin_info").unwrap()).unwrap()
         } else {
             let info = all_users
                 .select((

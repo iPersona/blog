@@ -2,7 +2,6 @@ use actix_web::web::{Data, Form, Path, Query};
 use actix_web::{Error, HttpRequest, HttpResponse};
 use futures::future::Future;
 use futures::stream::Stream;
-use log::{debug, info};
 use uuid::Uuid;
 
 use crate::models::articles::{

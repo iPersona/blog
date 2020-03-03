@@ -1,4 +1,3 @@
-use log::debug;
 use std::env;
 
 pub struct Env {

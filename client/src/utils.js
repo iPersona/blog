@@ -16,4 +16,23 @@ export default class Utils {
   static password(password) {
     return Utils.randomString(6) + password
   }
+
+  static isObjEmpty(obj) {
+    return obj === undefined ||
+      (Object.entries(obj).length === 0 && obj.constructor === Object)
+  }
+
+  static blink(callback, delay, repetitions) {
+    Utils.startStoppableInterval(callback, delay, repetitions)
+  }
+
+  static startStoppableInterval(callback, delay, repetitions) {
+    let x = 0
+    let intervalID = setInterval(function () {
+      callback()
+      if (++x === repetitions) {
+        clearInterval(intervalID)
+      }
+    }, delay)
+  }
 }

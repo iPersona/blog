@@ -3,9 +3,10 @@
     <ul class="comment-list">
       <SubCommentEntity
         v-for="comment in comments"
-        :id="comment.id"
+        :ref="`cmt-${comment.id}`"
         :key="comment.id"
         :comment="comment"
+        :focus="focus(comment.id)"
       />
     </ul>
     <b-pagination
@@ -41,6 +42,10 @@ export default {
       type: String,
       default: ''
     },
+    locationData: {
+      type: Object,
+      default: () => { return {} }
+    }
   },
   data() {
     return {
@@ -51,10 +56,14 @@ export default {
     }
   },
   mounted() {
-    console.log(`articleId: ${this.articleId}`)
-    // load comments
-    this.loadComments(true)
     this.listenEventBus()
+    if (this.locationData === undefined) {
+      // load comments
+      this.loadComments(true)
+    } else {
+      // locate comment
+      this.locateComment()
+    }
   },
   beforeDestroy() {
     EventBus.$off(EVENT_RELOAD_SUB_COMMENTS)
@@ -69,8 +78,18 @@ export default {
         }
       })
     },
+    commentRef(commentId) {
+      return `cmt-${commentId}`
+    },
+    focus(commentId) {
+      return this.locationData.child !== undefined && this.locationData.targetId === commentId
+    },
+    locateComment() {
+      this.totalPages = this.locationData.child.total
+      this.currentPage = this.locationData.child.page
+      this.comments = this.locationData.child.comments
+    },
     async loadComments(isReload) {
-      console.log(`load-subcomments`)
       // request comments
       let api = new Api()
       let args = {

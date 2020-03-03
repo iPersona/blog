@@ -19,7 +19,6 @@ use crate::cron::cache::IncreaseArticleVisitNum;
 use crate::models::token::TokenExtension;
 use crate::util::errors::{Error, ErrorCode};
 use crate::util::result::InternalStdResult;
-use log::error;
 use std::cell::Ref;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

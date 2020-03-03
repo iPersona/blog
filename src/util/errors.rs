@@ -22,6 +22,8 @@ pub enum ErrorCode {
     ParseError,
     // Database error
     DbError,
+    // Redis Error
+    RedisError,
     // Unknown error
     Unknown,
 }

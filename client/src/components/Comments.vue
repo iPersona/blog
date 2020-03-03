@@ -3,10 +3,11 @@
     <ul class="comment-list">
       <CommentEntity
         v-for="(comment, idx) in comments"
-        :id="comment.id"
+        :ref="comment.id"
         :key="comment.id"
         :comment="comment"
         :show-separator="idx !== 0"
+        :location-data="getLocationData(comment.id)"
         class="comment-entity"
       />
     </ul>
@@ -28,23 +29,21 @@
 import CommentEntity from './CommentEntity'
 import Api from '@/api'
 import { EventBus, EVENT_RELOAD_COMMENTS } from '@/event-bus.js'
-// import BlinkFocus from './BlinkFocus'
 
 export default {
   name: "Comments",
   components: {
     CommentEntity,
-    // BlinkFocus,
   },
   props: {
     articleId: {
       type: String,
       default: ''
     },
-    userId: {
+    locateCommentId: {
       type: String,
       default: ''
-    },
+    }
   },
   data() {
     return {
@@ -52,18 +51,55 @@ export default {
       currentPage: 1,
       pageSize: 10,
       totalPages: 0,
+      locationData: undefined,
     }
   },
-  mounted() {
+  async mounted() {
     console.log(`articleId: ${this.articleId}`)
     // load comments
-    this.loadComments(true)
+    if (this.locateCommentId === '') {
+      await this.loadComments(true)
+    } else {
+      await this.locateComment()
+    }
     this.listenEventBus()
   },
   beforeDestroy() {
     EventBus.$off(EVENT_RELOAD_COMMENTS)
   },
   methods: {
+    getLocationData(commentId) {
+      if (this.locationData === undefined) {
+        // not locate comment
+        return undefined
+      }
+
+      // get target comment id, 
+      // if no `parentId` field, there is no sub comments
+      let targetId = this.locationData.parentId === undefined ? this.locationData.targetId : this.locationData.parentId
+
+      return commentId === targetId ? this.locationData : undefined
+    },
+    async locateComment() {
+      let api = new Api()
+      let rsp = await api.locateComment(this.articleId, this.locateCommentId, this.pageSize)
+      if (!Api.isSuccessResponse(rsp)) {
+        console.log(`rsp-err: ${JSON.stringify(rsp)}`)
+        return
+      }
+
+      // update total page
+      this.totalPages = rsp.data.parent.total
+      this.currentPage = rsp.data.parent.page
+      this.comments = rsp.data.parent.comments
+
+      // expand sub comments
+      this.locationData = {
+        targetId: this.locateCommentId,
+        parentId: rsp.data.child === undefined ? undefined : rsp.data.child.pid,
+        child: rsp.data.child
+      }
+    },
     listenEventBus() {
       const self = this;
       EventBus.$on(EVENT_RELOAD_COMMENTS, async function (opt) {
@@ -77,15 +113,13 @@ export default {
       console.log(`load-comments`)
       // request comments
       let api = new Api()
-      let args = {
+      let rsp = await api.getComments(this.articleId, {
         limit: this.pageSize,
         offset: (this.currentPage - 1) * this.pageSize,
-        userId: this.userId === '' ? undefined : this.userId,
-      }
-      let rsp = await api.getComments(this.articleId, args)
+      })
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`)
       if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`get comments failed: ${rsp.detail}`)
+        this.$getUi().toast.fail(`failed to get comments: ${rsp.detail}`)
         return
       }
 
@@ -98,25 +132,6 @@ export default {
       }
       // update comment data
       this.comments = rsp.data.comments
-    },
-    async loadSubComments(parentCommentId) {
-      console.log(`load-subcomments`)
-      let api = new Api()
-      let currentPage = this.currentPage
-      let args = {
-        limit: this.pageSize,
-        offset: (currentPage - 1) * this.pageSize,
-        userId: this.userId === '' ? undefined : this.userId,
-        parent_comment_id: parentCommentId,
-      }
-      let rsp = await api.getComments(this.articleId, args)
-      this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`)
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`failed to load sub comments: ${rsp.detail}`)
-        return
-      }
-
-
     },
     pageChanged(currentPage) {
       // update current page

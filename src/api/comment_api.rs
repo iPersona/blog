@@ -1,5 +1,5 @@
 use crate::api::ApiResult;
-use crate::models::comment::CommentQueryOption;
+use crate::models::comment::{CommentLocation, CommentLocationArgs, CommentQueryOption};
 use crate::util::errors::ErrorCode;
 use crate::util::result::InternalStdResult;
 use crate::{AppState, Comments, DeleteComment, NewComments, SubComment};
@@ -8,7 +8,6 @@ use actix_web::{web, Error, HttpRequest, HttpResponse};
 use diesel::PgConnection;
 use futures::stream::Stream;
 use futures::Future;
-use log::{debug, info};
 use uuid::Uuid;
 
 pub struct CommentApi;
@@ -95,6 +94,19 @@ impl CommentApi {
         }
     }
 
+    fn locate_comment(
+        state: Data<AppState>,
+        _req: HttpRequest,
+        params: Query<CommentLocationArgs>,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let conn = &state.db.connection();
+        let res = CommentLocation::locate(conn, &params.into_inner());
+        match res {
+            Ok(data) => api_resp!(ApiResult::from_raw_data(data.data)),
+            Err(e) => api_resp_err_with_code!(e.code, e.detail),
+        }
+    }
+
     pub fn configure(cfg: &mut web::ServiceConfig) {
         cfg.service(
             web::resource("/comment").route(web::post().to_async(Self::new_comment)), // create comment
@@ -105,6 +117,9 @@ impl CommentApi {
         )
         .service(
             web::resource("/comments/{article_id}").route(web::get().to_async(Self::list_comments)),
+        )
+        .service(
+            web::resource("/location/comment").route(web::get().to_async(Self::locate_comment)),
         );
     }
 }

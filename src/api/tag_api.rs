@@ -7,7 +7,6 @@ use crate::{AppState, NewTag, TagCount, Tags};
 use actix_web::web::{Data, Path, Query};
 use actix_web::{web, web::Form, Error, HttpRequest, HttpResponse};
 use futures::{Future, Stream};
-use log::{debug, info};
 use uuid::Uuid;
 
 pub struct TagApi;

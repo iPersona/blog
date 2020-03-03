@@ -8,7 +8,6 @@ use actix_web::web::{Data, Form};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use futures::stream::Stream;
 use futures::Future;
-use log::debug;
 
 pub struct UserApi;
 

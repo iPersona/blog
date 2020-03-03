@@ -34,6 +34,15 @@ table! {
 }
 
 table! {
+    comment_notify (id) {
+        id -> Int4,
+        user_id -> Uuid,
+        comment_id -> Uuid,
+        is_read -> Bool,
+    }
+}
+
+table! {
     comments (id) {
         id -> Uuid,
         comment -> Text,
@@ -81,11 +90,13 @@ table! {
 
 joinable!(article_tag_relation -> articles (article_id));
 joinable!(article_tag_relation -> tags (tag_id));
+joinable!(comment_notify -> users (user_id));
 joinable!(comments -> articles (article_id));
 
 allow_tables_to_appear_in_same_query!(
     article_tag_relation,
     articles,
+    comment_notify,
     comments,
     daily_statistic,
     tags,

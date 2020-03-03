@@ -2,14 +2,14 @@ use super::super::comments;
 use super::super::comments::dsl::comments as all_comments;
 
 use super::super::UserInfo;
-use super::FormDataExtractor;
+use super::{mailbox::mail_box::NewCommentNotify, user::UserSettings, FormDataExtractor};
 use crate::models::token::TokenExtension;
 use crate::util::errors::{Error, ErrorCode};
-use crate::util::result::InternalStdResult;
+use crate::{util::result::InternalStdResult, AppState};
 use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
-use diesel::sql_types::{BigInt, Nullable, Text};
+use diesel::sql_types::{BigInt, Json, Nullable, Text};
 use regex::Regex;
 use uuid::Uuid;
 
@@ -96,6 +96,10 @@ impl Comments {
         offset: i64,
         article_id: Uuid,
     ) -> Result<CommentSlice<Self>, String> {
+        // TODO: 使用row_to_json和array_to_json来重写sql，免去后续用rust再处理一遍返回数据
+        // reference:
+        // [row_to_json & array_to_josn](https://hashrocket.com/blog/posts/faster-json-generation-with-postgresql)
+        // [如何将行数据转换成array](https://www.postgresqltutorial.com/postgresql-aggregate-functions/postgresql-array_agg-function/)
         let raw_sql = format!(
             "with sub_comments as (
                 select distinct parent_comment, count(*) over(partition by parent_comment) as sub_comments_num
@@ -241,17 +245,47 @@ struct InsertComments {
 }
 
 impl InsertComments {
-    fn insert(self, conn: &PgConnection) -> InternalStdResult<Uuid> {
+    fn insert(self, conn: &PgConnection) -> InternalStdResult<CommentEntity> {
         let res = diesel::insert_into(comments::table)
             .values(&self)
-            .returning(comments::id)
+            // .returning(comments::id)
             .get_result(conn);
         match res {
-            Ok(id) => Ok(id),
+            Ok(c) => Ok(c),
             Err(e) => Err(Error {
                 code: ErrorCode::DbError,
                 detail: format!("failed to insert comment: {:?}", e),
             }),
+        }
+    }
+}
+
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
+#[table_name = "comments"]
+pub struct CommentEntity {
+    pub id: Uuid,
+    pub comment: String,
+    pub article_id: Uuid,
+    pub from_user: Uuid,
+    pub create_time: NaiveDateTime,
+    pub mentioned_users: Option<Vec<Uuid>>,
+    pub to_user: Option<Uuid>,
+    pub parent_comment: Option<Uuid>,
+}
+
+impl CommentEntity {
+    pub fn notified_users(&self) -> Option<Vec<Uuid>> {
+        let mut users = Vec::new();
+        if let Some(u) = self.to_user {
+            users.push(u);
+        }
+        if let Some(u) = &self.mentioned_users {
+            users.extend_from_slice(u.as_slice())
+        }
+        if users.is_empty() {
+            None
+        } else {
+            Some(users)
         }
     }
 }
@@ -279,7 +313,11 @@ impl NewComments {
         }
     }
 
-    pub fn insert(&self, conn: &PgConnection, user_info: &UserInfo) -> InternalStdResult<Uuid> {
+    pub fn insert(
+        &self,
+        conn: &PgConnection,
+        user_info: &UserInfo,
+    ) -> InternalStdResult<CommentEntity> {
         if self.comment.is_empty() {
             return Err(Error {
                 code: ErrorCode::InvalidContent,
@@ -367,6 +405,30 @@ impl NewComments {
         }
         Ok(users)
     }
+
+    pub fn send_to_mailbox(&self, state: &AppState, comment: &CommentEntity) {
+        let conn = &state.db.connection();
+        let redis_pool = &state.cache.into_inner();
+        let users = comment.notified_users();
+        if let Some(users) = users {
+            let mails = users
+                .into_iter()
+                .filter(|u| {
+                    let user_settings = UserSettings::get(redis_pool, u).unwrap();
+                    user_settings.settings.subscribe
+                })
+                .map(|u| NewCommentNotify {
+                    user_id: u,
+                    comment_id: comment.id,
+                })
+                .collect::<Vec<NewCommentNotify>>();
+            if let Err(e) = NewCommentNotify::save_all(conn, mails) {
+                error!("failed to send comment to mailbox: {:?}", e)
+            }
+
+            // TODO: send notify email
+        }
+    }
 }
 
 impl FormDataExtractor for NewComments {
@@ -389,7 +451,10 @@ impl FormDataExtractor for NewComments {
                 let conn = &state.db.connection();
                 match t.user_info {
                     Some(user) => match self.insert(&conn, &user) {
-                        Ok(_) => Ok(()),
+                        Ok(c) => {
+                            self.send_to_mailbox(state, &c);
+                            Ok(())
+                        }
                         Err(e) => Err(Error {
                             code: e.code,
                             detail: format!("new_comment failed: {:?}", e.detail),
@@ -482,4 +547,34 @@ impl FormDataExtractor for DeleteComment {
             }),
         }
     }
+}
+
+#[derive(Queryable, Debug, Clone, Deserialize, Serialize, QueryableByName)]
+pub struct CommentLocation {
+    #[sql_type = "Json"]
+    pub data: serde_json::Value,
+}
+
+impl CommentLocation {
+    pub fn locate(conn: &PgConnection, args: &CommentLocationArgs) -> InternalStdResult<Self> {
+        let raw_sql = format!(
+            "select comment_data('{}', '{}', {}) as data;",
+            args.article_id.to_hyphenated().to_string(),
+            args.comment_id.to_hyphenated().to_string(),
+            args.page_size
+        );
+        diesel::sql_query(raw_sql)
+            .get_result::<Self>(conn)
+            .map_err(|e| Error {
+                code: ErrorCode::DbError,
+                detail: format!("failed to load comment location data: {:?}", e),
+            })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommentLocationArgs {
+    pub article_id: Uuid,
+    pub comment_id: Uuid,
+    pub page_size: i64,
 }

@@ -108,9 +108,9 @@
     <hr>
 
     <!-- Comments -->
+    <!-- id="commentEditor" -->
     <NewComment
       v-if="isLogin"
-      id="commentEditor"
       :article-id="articleId"
     />
     <hr
@@ -119,27 +119,10 @@
     >
 
     <section class="container">
-      <!-- <b-tabs
-        v-if="isLogin"
-        v-model="activeTab"
-        position="is-centered"
-        class="block"
-      >
-        <b-tab-item label="All comments">
-          <Comments :article-id="articleId" />
-        </b-tab-item>
-        <b-tab-item label="Yours">
-          <Comments
-            :article-id="articleId"
-            :user-id="userId"
-          />
-        </b-tab-item>
-      </b-tabs>
       <Comments
-        v-else
         :article-id="articleId"
-      /> -->
-      <Comments :article-id="articleId" />
+        :locate-comment-id="targetCommentId"
+      />
     </section>
   </div>
 </template>
@@ -176,7 +159,7 @@ export default {
       focus: this.$route.query.focus,
       article: {},
       isEditArticle: false,
-      activeTab: (this.$route.query.focus === undefined || this.$route.query.focus === 'all') ? 0 : 1,
+      targetCommentId: this.$route.query.locate,
     }
   },
   computed: {
@@ -194,9 +177,6 @@ export default {
     })
   },
   watch: {
-    activeTab(newVal, oldVal) {
-      EventBus.$emit(EVENT_RELOAD_COMMENTS, { forceReload: false })
-    }
   },
   async mounted() {
     await this.getArticle();

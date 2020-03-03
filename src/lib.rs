@@ -25,6 +25,9 @@ extern crate serde_urlencoded;
 extern crate tiny_keccak;
 extern crate uuid;
 
+#[macro_use]
+extern crate log;
+
 pub mod api;
 pub mod cron;
 pub mod models;
@@ -40,7 +43,9 @@ pub(crate) use models::{
 pub(crate) use models::{ChangePassword, EditUser, RegisteredUser, UserInfo};
 pub(crate) use models::{Comments, DeleteComment, NewComments, SubComment};
 pub(crate) use models::{NewTag, TagCount, Tags};
-pub(crate) use schema::{article_tag_relation, article_with_tag, articles, comments, tags, users};
+pub(crate) use schema::{
+    article_tag_relation, article_with_tag, articles, comment_notify, comments, tags, users,
+};
 pub use util::RedisPool;
 //pub(crate) use util::{get_github_account_nickname_address, get_github_primary_email, get_github_token};
 pub use actix::Addr;

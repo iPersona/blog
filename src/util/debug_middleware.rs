@@ -1,7 +1,6 @@
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use futures::future::{ok, FutureResult};
 use futures::{Future, Poll};
-use log::info;
 
 pub struct Debug;
 

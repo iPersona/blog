@@ -15,6 +15,7 @@ use actix_web::{App, HttpServer};
 use blog::util::env::Env;
 use dotenv::dotenv;
 
+extern crate pretty_env_logger;
 // #[macro_use]
 extern crate log;
 
@@ -40,7 +41,8 @@ fn main() {
     // init env variable
     dotenv().ok();
     // init logger
-    env_logger::init();
+    // env_logger::init();
+    pretty_env_logger::init();
     // show env variable
     Env::get().print(true);
 

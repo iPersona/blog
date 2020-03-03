@@ -25,7 +25,6 @@ use actix_web::{HttpRequest, HttpResponse};
 use chrono::NaiveDateTime;
 use futures::future::{ok, Either, FutureResult};
 use futures::Poll;
-use log::error;
 use typename::TypeName;
 use uuid::Uuid;
 

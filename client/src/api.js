@@ -46,6 +46,7 @@ export default class Api {
                 return `${host}/comments/${articleId}`
             },
             newComment: `${host}/comment`,
+            locateComment: `${host}/location/comment`,
 
             // user
             user: function (user_id) {
@@ -117,6 +118,14 @@ export default class Api {
         return this.get(this.url.getDailyVisit, {
             start,
             end
+        })
+    }
+
+    async locateComment(articleId, commentId, pageSize) {
+        return this.get(this.url.locateComment, {
+            article_id: articleId,
+            comment_id: commentId,
+            page_size: pageSize,
         })
     }
 

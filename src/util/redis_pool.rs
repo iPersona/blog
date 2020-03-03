@@ -1,6 +1,11 @@
 use std::sync::Arc;
 
 use crate::util::env::Env;
+
+use super::{
+    errors::{Error, ErrorCode},
+    result::InternalStdResult,
+};
 use dotenv;
 use r2d2;
 use r2d2::Pool;
@@ -59,14 +64,12 @@ impl RedisPool {
         self.with_conn(a);
     }
 
-    pub fn del<T>(&self, redis_keys: T) -> bool
+    pub fn del<T>(&self, redis_key: T)
     where
         T: redis::ToRedisArgs,
     {
-        redis::cmd("del")
-            .arg(redis_keys)
-            .query(&*self.pool.get().unwrap())
-            .unwrap()
+        let a = |conn: &redis::Connection| redis::cmd("del").arg(redis_key).execute(conn);
+        self.with_conn(a);
     }
 
     pub fn set(&self, redis_key: &str, value: &str) {
@@ -115,7 +118,7 @@ impl RedisPool {
         self.with_conn(a)
     }
 
-    pub fn hget<T>(&self, redis_key: &str, hash_key: &str) -> T
+    pub fn hget<T>(&self, redis_key: &str, hash_key: &str) -> InternalStdResult<T>
     where
         T: redis::FromRedisValue,
     {
@@ -123,7 +126,33 @@ impl RedisPool {
             .arg(redis_key)
             .arg(hash_key)
             .query(&*self.pool.get().unwrap())
+            .map_err(|e| Error {
+                code: ErrorCode::RedisError,
+                detail: format!(
+                    "failed to get value of hashmap {} with key {}: {:?}",
+                    redis_key, hash_key, e
+                ),
+            })
+    }
+
+    pub fn hmget<T>(&self, redis_key: &str, hash_keys: Vec<&str>) -> T
+    where
+        T: redis::FromRedisValue,
+    {
+        redis::cmd("hmget")
+            .arg(redis_key)
+            .arg(hash_keys)
+            .query(&*self.pool.get().unwrap())
             .unwrap()
+    }
+
+    pub fn hmset<T>(&self, redis_key: &str, val: T)
+    where
+        T: redis::ToRedisArgs,
+    {
+        let cmd =
+            |conn: &redis::Connection| redis::cmd("hmset").arg(redis_key).arg(val).execute(conn);
+        self.with_conn(cmd);
     }
 
     pub fn hgetall<T>(&self, redis_key: &str) -> Vec<T>
@@ -238,15 +267,20 @@ impl RedisPool {
 }
 
 pub enum RedisKeys {
+    // Cache visit info
     VisitCache,
+    // Cache last persist time
     PersistTime,
+    // Cache user info
+    Users,
 }
 
 impl RedisKeys {
     pub fn to_string(&self) -> String {
         match self {
-            Self::VisitCache => "visit-cron".to_string(),
-            Self::PersistTime => "visit-cron-persist-time".to_string(),
+            Self::VisitCache => "visit:num".to_string(),
+            Self::PersistTime => "visit:pst".to_string(),
+            Self::Users => "users".to_string(),
         }
     }
 }

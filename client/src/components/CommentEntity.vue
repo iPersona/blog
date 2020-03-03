@@ -1,12 +1,11 @@
 <template>
-  <li>
+  <li ref="comment">
     <hr
       v-if="showSeparator"
       class="separator"
     >
     <div class="container comment-area">
-      <div :class="{overlay: showOverlay, blink: true}" />
-      <article class="media">
+      <article :class="{overlay: showOverlay, blink: true, media: true}">
         <figure class="media-left">
           <p class="image is-64x64">
             <Avatar />
@@ -116,8 +115,9 @@
             >
               <div
                 :is="subCommentsComponent"
+                :id="comment.id"
                 class="sub-comment-component"
-                v-bind="{articleId: comment.article_id, parentCommentId: comment.id}"
+                v-bind="{articleId: comment.article_id, parentCommentId: comment.id, locationData: subCommentData}"
               />
             </b-collapse>
           </div>
@@ -139,6 +139,8 @@ import Url from './utils/url'
 import { mapGetters } from "vuex";
 import { IS_LOGIN, USER_ID } from "@/store/modules/store-types.js";
 import { USER } from "@/store/modules/module-names";
+import Utils from '@/utils'
+import VueScrollTo from 'vue-scrollto'
 
 export default {
   name: "CommentEntity",
@@ -157,6 +159,10 @@ export default {
     showSeparator: {
       type: Boolean,
       default: false,
+    },
+    locationData: {
+      type: Object,
+      default: () => { return {} }
     }
   },
   data() {
@@ -166,6 +172,7 @@ export default {
       subCommentsComponent: 'Empty',
       showSubComments: false,
       showOverlay: false,
+      subCommentData: undefined,
     }
   },
   computed: {
@@ -178,26 +185,37 @@ export default {
     })
   },
   mounted() {
-    console.log(`comments: ${JSON.stringify(this.comment)}`)
     this.listenEvents()
+    if (this.locationData !== undefined
+      && !Utils.isObjEmpty(this.locationData)) {
+      this.locateComment()
+    }
   },
   beforeDestroy() {
     EventBus.$off(EVENT_CLOSE_COMMENT_REPLY_VIEW)
   },
   methods: {
-    blink() {
-      this.startStoppableInterval(() => {
-        this.showOverlay = !this.showOverlay
-      }, 800, 3)
-    },
-    startStoppableInterval(callback, delay, repetitions) {
-      let x = 0
-      let intervalID = setInterval(function () {
-        callback()
-        if (++x === repetitions) {
-          clearInterval(intervalID)
-        }
-      }, delay)
+    locateComment() {
+      if (this.locationData.child === undefined) {
+        // no sub comments, just focus on target comment
+        setTimeout(() => {
+          // blink
+          Utils.blink(() => {
+            this.showOverlay = !this.showOverlay
+          }, 800, 3)
+
+          // scroll to target comment
+          VueScrollTo.scrollTo(this.$refs.comment, 500)
+        }, 2000)
+        return
+      }
+      // otherwise focus on the target sub comment 
+      this.toggleSubComments()
+      // update sub comment data
+      this.subCommentData = {
+        targetId: this.locationData.targetId,
+        child: this.locationData.child,
+      }
     },
     listenEvents() {
       const self = this;
@@ -226,7 +244,6 @@ export default {
     copyUserInfo() {
       let self = this
       let userInfo = `[@${this.comment.nickname}](${Url.getUrls().user(this.comment.from_user)})`
-      console.log(`userInfo: ${userInfo}`)
       this.$copyText(userInfo).then(function (e) {
         self.$getUi().toast.success('User id copied!')
       }, function (e) {
@@ -255,16 +272,9 @@ export default {
 }
 
 .overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  /* background-color: #d5c7fc; */
   background-color: #d5c7fc;
-  opacity: 0.4;
-  width: 100%;
-  height: 100%;
+  opacity: 0.8;
   border-radius: 0.3rem;
-  padding: 0.75rem;
 }
 
 .separator {

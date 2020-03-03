@@ -4,7 +4,6 @@ use crate::RedisPool;
 use chrono::{NaiveDateTime, Utc};
 use diesel;
 use diesel::prelude::*;
-use log::error;
 use std::sync::Arc;
 use typename::TypeName;
 

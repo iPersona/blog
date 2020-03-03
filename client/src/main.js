@@ -62,7 +62,19 @@ Vue.use(Log)
 
 // scroll to element
 import VueScrollTo from 'vue-scrollto'
-Vue.use(VueScrollTo)
+Vue.use(VueScrollTo, {
+  container: "body",
+  duration: 500,
+  easing: "ease",
+  offset: -60,
+  force: true,
+  cancelable: true,
+  onStart: false,
+  onDone: false,
+  onCancel: false,
+  x: false,
+  y: true
+})
 
 // clicpboard
 import VueClipboard from 'vue-clipboard2'
