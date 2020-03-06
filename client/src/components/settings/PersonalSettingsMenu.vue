@@ -29,7 +29,7 @@
 import { EventBus, EVENT_STATISTIC_VIEW_MOUNTED } from '@/event-bus'
 
 export default {
-  name: "ActionMenu",
+  name: "PersonalSettingsMenu",
   components: {},
   data() {
     return {

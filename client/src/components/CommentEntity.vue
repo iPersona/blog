@@ -35,7 +35,12 @@
                       aria-role="listitem"
                       @click="copyUserInfo"
                     >
-                      Copy user info
+                      <IconText
+                        icon="copy"
+                        text="Copy user info"
+                        size="1x"
+                        stroke-width="bold"
+                      />
                     </b-dropdown-item>
                   </b-dropdown>
                 </div>
@@ -65,13 +70,17 @@
                     slot="trigger"
                     type="is-text"
                     size="is-small"
-                    icon-pack="mdi"
-                    icon-left="reply"
                     style="text-decoration: none; color: gray;"
                     aria-controls="replyComment"
                     @click="quoteReply"
                   >
-                    Reply
+                    <IconText
+                      icon="corner-up-left"
+                      text="Reply"
+                      size="1x"
+                      color="gray"
+                      text-color="gray"
+                    />
                   </b-button>
                 </div>
               </div>
@@ -141,6 +150,7 @@ import { IS_LOGIN, USER_ID } from "@/store/modules/store-types.js";
 import { USER } from "@/store/modules/module-names";
 import Utils from '@/utils'
 import VueScrollTo from 'vue-scrollto'
+import IconText from '@/components/controllers/IconText'
 
 export default {
   name: "CommentEntity",
@@ -150,6 +160,7 @@ export default {
     NewComment,
     Empty,
     SubComments,
+    IconText
   },
   props: {
     comment: {
@@ -202,7 +213,7 @@ export default {
           // blink
           Utils.blink(() => {
             this.showOverlay = !this.showOverlay
-          }, 800, 3)
+          }, 800, 4)
 
           // scroll to target comment
           VueScrollTo.scrollTo(this.$refs.comment, 500)
@@ -268,7 +279,7 @@ export default {
 }
 
 .blink {
-  transition: background 0.3s;
+  transition: background 3s;
 }
 
 .overlay {

@@ -1,7 +1,6 @@
 import Vue from 'vue';
 import App from './App.vue';
 
-
 import axios from 'axios';
 import VueAxios from 'vue-axios';
 Vue.use(VueAxios, axios);
@@ -62,19 +61,7 @@ Vue.use(Log)
 
 // scroll to element
 import VueScrollTo from 'vue-scrollto'
-Vue.use(VueScrollTo, {
-  container: "body",
-  duration: 500,
-  easing: "ease",
-  offset: -60,
-  force: true,
-  cancelable: true,
-  onStart: false,
-  onDone: false,
-  onCancel: false,
-  x: false,
-  y: true
-})
+Vue.use(VueScrollTo)
 
 // clicpboard
 import VueClipboard from 'vue-clipboard2'

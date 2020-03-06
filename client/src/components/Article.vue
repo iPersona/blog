@@ -9,12 +9,12 @@
         position="is-right"
       >
         <p class="control">
-          <BButton
-            icon-pack="fas"
-            icon-left="edit"
-            @click="editArticle"
-          >
-            Edit
+          <BButton @click="editArticle">
+            <IconText
+              icon="edit"
+              text="Edit"
+              size="1x"
+            />
           </BButton>
         </p>
 
@@ -28,23 +28,18 @@
               slot="trigger"
               class="button"
             >
-              <b-icon
-                pack="fas"
-                icon="ellipsis-h"
-              />
+              <MoreHorizontalIcon size="1x" />
             </button>
 
             <b-dropdown-item
               aria-role="listitem"
               @click="deleteArticle"
             >
-              <b-icon
-                pack="fas"
-                icon="trash-alt"
+              <IconText
+                icon="trash-2"
+                text="Delete"
+                size="1x"
               />
-              <span>
-                Delete
-              </span>
             </b-dropdown-item>
           </b-dropdown>
         </p>
@@ -140,13 +135,17 @@ import Comments from "./Comments";
 import { EventBus, EVENT_RELOAD_ARTICLE, EVENT_SCROLL_TO_COMMENT_EDITOR, EVENT_RELOAD_COMMENTS } from "@/event-bus.js";
 import NewComment from "./NewComment"
 import VueScrollTo from 'vue-scrollto'
+import IconText from '@/components/controllers/IconText'
+import { MoreHorizontalIcon } from 'vue-feather-icons'
 
 export default {
   name: "Article",
   components: {
     ArticleEditor,
     Comments,
-    NewComment
+    NewComment,
+    IconText,
+    MoreHorizontalIcon,
   },
   props: {},
   data() {

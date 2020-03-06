@@ -26,6 +26,7 @@
 <script>
 import SubCommentEntity from './SubCommentEntity'
 import Api from '@/api'
+import Utils from '@/utils'
 import { EventBus, EVENT_RELOAD_SUB_COMMENTS } from '@/event-bus.js'
 
 export default {
@@ -57,7 +58,7 @@ export default {
   },
   mounted() {
     this.listenEventBus()
-    if (this.locationData === undefined) {
+    if (Utils.isObjEmpty(this.locationData)) {
       // load comments
       this.loadComments(true)
     } else {

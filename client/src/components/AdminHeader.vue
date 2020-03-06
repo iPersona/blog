@@ -43,11 +43,15 @@
 
       <template slot="end">
         <BNavbarItem>
-          <BIcon
-            pack="fas"
-            icon="plus-circle"
-            size="is-medium"
-            @click.native="newPost"
+          <plus-circle-icon
+            size="1.5x"
+            @click="newPost"
+          />
+        </BNavbarItem>
+        <BNavbarItem>
+          <BellIcon
+            size="1.5x"
+            @click="goToNotificationView"
           />
         </BNavbarItem>
         <BNavbarItem>
@@ -62,9 +66,9 @@
               type="button"
             >
               <template>
-                <BIcon icon="account" />
-                <span><b>{{ userName }}</b></span>
-                <BIcon icon="menu-down" />
+                <UserIcon size="1.5x" />
+                <span class="dropdown-btn-text"><b>{{ userName }}</b></span>
+                <ChevronDownIcon size="1.5x" />
               </template>
             </button>
             <BDropdownItem
@@ -77,13 +81,15 @@
                 :to="{name: 'profile'}"
                 exact
               >
-                <BIcon
-                  pack="fas"
-                  icon="id-card"
-                />
-                <span>
-                  Profile
-                </span>
+                <template>
+                  <CreditCardIcon
+                    size="1.5x"
+                    class="menu_icon"
+                  />
+                  <span class="menu_text">
+                    Profile
+                  </span>
+                </template>
               </router-link>
             </BDropdownItem>
 
@@ -99,13 +105,15 @@
                 :to="{name: 'settings'}"
                 exact
               >
-                <BIcon
-                  pack="fas"
-                  icon="cog"
-                />
-                <span>
-                  Settings
-                </span>
+                <template>
+                  <SettingsIcon
+                    size="1.5x"
+                    class="menu_icon"
+                  />
+                  <span class="menu_text">
+                    Settings
+                  </span>
+                </template>
               </router-link>
             </BDropdownItem>
 
@@ -114,11 +122,15 @@
               aria-role="menuitem"
               @click="logout"
             >
-              <BIcon
-                pack="fas"
-                icon="sign-out-alt"
-              />
-              <span>Logout</span>
+              <template>
+                <LogOutIcon
+                  size="1.5x"
+                  class="menu_icon"
+                />
+                <span class="menu_text">
+                  Logout
+                </span>
+              </template>
             </BDropdownItem>
           </BDropdown>
         </BNavbarItem>
@@ -144,11 +156,19 @@ import { LOGOUT } from '@/store/modules/mutation-types.js'
 import { USER } from '@/store/modules/module-names'
 import Api from '@/api.js'
 import ArticleEditor from './ArticleEditor'
+import { PlusCircleIcon, BellIcon, UserIcon, ChevronDownIcon, SettingsIcon, CreditCardIcon, LogOutIcon } from 'vue-feather-icons';
 
 export default {
   name: 'AdminHeader',
   components: {
     ArticleEditor,
+    PlusCircleIcon,
+    BellIcon,
+    UserIcon,
+    ChevronDownIcon,
+    SettingsIcon,
+    CreditCardIcon,
+    LogOutIcon,
   },
   data() {
     return {
@@ -174,6 +194,25 @@ export default {
       // this.$router.push({ name: 'new_post' })
       this.isEditArticle = true
     },
+    goToNotificationView() {
+      this.$router.push({ name: 'notifications' })
+    }
   },
 }
 </script>
+
+<style scoped>
+.dropdown-btn-text {
+  margin-left: 0.3rem;
+  margin-right: 0.3rem;
+}
+
+.menu_icon {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.menu_text {
+  margin-left: 0.5rem;
+}
+</style>

@@ -26,12 +26,11 @@ export default {
   },
   data() {
     return {
-      tab: 1
-    };
+    }
   },
   mounted() {
     console.log(`App mounted`);
-    this.loadAppData();
+    this.loadAppData()
   },
   methods: {
     ...mapMutations(USER, {
@@ -41,9 +40,9 @@ export default {
       loadTag: LOAD_TAG
     }),
     loadAppData() {
-      this.loadUser();
-      this.loadTag();
-    }
+      this.loadUser()
+      this.loadTag()
+    },
   }
 };
 </script>
@@ -58,7 +57,7 @@ export default {
   margin-top: 60px;
 }
 @import "https://cdn.materialdesignicons.com/2.5.94/css/materialdesignicons.min.css";
-@import "https://use.fontawesome.com/releases/v5.2.0/css/all.css";
+/* @import "https://use.fontawesome.com/releases/v5.2.0/css/all.css"; */
 
 .router-view {
   margin-left: 15%;

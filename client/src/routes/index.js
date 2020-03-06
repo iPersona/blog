@@ -1,15 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
-import store from '@/store/index'
-import {
-    TAG_ID,
-    TAG_NAME
-} from '@/store/modules/store-types'
-import {
-    TAG
-} from '@/store/modules/module-names'
 
-// import ResultDiff from '@/components/ResultDiff'
 import NotFound from '@/components/NotFound'
 import Home from '@/components/Home'
 import Articles from '@/components/ArticleList'
@@ -30,6 +21,8 @@ import Security from '@/components/settings/Security'
 import ErrorPage from '@/components/ErrorPage'
 import Verify from '@/components/EmailVerify'
 import User from '@/components/User'
+import CommentNotification from '@/components/notification/CommentNotification'
+import Notifications from '@/components/notification/Notifications'
 
 Vue.use(Router)
 
@@ -85,6 +78,16 @@ export default new Router({
             path: '/verify/:token',
             name: 'verify',
             component: Verify
+        },
+        {
+            path: '/notification/comments',
+            name: 'comment_notification',
+            component: CommentNotification
+        },
+        {
+            path: '/notifications',
+            name: 'notifications',
+            component: Notifications,
         },
         {
             path: '/management',

@@ -69,6 +69,9 @@ export default class Api {
 
             // statistic
             getDailyVisit: `${host}/dashboard/visit`,
+
+            // notifications
+            getCommentNotifications: `${host}/notification/comment`
         }
     }
 
@@ -97,6 +100,10 @@ export default class Api {
             console.log(error) // for debug
             Promise.reject(error)
         })
+    }
+
+    async getCommentNotifications() {
+        return this.get(this.url.getCommentNotifications)
     }
 
     async updatePassword(oldPassword, newPassword) {

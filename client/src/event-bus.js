@@ -13,6 +13,7 @@ export const EVENT_SCROLL_TO_COMMENT_EDITOR = 'scroll-to-comment-editor'
 export const EVENT_CLOSE_COMMENT_REPLY_VIEW = 'close-comment-reply-view'
 export const EVENT_CLOSE_SUB_COMMENT_REPLY_VIEW = 'close-sub-comment-reply-view'
 export const EVENT_RELOAD_SUB_COMMENTS = 'reload-sub-comments'
+export const EVENT_RESET_ACTION_MENU_STATUS = 'reset-action-menu-status'
 
 // Bus
 export const EventBus = new Vue()

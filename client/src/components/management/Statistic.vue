@@ -17,7 +17,7 @@
 import Api from "@/api"
 import VueApexCharts from "vue-apexcharts"
 import DateRangePicker from "./DateRangePicker"
-import { EventBus, EVENT_STATISTIC_DATE_RANGE_CHANGED, EVENT_STATISTIC_VIEW_MOUNTED } from '@/event-bus'
+import { EventBus, EVENT_STATISTIC_DATE_RANGE_CHANGED, EVENT_RESET_ACTION_MENU_STATUS } from '@/event-bus'
 
 export default {
   name: "Statistic",
@@ -57,7 +57,7 @@ export default {
   },
   methods: {
     emitMountedEvent() {
-      EventBus.$emit(EVENT_STATISTIC_VIEW_MOUNTED)
+      EventBus.$emit(EVENT_RESET_ACTION_MENU_STATUS)
     },
     async loadDefaultRange() {
       let range = this.$refs.dateRangePicker.getDefaultRange()

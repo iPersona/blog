@@ -7,8 +7,7 @@
         type="search"
         placeholder="Search..."
         expanded
-        icon-pack="fas"
-        icon="search"
+        icon="magnify"
         @input="searchTag"
       />
     </BField>
