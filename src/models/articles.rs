@@ -195,7 +195,7 @@ impl ArticleSummary {
             .replace("\n", "") // remove newline
             .to_string()
             .chars()
-            .take(50) // TODO: limit summary length
+            .take(20) // TODO: limit summary length
             .collect();
         self.raw_content = [summary.as_str(), "..."].concat()
     }

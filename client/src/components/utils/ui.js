@@ -20,6 +20,7 @@ Ui.install = function (Vue) {
           }
         },
         warning: function (msg, isBottom) {
+          console.warn(`${msg}`)
           if (isBottom === undefined) {
             // Vue.$buefy.toast.open({
             self.$options.parent.$buefy.toast.open({
@@ -36,6 +37,7 @@ Ui.install = function (Vue) {
           }
         },
         fail: function (msg, isBottom) {
+          console.error(`${msg}`)
           if (isBottom === undefined) {
             // Vue.$buefy.toast.open({
             self.$options.parent.$buefy.toast.open({

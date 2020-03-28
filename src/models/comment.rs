@@ -558,11 +558,13 @@ pub struct CommentLocation {
 impl CommentLocation {
     pub fn locate(conn: &PgConnection, args: &CommentLocationArgs) -> InternalStdResult<Self> {
         let raw_sql = format!(
-            "select comment_data('{}', '{}', {}) as data;",
+            "select comment_data('{}', '{}', {}, {}) as data;",
             args.article_id.to_hyphenated().to_string(),
             args.comment_id.to_hyphenated().to_string(),
+            args.notify_comment_id,
             args.page_size
         );
+        debug!("{}", raw_sql);
         diesel::sql_query(raw_sql)
             .get_result::<Self>(conn)
             .map_err(|e| Error {
@@ -574,7 +576,9 @@ impl CommentLocation {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CommentLocationArgs {
+    pub user_id: Uuid,
     pub article_id: Uuid,
+    pub notify_comment_id: i64,
     pub comment_id: Uuid,
     pub page_size: i64,
 }

@@ -46,11 +46,11 @@
       </b-field>
     </nav>
     <section class="container">
-      <div class="container">
-        <h1 class="title title-fix">
-          {{ article.title }}
-        </h1>
-      </div>
+      <!-- <div class="container"> -->
+      <h1 class="title title-fix">
+        {{ article.title }}
+      </h1>
+      <!-- </div> -->
     </section>
     <!-- article content -->
     <section
@@ -117,6 +117,7 @@
       <Comments
         :article-id="articleId"
         :locate-comment-id="targetCommentId"
+        :cmt-nty-id="commentNotifyId"
       />
     </section>
   </div>
@@ -151,14 +152,10 @@ export default {
   data() {
     return {
       articleId: this.$route.params.id,
-      // set focused comment tab, 
-      // undefined: All comments, 
-      // 'all': as 'undefined',
-      // 'user': Yours
-      focus: this.$route.query.focus,
       article: {},
       isEditArticle: false,
       targetCommentId: this.$route.query.locate,
+      commentNotifyId: this.$route.query.ntycid,
     }
   },
   computed: {
@@ -286,7 +283,8 @@ export default {
 }
 
 .title-fix {
-  margin-bottom: 0.75rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
 }
 
 .article-tags {

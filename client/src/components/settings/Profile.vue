@@ -49,7 +49,7 @@
 <script>
 import { mapGetters, mapMutations } from 'vuex'
 import { USER_INFO } from '@/store/modules/store-types.js'
-import { UPDATE_TOKEN } from "@/store/modules/mutation-types.js"
+import { UPDATE_LOGIN_DATA } from "@/store/modules/mutation-types.js"
 import { USER } from '@/store/modules/module-names'
 import Api from '@/api'
 
@@ -88,7 +88,7 @@ export default {
   },
   methods: {
     ...mapMutations(USER, {
-      updateToken: UPDATE_TOKEN
+      updateLoginData: UPDATE_LOGIN_DATA
     }),
     updateUserInfo(userInfo) {
       this.name = userInfo.name
@@ -112,7 +112,7 @@ export default {
       // save token
       let token = rsp.data;
       this.$getLog().debug(`token: ${token}`)
-      this.updateToken(token)
+      this.updateLoginData(token)
 
       this.$getUi().toast.success('update profile successfully!')
     }

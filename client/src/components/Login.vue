@@ -85,7 +85,7 @@ export default {
   },
   methods: {
     ...mapMutations(USER, {
-      updateToken: LOGIN
+      updateLoginData: LOGIN
     }),
     async login() {
       // show loading indicator
@@ -97,8 +97,8 @@ export default {
 
       let api = new Api();
       // let rsp = await api.login(this.username, Util.password(this.password), this.remember);
-      let rsp = await api.login("admin", Util.password("123456"), true, rechaptchaToken);
-      // let rsp = await api.login("user-4", Util.password("123456"), true, rechaptchaToken);
+      // let rsp = await api.login("admin", Util.password("123456"), true, rechaptchaToken);
+      let rsp = await api.login("user-4", Util.password("123456"), true, rechaptchaToken);
       // let rsp = await api.login("user-1", Util.password("123456"), true);
       this.$getLog().debug("rsp: " + JSON.stringify(rsp));
       if (!Api.isSuccessResponse(rsp)) {
@@ -108,9 +108,9 @@ export default {
       }
 
       // save token
-      let token = rsp.data;
-      this.$getLog().debug(`token: ${token}`)
-      this.updateToken(token)
+      let loginData = rsp.data;
+      this.$getLog().debug(`token: ${JSON.stringify(loginData)}`)
+      this.updateLoginData(loginData)
 
       // Stop loading indicator
       this.isLoading = false
@@ -122,7 +122,7 @@ export default {
       return await
         this.$recaptchaLoaded().then(async () => {
           return await this.$recaptcha('login').then((token) => {
-            this.$getLog().debug(`token: ${token}`) // Will print the token
+            this.$getLog().debug(`recaptcha-token: ${token}`) // Will print the token
             return token
           })
         })

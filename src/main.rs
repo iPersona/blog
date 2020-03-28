@@ -84,6 +84,7 @@ fn main() {
             .configure(api::tag_api::TagApi::configure)
             .configure(api::user_api::UserApi::configure)
             .configure(api::dashboard_api::DashboardApi::configure)
+            .configure(api::mail_box_api::MailboxApi::configure)
             // .wrap(
             //     CookieSession::signed(&[0; 32])
             //         .name("blog_session")

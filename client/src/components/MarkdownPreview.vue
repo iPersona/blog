@@ -27,7 +27,7 @@ export default {
   },
   computed: {
     compiledMarkdown: function () {
-      this.$getLog().debug(`compiledMarkdown: ${this.content}`);
+      // this.$getLog().debug(`compiledMarkdown: ${this.content}`);
       return marked(this.content);
     },
   },

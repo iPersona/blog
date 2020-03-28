@@ -1,0 +1,1 @@
+DROP FUNCTION get_comment_notifications (uuid);

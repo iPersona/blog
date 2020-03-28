@@ -197,8 +197,7 @@ export default {
   },
   mounted() {
     this.listenEvents()
-    if (this.locationData !== undefined
-      && !Utils.isObjEmpty(this.locationData)) {
+    if (!Utils.isObjEmpty(this.locationData)) {
       this.locateComment()
     }
   },
@@ -216,6 +215,7 @@ export default {
           }, 800, 4)
 
           // scroll to target comment
+          console.log('scroll to commententity')
           VueScrollTo.scrollTo(this.$refs.comment, 500)
         }, 2000)
         return
@@ -254,7 +254,7 @@ export default {
     },
     copyUserInfo() {
       let self = this
-      let userInfo = `[@${this.comment.nickname}](${Url.getUrls().user(this.comment.from_user)})`
+      let userInfo = `[@${this.comment.nickname}](${Url.getUrls().user(this.comment.user_id)})`
       this.$copyText(userInfo).then(function (e) {
         self.$getUi().toast.success('User id copied!')
       }, function (e) {

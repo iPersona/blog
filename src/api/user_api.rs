@@ -1,6 +1,6 @@
 use crate::api::recaptcha_api::verify_recaptcha;
 use crate::models::token::{Token, TokenExtension};
-use crate::models::user::{CheckUser, LoginUser, Users, Verify};
+use crate::models::user::{login_data, verify_data, CheckUser, LoginUser, Users, Verify};
 use crate::util::email::SignUpVerify;
 use crate::util::errors::ErrorCode;
 use crate::{AppState, ChangePassword, EditUser, RegisteredUser};
@@ -121,15 +121,13 @@ impl UserApi {
 
         let is_remember = params.get_remember();
         let max_age: Option<i64> = if is_remember { Some(24 * 90) } else { None };
-        let pg_pool = state.db.connection();
-        match params.verification(&pg_pool, &max_age) {
-            Ok(user_info) => {
-                let token = Token::new(&user_info, true);
-                match token.encode() {
-                    Ok(v) => api_resp_data!(v),
-                    Err(e) => api_resp_err!(format!("{:?}", e)),
-                }
-            }
+        let conn = &state.db.connection();
+        match params.verification(conn, &max_age) {
+            // generate login data
+            Ok(user_info) => match login_data(conn, &user_info) {
+                Ok(v) => api_resp_data!(v),
+                Err(e) => api_resp_err_with_code!(e.code, e.detail),
+            },
             Err(err) => api_resp_err_with_code!(err.code, err.detail),
         }
     }
@@ -155,7 +153,7 @@ impl UserApi {
                             // return activated token
                             let mut new_token = t.clone();
                             new_token.active();
-                            match new_token.encode() {
+                            match verify_data(conn, new_token) {
                                 Ok(t) => api_resp_data!(t),
                                 Err(e) => api_resp_err_with_code!(
                                     ErrorCode::TokenError,

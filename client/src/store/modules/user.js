@@ -10,7 +10,8 @@ import {
   LOGOUT,
   LOGIN,
   LOAD_USER,
-  UPDATE_TOKEN,
+  UPDATE_LOGIN_DATA,
+  DECREASE_NOTIFICATION_NUM
 } from './mutation-types'
 
 import {
@@ -20,10 +21,8 @@ import {
   USER_INFO,
   IS_LOGIN,
   IS_ADMIN,
+  NOTIFY_NUM,
 } from './store-types'
-import {
-  userInfo
-} from 'os'
 
 function saveState(s) {
   console.log(`saveState...`)
@@ -45,6 +44,7 @@ function getState() {
 }
 
 function loadState(state) {
+  console.log('aaaaa')
   let s = getState()
   if (s === null) {
     return
@@ -55,15 +55,22 @@ function loadState(state) {
   state[IS_LOGIN] = s[IS_LOGIN]
   state[TOKEN] = s[TOKEN]
   state[IS_ADMIN] = s[IS_ADMIN]
+  state[NOTIFY_NUM] = s[NOTIFY_NUM]
 }
 
-function updateToken(state, token) {
-  if (token === undefined || token === null) {
+function updateLoginData(state, data) {
+  if (data.notify_num === undefined) {
+    state[NOTIFY_NUM] = 0
+  } else {
+    state[NOTIFY_NUM] = data.notify_num
+  }
+
+  if (data.token === undefined || data.token === null) {
     return
   }
 
   // decode jwt
-  let decoded = jwt.decode(token, {
+  let decoded = jwt.decode(data.token, {
     complete: true
   })
 
@@ -72,7 +79,7 @@ function updateToken(state, token) {
   }
 
   state[IS_LOGIN] = true
-  state[TOKEN] = token
+  state[TOKEN] = data.token
   state[USER_NAME] = decoded.payload.user_name
   state[USER_ID] = decoded.payload.user_id
   state[IS_ADMIN] = decoded.payload.is_admin
@@ -89,12 +96,18 @@ function userInfoFromPayload(payload) {
   }
 }
 
+function decreaseNotificationNum(state) {
+  state[NOTIFY_NUM] -= 1
+  saveState(state)
+}
+
 const state = {
   [USER_NAME]: '',
   [USER_ID]: '',
   [TOKEN]: '',
   [IS_LOGIN]: false,
   [IS_ADMIN]: false,
+  [NOTIFY_NUM]: 0,
 }
 
 const mutations = {
@@ -102,18 +115,22 @@ const mutations = {
     state[IS_LOGIN] = false
     state[USER_NAME] = ''
     state[IS_ADMIN] = false
+    state[NOTIFY_NUM] = 0
     clearState()
     // refresh page to reset component
     window.location.reload()
   },
-  [LOGIN](state, token) {
-    updateToken(state, token)
+  [LOGIN](state, data) {
+    updateLoginData(state, data)
   },
   [LOAD_USER](state) {
     loadState(state)
   },
-  [UPDATE_TOKEN](state, token) {
-    updateToken(state, token)
+  [UPDATE_LOGIN_DATA](state, data) {
+    updateLoginData(state, data)
+  },
+  [DECREASE_NOTIFICATION_NUM](state) {
+    decreaseNotificationNum(state)
   }
 }
 
@@ -132,6 +149,9 @@ const getters = {
   },
   [TOKEN]: (state) => {
     return state[TOKEN]
+  },
+  [NOTIFY_NUM]: (state) => {
+    return state[NOTIFY_NUM]
   },
   [USER_INFO]: (state) => {
     let token = state[TOKEN]

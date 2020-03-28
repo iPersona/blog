@@ -133,15 +133,17 @@ impl Token {
         }
     }
 
-    pub fn encode(&self) -> Result<String> {
+    pub fn encode(&self) -> InternalStdResult<String> {
         let mut header = Header::default();
         header.alg = Algorithm::HS256;
-        encode(&header, &self, Env::get().token_secret.as_bytes())
+        match encode(&header, &self, Env::get().token_secret.as_bytes()) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(Error {
+                code: ErrorCode::EncodeError,
+                detail: format!("Encode token failed: {:?}", e),
+            }),
+        }
     }
-
-    // pub fn to_base64(encoded: &str) -> String {
-    //     base64::encode(encoded.as_bytes())
-    // }
 
     pub fn is_admin(&self) -> bool {
         self.is_admin
@@ -283,6 +285,13 @@ impl TokenExtension {
         let token_ext = Self::from_request(req);
         match token_ext {
             Some(t) => t.user_type == UserType::Admin,
+            None => false,
+        }
+    }
+
+    pub fn is_user(&self, user_id: Uuid) -> bool {
+        match &self.user_info {
+            Some(u) => u.id == user_id,
             None => false,
         }
     }

@@ -36,13 +36,13 @@ export default {
     })
   },
   async mounted() {
-    this.$getLog().debug(`xxxxxxxx tagId: ${this.tagId}, tagName: ${this.tagName}`)
+    this.$getLog().debug(`tagId: ${this.tagId}, tagName: ${this.tagName}`)
     if (this.tagId !== undefined && this.tagName !== undefined) {
       let tag = {
         id: this.tagId,
         name: this.tagName,
       }
-      this.$getLog().debug(`yyyy tag: ${JSON.stringify(tag)}`)
+      this.$getLog().debug(`tag: ${JSON.stringify(tag)}`)
       await this.saveTag(tag)
     }
   },

@@ -1,13 +1,11 @@
+use crate::api::ApiResult;
 use crate::util::errors::ErrorCode;
 use crate::{
-    models::{
-        mailbox::mail_box::{CommentNotify, CommentNotifyParam},
-        token::TokenExtension,
-    },
+    models::{mailbox::mail_box::CommentNotify, token::TokenExtension},
     AppState,
 };
 use actix_web::{
-    web::{Data, Query},
+    web::{self, Data},
     Error, HttpRequest, HttpResponse,
 };
 use futures::Future;
@@ -15,12 +13,11 @@ use futures::Future;
 pub struct MailboxApi;
 
 impl MailboxApi {
-    pub fn user_comment_notifies(
+    pub fn comment_notifies(
         state: Data<AppState>,
         req: HttpRequest,
-        params: Query<CommentNotifyParam>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        debug!("user_comment_notifies");
+        debug!("comment_notifies");
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
@@ -34,12 +31,11 @@ impl MailboxApi {
 
                 // get comment notifies of user
                 match &t.user_info {
-                    Some(_) => {
+                    Some(user) => {
                         let conn = &state.db.connection();
-                        let user_id = params.into_inner().user_id;
-                        let res = CommentNotify::user_notifies(user_id, conn);
+                        let res = CommentNotify::user_notifies(user.id, conn);
                         match res {
-                            Ok(data) => api_resp_data!(data),
+                            Ok(data) => api_resp!(ApiResult::from_data(data)),
                             Err(e) => api_resp_err_with_code!(e.code, e.detail),
                         }
                     }
@@ -50,5 +46,12 @@ impl MailboxApi {
             }
             None => api_resp_err!(format!("failed to get user info from token")),
         }
+    }
+
+    pub fn configure(cfg: &mut web::ServiceConfig) {
+        cfg.service(
+            web::resource("/notification/comment")
+                .route(web::get().to_async(Self::comment_notifies)), // list comment notifications
+        );
     }
 }

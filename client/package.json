@@ -11,6 +11,7 @@
     "apexcharts": "^3.10.1",
     "axios": "^0.18.1",
     "buefy": "^0.8.2",
+    "bulma-badge": "^3.0.1",
     "css-loader": "^2.0.1",
     "dateformat": "^3.0.3",
     "easymde": "^2.8.0",

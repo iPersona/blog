@@ -14,7 +14,7 @@ pub struct Env {
     // background interval (hour)
     // persist cache interval
     pub persist_cache_interval: u64,
-    //
+    // clear unverified user worker checking interval (hour)
     pub clear_unverified_user_interval: u64,
 }
 

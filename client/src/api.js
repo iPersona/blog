@@ -128,10 +128,12 @@ export default class Api {
         })
     }
 
-    async locateComment(articleId, commentId, pageSize) {
+    async locateComment(userId, articleId, commentId, cmtNtyId, pageSize) {
         return this.get(this.url.locateComment, {
+            user_id: userId,
             article_id: articleId,
             comment_id: commentId,
+            notify_comment_id: cmtNtyId,
             page_size: pageSize,
         })
     }

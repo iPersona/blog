@@ -12,6 +12,8 @@ pub enum ErrorCode {
     TokenExpired,
     // Token associated errors
     TokenError,
+    // Encode error
+    EncodeError,
     // Permission denied
     PermissionDenied,
     // Email is not verified

@@ -80,14 +80,15 @@ export default new Router({
             component: Verify
         },
         {
-            path: '/notification/comments',
-            name: 'comment_notification',
-            component: CommentNotification
-        },
-        {
-            path: '/notifications',
-            name: 'notifications',
+            path: '/notification',
+            name: 'notification',
             component: Notifications,
+            redirect: '/notification/comment',
+            children: [{
+                path: 'comment',
+                name: 'comment-notification',
+                component: CommentNotification
+            }]
         },
         {
             path: '/management',

@@ -15,7 +15,7 @@
       </figure>
       <div class="media-content">
         <div>
-          <BField style="margin-bottom: 0rem;">
+          <BField style="margin-bottom: 0;">
             <!-- header -->
             <div class="comment-header">
               <!-- left header -->
@@ -24,11 +24,31 @@
                 class="comment-header-left"
               >
                 <!-- nick name -->
-                <a class="is-primary comment-nickname">{{ comment.from_nickname }}</a>
+                <b-dropdown aria-role="list">
+                  <b-button
+                    slot="trigger"
+                    type="is-text"
+                    size="is-small"
+                    style="text-decoration: none; color: gray; padding-left: 5px"
+                  >
+                    <span class="comment-nickname">{{ comment.nickname }}</span>
+                  </b-button>
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    @click="copyUserInfo"
+                  >
+                    <IconText
+                      icon="copy"
+                      text="Copy user info"
+                      size="1x"
+                      stroke-width="bold"
+                    />
+                  </b-dropdown-item>
+                </b-dropdown>
               </div>
             </div>
           </BField>
-          <BField style="margin-bottom: 0rem;">
+          <BField style="margin-bottom: 0;">
             <div
               align="left"
               class="comment-content"
@@ -156,6 +176,7 @@ export default {
         }, 800, 4)
 
         // scroll to target comment
+        console.log(`scroll to subcommententity`)
         VueScrollTo.scrollTo(this.$refs.comment, 500)
       }, 2000)
     },

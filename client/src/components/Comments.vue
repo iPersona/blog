@@ -30,6 +30,10 @@ import CommentEntity from './CommentEntity'
 import Api from '@/api'
 import { EventBus, EVENT_RELOAD_COMMENTS } from '@/event-bus.js'
 
+import { USER } from '@/store/modules/module-names'
+import { mapGetters } from 'vuex'
+import { USER_ID } from '@/store/modules/store-types.js'
+
 export default {
   name: "Comments",
   components: {
@@ -43,6 +47,10 @@ export default {
     locateCommentId: {
       type: String,
       default: ''
+    },
+    cmtNtyId: {
+      type: String,
+      default: '',
     }
   },
   data() {
@@ -53,6 +61,12 @@ export default {
       totalPages: 0,
       locationData: undefined,
     }
+  },
+  computed: {
+    ...mapGetters(USER, {
+      userId: USER_ID
+    }),
+
   },
   async mounted() {
     console.log(`articleId: ${this.articleId}`)
@@ -82,11 +96,12 @@ export default {
     },
     async locateComment() {
       let api = new Api()
-      let rsp = await api.locateComment(this.articleId, this.locateCommentId, this.pageSize)
+      let rsp = await api.locateComment(this.userId, this.articleId, this.locateCommentId, parseInt(this.cmtNtyId), this.pageSize)
       if (!Api.isSuccessResponse(rsp)) {
         console.log(`rsp-err: ${JSON.stringify(rsp)}`)
         return
       }
+      console.log(`resp: ${JSON.stringify(rsp)}`)
 
       // update total page
       this.totalPages = rsp.data.parent.total

@@ -70,12 +70,7 @@
       bottom="50px"
       right="50px"
     >
-      <BIcon
-        type="is-primary"
-        pack="fas"
-        icon="chevron-up"
-        size="is-medium"
-      />
+      <chevron-up-icon size="3x" />
     </BackToTop>
   </div>
 </template>
@@ -83,6 +78,7 @@
 import InfiniteLoading from 'vue-infinite-loading'
 import BackToTop from 'vue-backtotop'
 import Api from "@/api.js"
+import { ChevronUpIcon } from 'vue-feather-icons'
 
 import { EventBus, EVENT_RELOAD_ARTICLE_LIST } from '@/event-bus'
 
@@ -97,6 +93,7 @@ export default {
   components: {
     InfiniteLoading,
     BackToTop,
+    ChevronUpIcon
   },
   props: {
     isFilteredByTag: {

@@ -14,7 +14,7 @@ use uuid::Uuid;
 use super::super::{
     /*get_github_primary_email, */ get_password, random_string, sha3_256_encode, RedisPool,
 };
-use super::token::Token;
+use super::{mailbox::mail_box::CommentNotify, token::Token};
 use crate::models::token::TokenExtension;
 use crate::util::env::Env;
 use crate::util::errors::{Error, ErrorCode};
@@ -22,7 +22,7 @@ use crate::util::redis_pool::RedisKeys;
 use crate::util::result::InternalStdResult;
 use crate::AppState;
 use std::cell::Ref;
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
 use time::Duration;
 
 #[derive(Queryable, Debug, Clone, Deserialize, Serialize)]
@@ -156,6 +156,17 @@ impl From<UserSettingResult> for UserSettingVal {
     }
 }
 
+impl TryFrom<String> for UserSettingVal {
+    type Error = crate::util::errors::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        serde_json::from_str::<Self>(value.as_str()).map_err(|e| Error {
+            code: ErrorCode::ParseError,
+            detail: format!("parse UserSettings from string failed: {:?}", e),
+        })
+    }
+}
+
 impl UserSettingVal {
     pub fn to_string(self) -> String {
         serde_json::to_string(&self).unwrap()
@@ -176,13 +187,6 @@ pub struct UserSettings {
 }
 
 impl UserSettings {
-    pub fn from_str(s: &str) -> InternalStdResult<Self> {
-        serde_json::from_str::<Self>(s).map_err(|e| Error {
-            code: ErrorCode::ParseError,
-            detail: format!("parse UserSettings from string failed: {:?}", e),
-        })
-    }
-
     pub fn load(conn: &PgConnection, redis_pool: &Arc<RedisPool>) -> InternalStdResult<()> {
         // get user settings
         let res = all_users
@@ -195,7 +199,7 @@ impl UserSettings {
                 redis_pool.del(redis_key.as_str());
 
                 // load new data
-                let kv = user_settings
+                let args = user_settings
                     .into_iter()
                     .map(|s| {
                         Self {
@@ -204,10 +208,12 @@ impl UserSettings {
                                 subscribe: s.subscribe,
                             },
                         }
-                        .to_kv()
+                        .to_array()
                     })
-                    .collect::<Vec<(String, String)>>();
-                redis_pool.hmset(redis_key.as_str(), kv);
+                    .flatten()
+                    .collect::<Vec<String>>();
+
+                redis_pool.hmset(redis_key.as_str(), args);
                 Ok(())
             }
             Err(e) => Err(Error {
@@ -217,17 +223,22 @@ impl UserSettings {
         }
     }
 
-    pub fn to_kv(self) -> (String, String) {
-        (
+    pub fn to_array(self) -> Vec<String> {
+        vec![
             self.id.to_hyphenated().to_string(),
             serde_json::to_value(self.settings).unwrap().to_string(),
-        )
+        ]
     }
 
     pub fn get(redis: &Arc<RedisPool>, user_id: &Uuid) -> InternalStdResult<Self> {
         let key = RedisPool::get_redis_key(RedisKeys::Users);
         let s = redis.hget::<String>(key.as_str(), user_id.to_hyphenated().to_string().as_str())?;
-        Self::from_str(s.as_str())
+
+        let setting_val = UserSettingVal::try_from(s)?;
+        Ok(UserSettings {
+            id: user_id.clone(),
+            settings: setting_val,
+        })
     }
 }
 
@@ -715,4 +726,66 @@ impl UserType {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Verify {
     pub token: String,
+}
+
+/// Represent login data
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LoginData {
+    pub token: Option<String>,
+    pub notify_num: Option<i64>,
+}
+
+pub struct LoginDataBuilder {
+    data: LoginData,
+}
+
+impl LoginDataBuilder {
+    pub fn new() -> Self {
+        LoginDataBuilder {
+            data: LoginData {
+                token: None,
+                notify_num: None,
+            },
+        }
+    }
+
+    pub fn build(self) -> LoginData {
+        self.data
+    }
+
+    pub fn token(mut self, t: Token) -> InternalStdResult<Self> {
+        match t.encode() {
+            Ok(token) => self.data.token = Some(token),
+            Err(e) => return Err(e),
+        };
+        Ok(self)
+    }
+
+    fn notify_num(mut self, nty_num: i64) -> InternalStdResult<Self> {
+        self.data.notify_num = Some(nty_num);
+        Ok(self)
+    }
+}
+
+pub fn login_data(conn: &PgConnection, user_info: &UserInfo) -> InternalStdResult<LoginData> {
+    let token = Token::new(&user_info, true);
+    let notify_num = CommentNotify::count(user_info.id, conn, true)?;
+    let data = LoginDataBuilder::new()
+        .token(token)?
+        .notify_num(notify_num)?
+        .build();
+    Ok(data)
+}
+
+pub fn verify_data(conn: &PgConnection, token: Token) -> InternalStdResult<LoginData> {
+    let user_id = Uuid::parse_str(token.user_id.as_str()).map_err(|e| Error {
+        code: ErrorCode::ParseError,
+        detail: format!("{:?}", e),
+    })?;
+    let notify_num = CommentNotify::count(user_id, conn, true)?;
+    let data = LoginDataBuilder::new()
+        .token(token)?
+        .notify_num(notify_num)?
+        .build();
+    Ok(data)
 }

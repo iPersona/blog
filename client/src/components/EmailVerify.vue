@@ -18,7 +18,7 @@
 import { mapMutations } from 'vuex'
 import Api from "@/api.js"
 import Util from '@/utils.js'
-import { UPDATE_TOKEN } from "@/store/modules/mutation-types.js"
+import { UPDATE_LOGIN_DATA } from "@/store/modules/mutation-types.js"
 import { USER } from '@/store/modules/module-names'
 import { HalfCircleSpinner } from 'epic-spinners'
 
@@ -38,7 +38,7 @@ export default {
   },
   methods: {
     ...mapMutations(USER, {
-      updateToken: UPDATE_TOKEN
+      updateLoginData: UPDATE_LOGIN_DATA
     }),
     async verify() {
       let api = new Api();
@@ -50,9 +50,9 @@ export default {
       }
 
       // save token
-      let token = rsp.data;
-      this.$getLog().debug(`token: ${token}`)
-      this.updateToken(token)
+      let loginData = rsp.data;
+      this.$getLog().debug(`loginData: ${JSON.stringify(loginData)}`)
+      this.updateLoginData(loginData)
 
       // redirect to home page
       this.$router.replace({ name: 'articles' })

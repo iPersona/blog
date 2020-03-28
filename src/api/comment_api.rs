@@ -1,5 +1,8 @@
 use crate::api::ApiResult;
-use crate::models::comment::{CommentLocation, CommentLocationArgs, CommentQueryOption};
+use crate::models::{
+    comment::{CommentLocation, CommentLocationArgs, CommentQueryOption},
+    token::TokenExtension,
+};
 use crate::util::errors::ErrorCode;
 use crate::util::result::InternalStdResult;
 use crate::{AppState, Comments, DeleteComment, NewComments, SubComment};
@@ -96,14 +99,40 @@ impl CommentApi {
 
     fn locate_comment(
         state: Data<AppState>,
-        _req: HttpRequest,
+        req: HttpRequest,
         params: Query<CommentLocationArgs>,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        let conn = &state.db.connection();
-        let res = CommentLocation::locate(conn, &params.into_inner());
-        match res {
-            Ok(data) => api_resp!(ApiResult::from_raw_data(data.data)),
-            Err(e) => api_resp_err_with_code!(e.code, e.detail),
+        let token_ext = TokenExtension::from_request(&req);
+        match token_ext {
+            Some(t) => {
+                // Only login user is allowed
+                if !t.is_login() {
+                    return api_resp_err_with_code!(
+                        ErrorCode::PermissionDenied,
+                        "please login first"
+                    );
+                }
+                let args = params.into_inner();
+                if !t.is_user(args.user_id) {
+                    return api_resp_err_with_code!(
+                        ErrorCode::PermissionDenied,
+                        "User not match, operation denied!"
+                    );
+                }
+
+                let conn = &state.db.connection();
+                let res = CommentLocation::locate(conn, &args);
+                match res {
+                    Ok(data) => api_resp!(ApiResult::from_raw_data(data.data)),
+                    Err(e) => api_resp_err_with_code!(e.code, e.detail),
+                }
+            }
+            None => {
+                return api_resp_err_with_code!(
+                    ErrorCode::PermissionDenied,
+                    "This API is for login user only!"
+                );
+            }
         }
     }
 

@@ -55,7 +55,7 @@ impl Recaptcha {
 
     fn proxy_client(&self) -> reqwest::Result<reqwest::Client> {
         if cfg!(debug_assertions) {
-            let proxy = reqwest::Proxy::https("http://127.0.0.1:1082");
+            let proxy = reqwest::Proxy::https("http://127.0.0.1:1088");
             match proxy {
                 Ok(p) => reqwest::Client::builder().proxy(p).build(),
                 Err(e) => {
