@@ -41,51 +41,7 @@ impl ApiResult {
     }
 }
 
-// use actix_web::Error;
-// use futures::Future;
-
-// pub type JsonResponse = Box<Future<Item = actix_web::web::Json<ApiResult>, Error = Error>>;
 pub type JsonApiResult = actix_web::web::Json<ApiResult>;
-
-/// result macro
-// //#[macro_export]
-// macro_rules! result_ok {
-//     () => {
-//         Ok(actix_web::Json($crate::api::ApiResult::Success {
-//             status: $crate::api::Status::Ok,
-//         }))
-//     };
-// }
-
-// //#[macro_export]
-// macro_rules! result_err {
-//     ($detail:expr) => {
-//         Ok(actix_web::Json($crate::api::ApiResult::Error {
-//             status: $crate::api::Status::Err,
-//             detail: String::from($detail),
-//         }))
-//     };
-// }
-
-// //#[macro_export]
-// macro_rules! result_data {
-//     ($data:expr) => {
-//         Ok(actix_web::Json($crate::api::ApiResult::Data {
-//             data: serde_json::to_value($data).unwrap(),
-//         }))
-//     };
-// }
-
-/// API response macro
-// //#[macro_export]
-// macro_rules! api_resp_err {
-//     ($detail:expr) => {
-//         api_resp!($crate::api::ApiResult::Error {
-//             status: $crate::api::Status::Err,
-//             detail: String::from($detail)
-//         })
-//     };
-// }
 
 macro_rules! middleware_resp_err {
     ($req:expr, $code:expr, $msg:expr) => {
@@ -111,6 +67,16 @@ macro_rules! api_resp {
     ($api_ret:expr) => {
         futures::future::ok(actix_web::HttpResponse::Ok().json($api_ret))
     };
+    ($api_ret:expr, $( $cookie:expr ),*) => {
+        {
+            let mut rb = actix_web::HttpResponse::Ok();
+            let mut rb_ptr = &mut rb;
+            $(
+                rb_ptr = rb_ptr.cookie($cookie);
+            )*
+            futures::future::ok(rb_ptr.json($api_ret))
+        }
+    }
 }
 
 //#[macro_export]
@@ -119,6 +85,11 @@ macro_rules! api_resp_ok {
         api_resp!($crate::api::ApiResult::Success {
             status: $crate::api::Status::Ok
         })
+    };
+    ($( $cookie:expr ),*) => {
+        api_resp!($crate::api::ApiResult::Success {
+            status: $crate::api::Status::Ok
+        }, $($cookie), *)
     };
 }
 
@@ -150,6 +121,11 @@ macro_rules! api_resp_data {
         api_resp!($crate::api::ApiResult::Data {
             data: serde_json::to_value($data).unwrap()
         })
+    };
+    ($data:expr, $( $cookie:expr ),*) => {
+        api_resp!($crate::api::ApiResult::Data {
+            data: serde_json::to_value($data).unwrap()
+        }, $($cookie), *)
     };
 }
 

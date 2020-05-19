@@ -1,6 +1,8 @@
 use crate::api::recaptcha_api::verify_recaptcha;
 use crate::models::token::{Token, TokenExtension};
-use crate::models::user::{login_data, verify_data, CheckUser, LoginUser, Users, Verify};
+use crate::models::user::{
+    disabled_cookie, user_data as gen_user_data, verify_data, CheckUser, LoginUser, Users, Verify,
+};
 use crate::util::email::SignUpVerify;
 use crate::util::errors::ErrorCode;
 use crate::{AppState, ChangePassword, EditUser, RegisteredUser};
@@ -57,9 +59,24 @@ impl UserApi {
 
     fn sign_out(
         _state: Data<AppState>,
-        _req: HttpRequest,
+        req: HttpRequest,
     ) -> impl Future<Item = HttpResponse, Error = Error> {
-        api_resp_ok!()
+        let token_ext = TokenExtension::from_request(&req);
+        match token_ext {
+            Some(t) => {
+                // Only login user is allowed
+                if !t.is_login() {
+                    return api_resp_err_with_code!(
+                        ErrorCode::PermissionDenied,
+                        "please login first"
+                    );
+                }
+
+                let c = disabled_cookie();
+                api_resp_ok!(c)
+            }
+            None => api_resp_err!(format!("failed to get user info from token")),
+        }
     }
 
     fn create_user(
@@ -122,10 +139,15 @@ impl UserApi {
         let is_remember = params.get_remember();
         let max_age: Option<i64> = if is_remember { Some(24 * 90) } else { None };
         let conn = &state.db.connection();
+
         match params.verification(conn, &max_age) {
             // generate login data
-            Ok(user_info) => match login_data(conn, &user_info) {
-                Ok(v) => api_resp_data!(v),
+            Ok(user_info) => match gen_user_data(conn, &user_info) {
+                Ok(v) => {
+                    let token = Token::new(&user_info, true);
+                    let c = token.into_cookie().unwrap();
+                    api_resp_data!(v, c)
+                }
                 Err(e) => api_resp_err_with_code!(e.code, e.detail),
             },
             Err(err) => api_resp_err_with_code!(err.code, err.detail),
@@ -177,6 +199,38 @@ impl UserApi {
         }
     }
 
+    fn user_data(
+        state: Data<AppState>,
+        req: HttpRequest,
+    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        let token_ext = TokenExtension::from_request(&req);
+        match token_ext {
+            Some(t) => {
+                // Only login user is allowed
+                if !t.is_login() {
+                    return api_resp_err_with_code!(
+                        ErrorCode::PermissionDenied,
+                        "please login first"
+                    );
+                }
+
+                match &t.user_info {
+                    Some(u) => {
+                        let conn = &state.db.connection();
+                        match gen_user_data(conn, u) {
+                            Ok(v) => api_resp_data!(v),
+                            Err(e) => api_resp_err_with_code!(e.code, e.detail),
+                        }
+                    }
+                    None => {
+                        api_resp_err_with_code!(ErrorCode::PermissionDenied, "please login first")
+                    }
+                }
+            }
+            None => api_resp_err!(format!("failed to get user info from token")),
+        }
+    }
+
     pub fn configure(cfg: &mut web::ServiceConfig) {
         cfg.service(web::resource("/user/password").route(web::patch().to_async(Self::change_pwd)))
             .service(
@@ -187,6 +241,7 @@ impl UserApi {
             )
             .service(web::resource("/verify").route(web::post().to_async(Self::verify)))
             .service(web::resource("/login").route(web::post().to_async(Self::login)))
-            .service(web::resource("/logout").route(web::get().to_async(Self::sign_out)));
+            .service(web::resource("/logout").route(web::post().to_async(Self::sign_out)))
+            .service(web::resource("/user/data").route(web::get().to_async(Self::user_data)));
     }
 }
