@@ -220,7 +220,7 @@ export default {
 
 .article-summary {
   font-size: medium;
-  color: gray;
+  color: #595959;
 }
 
 .article-bottom {

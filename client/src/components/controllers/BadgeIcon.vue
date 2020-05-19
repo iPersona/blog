@@ -1,9 +1,21 @@
 <template>
   <div
+    v-if="number > 0"
     class="badge"
     :style="badgeSize"
     :data-badge="number"
     @click="clickEvent"
+  >
+    <!-- eslint-disable vue/no-v-html -->
+    <span
+      class="menu_icon"
+      @click="clickEvent"
+      v-html="toSvg(icon)"
+    />
+  </div>
+  <div
+    v-else
+    :style="badgeSize"
   >
     <!-- eslint-disable vue/no-v-html -->
     <span
