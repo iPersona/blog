@@ -115,14 +115,18 @@ export default {
       // load data from server
       let api = new Api()
       let rsp = await api.getCommentNotifications()
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`failed to get comment notifications: ${JSON.stringify(rsp.detail)}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`failed to get comment notifications: ${JSON.stringify(rsp.errorDetail())}`)
+        if (rsp.isPermissionDenied()) {
+          // goto home page
+          this.$router.push({ name: 'home' })
+        }
         return
       }
-      console.log(`comment-notifications: ${JSON.stringify(rsp.data)}`)
+      console.log(`comment-notifications: ${JSON.stringify(rsp.data())}`)
 
       // update data
-      this.data = rsp.data
+      this.data = rsp.data()
       // stop loading indicator
       this.isLoading = false
     },

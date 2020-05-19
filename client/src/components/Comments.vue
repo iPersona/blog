@@ -28,6 +28,7 @@
 <script>
 import CommentEntity from './CommentEntity'
 import Api from '@/api'
+import Utils from '@/utils'
 import { EventBus, EVENT_RELOAD_COMMENTS } from '@/event-bus.js'
 
 import { USER } from '@/store/modules/module-names'
@@ -95,24 +96,29 @@ export default {
       return commentId === targetId ? this.locationData : undefined
     },
     async locateComment() {
+      if (Utils.isStringEmpty(this.userId)) {
+        this.$getUi().toast.fail('Permission denied! Please login!')
+        return
+      }
+
       let api = new Api()
       let rsp = await api.locateComment(this.userId, this.articleId, this.locateCommentId, parseInt(this.cmtNtyId), this.pageSize)
-      if (!Api.isSuccessResponse(rsp)) {
+      if (!rsp.isSuccess()) {
         console.log(`rsp-err: ${JSON.stringify(rsp)}`)
         return
       }
       console.log(`resp: ${JSON.stringify(rsp)}`)
 
       // update total page
-      this.totalPages = rsp.data.parent.total
-      this.currentPage = rsp.data.parent.page
-      this.comments = rsp.data.parent.comments
+      this.totalPages = rsp.data().parent.total
+      this.currentPage = rsp.data().parent.page
+      this.comments = rsp.data().parent.comments
 
       // expand sub comments
       this.locationData = {
         targetId: this.locateCommentId,
-        parentId: rsp.data.child === undefined ? undefined : rsp.data.child.pid,
-        child: rsp.data.child
+        parentId: rsp.data().child === undefined ? undefined : rsp.data().child.pid,
+        child: rsp.data().child
       }
     },
     listenEventBus() {
@@ -133,20 +139,20 @@ export default {
         offset: (this.currentPage - 1) * this.pageSize,
       })
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`)
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`failed to get comments: ${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`failed to get comments: ${rsp.errorDetail()}`)
         return
       }
 
       // update total page
-      this.totalPages = rsp.data.total
+      this.totalPages = rsp.data().total
       if (isReload) {
         // reset data
         this.comments = []
         this.currentPage = 1
       }
       // update comment data
-      this.comments = rsp.data.comments
+      this.comments = rsp.data().comments
     },
     pageChanged(currentPage) {
       // update current page

@@ -38,15 +38,17 @@
             align="left"
           >
             <BTaglist
-              v-for="t in article.tags"
-              :key="t"
+              v-for="(tag_id, idx) in article.tags_id"
+              :key="tag_id"
               class="article-tags"
             >
               <BTag
-                v-if="article.tags.length > 0"
+                v-if="article.tags_id.length > 0"
                 class="article-tag"
               >
-                {{ t }}
+                <RouterLink :to="{name: 'articles_with_tag', params: {tagId: tag_id, tagName: article.tags[idx]}}">
+                  {{ article.tags[idx] }}
+                </RouterLink>
               </BTag>
             </BTaglist>
           </div>
@@ -148,21 +150,21 @@ export default {
       let api = new Api();
       let rsp = await api.getArticlesByTag(this.tagId, this.pageSize, (this.currentPage - 1) * this.pageSize);
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getLog().error(`failed to get articles by tag-${this.tagId}: ${rsp.detail}`);
+      if (!rsp.isSuccess()) {
+        this.$getLog().error(`failed to get articles by tag-${this.tagId}: ${rsp.errorDetail()}`);
         return;
       }
 
       if ($state === undefined) {
         // Not from infinite-scroll event, reset articles to data directly
-        this.articles = rsp.data
+        this.articles = rsp.data()
         return
       }
 
-      if (rsp.data.length > 0) {
+      if (rsp.data().length > 0) {
         console.log(`$state-load`)
         this.currentPage += 1;
-        this.articles.push(...rsp.data)
+        this.articles.push(...rsp.data())
         $state.loaded()
       } else {
         console.log(`$state-complete`)
@@ -173,20 +175,20 @@ export default {
       let api = new Api();
       let rsp = await api.visitorViewAll(this.pageSize, (this.currentPage - 1) * this.pageSize);
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getLog().error(`failed to get articles: ${rsp.detail}`);
+      if (!rsp.isSuccess()) {
+        this.$getLog().error(`failed to get articles: ${rsp.errorDetail()}`);
         return;
       }
 
       if ($state === undefined) {
         // Not from infinite-scroll event, reset articles to data directly
-        this.articles = rsp.data
+        this.articles = rsp.data()
         return
       }
 
-      if (rsp.data.length > 0) {
+      if (rsp.data().length > 0) {
         this.currentPage += 1;
-        this.articles.push(...rsp.data)
+        this.articles.push(...rsp.data())
         console.log(`$state-load`)
         $state.loaded()
       } else {
@@ -213,11 +215,11 @@ export default {
 
 .article-title {
   font-weight: bold;
-  font-size: xx-large;
+  font-size: x-large;
 }
 
 .article-summary {
-  font-size: large;
+  font-size: medium;
   color: gray;
 }
 

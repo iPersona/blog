@@ -67,8 +67,8 @@ export default {
 
       let api = new Api()
       let rsp = await api.updatePassword(Util.password(this.oldPassword), Util.password(this.newPassword))
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`${rsp.errorDetail()}`)
         return
       }
       this.$getUi().toast.success('Password is successfully updated')

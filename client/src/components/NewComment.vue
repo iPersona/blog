@@ -103,8 +103,8 @@ export default {
 
       let api = new Api()
       let rsp = await api.newComment(this.articleId, this.$refs.editor.content(), this.userId)
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`failed to comment: ${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`failed to comment: ${rsp.errorDetail()}`)
         return
       }
       // reload comments

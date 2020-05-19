@@ -125,11 +125,11 @@ export default {
 
       let api = new Api();
       let rsp = await api.visitorViewArticle(this.articleId);
-      if (!Api.isSuccessResponse(rsp)) {
+      if (!rsp.isSuccess()) {
         return;
       }
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
-      let article = rsp.data;
+      let article = rsp.data();
       this.title = article.title
       this.content = article.content
       EventBus.$emit(EVENT_MARKDOWN_EDITOR_CONTENT_READY, this.content)
@@ -140,11 +140,11 @@ export default {
       let api = new Api()
       let rsp = await api.getTags()
       this.$getLog().debug(`get tags: ${JSON.stringify(rsp)}`)
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getLog().error(`get tags failed: ${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getLog().error(`get tags failed: ${rsp.errorDetail()}`)
         return
       }
-      this.availableTags = rsp.data;
+      this.availableTags = rsp.data();
     },
     getFilteredTags(text) {
       this.filteredTags = this.availableTags.filter((option) => {
@@ -179,8 +179,8 @@ export default {
         let classifiedTags = this.classifyTags()
         rsp = await api.editArticle(this.articleId, this.title, content, classifiedTags.newChoiceAlreadyExistTags, classifiedTags.deselectedTags, classifiedTags.newTags)
       }
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`Failed to ${this.isCreateNew ? "create" : "update"} article: ${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`Failed to ${this.isCreateNew ? "create" : "update"} article: ${rsp.errorDetail()}`)
         return
       }
 
