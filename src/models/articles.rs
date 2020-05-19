@@ -133,6 +133,7 @@ pub struct ArticleSummary {
     pub raw_content: String,
     pub published: bool,
     pub tags: Vec<Option<String>>,
+    pub tags_id: Vec<Option<Uuid>>,
     pub create_time: NaiveDateTime,
     pub modify_time: NaiveDateTime,
 }
@@ -153,6 +154,7 @@ impl ArticleSummary {
                     article_with_tag::raw_content,
                     article_with_tag::published,
                     article_with_tag::tags,
+                    article_with_tag::tags_id,
                     article_with_tag::create_time,
                     article_with_tag::modify_time,
                 ))
@@ -168,6 +170,7 @@ impl ArticleSummary {
                     article_with_tag::raw_content,
                     article_with_tag::published,
                     article_with_tag::tags,
+                    article_with_tag::tags_id,
                     article_with_tag::create_time,
                     article_with_tag::modify_time,
                 ))
@@ -213,7 +216,7 @@ impl ArticleSummary {
         offset: i64,
         admin: bool,
     ) -> Result<Vec<Self>, String> {
-        let raw_sql = format!("select id, title, raw_content, published, tags, create_time, modify_time from article_with_tag where ('{}' = any(tags_id)) {} order by create_time desc limit {} offset {}", tag_id, if admin {""} else {"and published = true"}, limit, offset);
+        let raw_sql = format!("select id, title, raw_content, published, tags, tags_id, create_time, modify_time from article_with_tag where ('{}' = any(tags_id)) {} order by create_time desc limit {} offset {}", tag_id, if admin {""} else {"and published = true"}, limit, offset);
         let res = diesel::sql_query(raw_sql).load::<Self>(conn);
         match res {
             Ok(mut data) => {
