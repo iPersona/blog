@@ -42,18 +42,24 @@
       </template>
 
       <template slot="end">
+        <!-- new post -->
         <BNavbarItem>
           <plus-circle-icon
             size="1.5x"
             @click="newPost"
           />
         </BNavbarItem>
+
+        <!-- notifications -->
         <BNavbarItem>
-          <BellIcon
-            size="1.5x"
-            @click="goToNotificationView"
+          <BadgeIcon
+            :number="notifyNum"
+            icon="bell"
+            @clickEvent="goToNotificationView"
           />
         </BNavbarItem>
+
+        <!-- menu  -->
         <BNavbarItem>
           <BDropdown
             v-model="item"
@@ -151,24 +157,25 @@
 <script>
 import { mapGetters } from 'vuex'
 import { mapMutations } from 'vuex'
-import { USER_NAME, TOKEN } from '@/store/modules/store-types.js'
+import { USER_NAME, NOTIFY_NUM } from '@/store/modules/store-types.js'
 import { LOGOUT } from '@/store/modules/mutation-types.js'
 import { USER } from '@/store/modules/module-names'
 import Api from '@/api.js'
 import ArticleEditor from './ArticleEditor'
-import { PlusCircleIcon, BellIcon, UserIcon, ChevronDownIcon, SettingsIcon, CreditCardIcon, LogOutIcon } from 'vue-feather-icons';
+import { PlusCircleIcon, UserIcon, ChevronDownIcon, SettingsIcon, CreditCardIcon, LogOutIcon } from 'vue-feather-icons'
+import BadgeIcon from './controllers/BadgeIcon'
 
 export default {
   name: 'AdminHeader',
   components: {
     ArticleEditor,
     PlusCircleIcon,
-    BellIcon,
     UserIcon,
     ChevronDownIcon,
     SettingsIcon,
     CreditCardIcon,
     LogOutIcon,
+    BadgeIcon,
   },
   data() {
     return {
@@ -183,19 +190,29 @@ export default {
   },
   computed: {
     ...mapGetters(USER, {
-      userName: [USER_NAME]
+      userName: [USER_NAME],
+      notifyNum: [NOTIFY_NUM]
     }),
   },
   methods: {
     ...mapMutations(USER, {
-      logout: LOGOUT,
+      clearSession: LOGOUT,
     }),
     newPost() {
       // this.$router.push({ name: 'new_post' })
       this.isEditArticle = true
     },
     goToNotificationView() {
-      this.$router.push({ name: 'notifications' })
+      this.$router.push({ name: 'notification' })
+    },
+    async logout() {
+      let api = new Api()
+      let rsp = await api.logout()
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`failed to logout: ${rsp.errorDetail()}`)
+        return
+      }
+      this.clearSession()
     }
   },
 }

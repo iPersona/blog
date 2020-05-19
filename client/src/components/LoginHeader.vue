@@ -9,7 +9,7 @@
         <BNavbarItem href="/">
           <img
             src="@/assets/logo.png"
-            alt="Lightweight UI components for Vue.js based on Bulma"
+            alt="Welcome home"
           >
         </BNavbarItem>
       </template>
@@ -36,16 +36,11 @@
       <template slot="end">
         <!-- notifications -->
         <BNavbarItem>
-          <div
-            class="badge"
-            :data-badge="notifyNum"
-            @click="goToNotificationView"
-          >
-            <BellIcon
-              size="1.5x"
-              @click="goToNotificationView"
-            />
-          </div>
+          <BadgeIcon
+            :number="notifyNum"
+            icon="bell"
+            @clickEvent="goToNotificationView"
+          />
         </BNavbarItem>
         <BNavbarItem>
           <BDropdown
@@ -109,21 +104,22 @@
 <script>
 import { mapGetters } from 'vuex'
 import { mapMutations } from 'vuex'
-import { USER_NAME, TOKEN, NOTIFY_NUM } from '@/store/modules/store-types.js'
+import { USER_NAME, NOTIFY_NUM } from '@/store/modules/store-types.js'
 import { LOGOUT } from '@/store/modules/mutation-types.js'
 import { USER } from '@/store/modules/module-names'
 import Api from '@/api.js'
 import { BellIcon, UserIcon, ChevronDownIcon, SettingsIcon, CreditCardIcon, LogOutIcon } from 'vue-feather-icons'
+import BadgeIcon from './controllers/BadgeIcon'
 
 export default {
   name: 'LoginHeader',
   components: {
-    BellIcon,
     UserIcon,
     ChevronDownIcon,
     SettingsIcon,
     CreditCardIcon,
     LogOutIcon,
+    BadgeIcon,
   },
   data() {
     return {
@@ -140,36 +136,25 @@ export default {
   },
   methods: {
     ...mapMutations(USER, {
-      logout: LOGOUT,
+      clearSession: LOGOUT,
     }),
     goToNotificationView() {
       this.$router.push({ name: 'notification' }).catch(err => { })
+    },
+    async logout() {
+      let api = new Api()
+      let rsp = await api.logout()
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`failed to logout: ${rsp.errorDetail()}`)
+        return
+      }
+      this.clearSession()
     }
   },
 }
 </script>
 
 <style scoped>
-.badge {
-  display: inline-block;
-  position: relative;
-}
-.badge[data-badge]:after {
-  content: attr(data-badge);
-  position: absolute;
-  top: -0.1rem;
-  right: -0.1rem;
-  font-size: 0.7em;
-  background: #ff3860;
-  color: white;
-  width: 15px;
-  height: 15px;
-  text-align: center;
-  line-height: 15px;
-  border-radius: 50%;
-  box-shadow: 0 0 1px #333;
-}
-
 .dropdown-btn-text {
   margin-left: 0.3rem;
   margin-right: 0.3rem;
