@@ -44,13 +44,13 @@ export default {
       let api = new Api();
       let rsp = await api.verify(this.token)
       this.$getLog().debug("rsp: " + JSON.stringify(rsp))
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`${rsp.errorDetail()}`)
         return
       }
 
       // save token
-      let loginData = rsp.data;
+      let loginData = rsp.data();
       this.$getLog().debug(`loginData: ${JSON.stringify(loginData)}`)
       this.updateLoginData(loginData)
 

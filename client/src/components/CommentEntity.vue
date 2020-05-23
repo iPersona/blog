@@ -60,7 +60,11 @@
             <BField style="margin-bottom: 0px;">
               <div class="comment-status">
                 <div class="comment-status-left">
-                  <span class="comment-info">{{ createTime }}</span>
+                  <ButtonSpan
+                    size="is-small"
+                    color="gray"
+                    :text="createTime"
+                  />
                 </div>
                 <div
                   v-if="isLogin"
@@ -72,7 +76,7 @@
                     size="is-small"
                     style="text-decoration: none; color: gray;"
                     aria-controls="replyComment"
-                    @click="quoteReply"
+                    @click="reply"
                   >
                     <IconText
                       icon="corner-up-left"
@@ -82,6 +86,31 @@
                       text-color="gray"
                     />
                   </b-button>
+                </div>
+                <div
+                  v-if="isLogin"
+                  class="comment-status-right"
+                >
+                  <b-dropdown
+                    hoverable
+                    aria-role="list"
+                  >
+                    <b-button
+                      slot="trigger"
+                      type="is-text"
+                      size="is-small"
+                      style="text-decoration: none; color: gray;"
+                    >
+                      <MoreHorizontalIcon size="1x" />
+                    </b-button>
+
+                    <b-dropdown-item
+                      aria-role="listitem"
+                      @click="quoteReply"
+                    >
+                      Quote reply
+                    </b-dropdown-item>
+                  </b-dropdown>
                 </div>
               </div>
             </BField>
@@ -95,7 +124,7 @@
               <div
                 :is="replyComponent"
                 v-if="isLogin"
-                v-bind="{articleId: comment.article_id, commentId: comment.id}"
+                v-bind="commentArgs"
                 class="reply-comment"
               />
             </b-collapse>
@@ -151,6 +180,8 @@ import { USER } from "@/store/modules/module-names";
 import Utils from '@/utils'
 import VueScrollTo from 'vue-scrollto'
 import IconText from '@/components/controllers/IconText'
+import ButtonSpan from '@/components/controllers/ButtonSpan'
+import { MoreHorizontalIcon } from 'vue-feather-icons'
 
 export default {
   name: "CommentEntity",
@@ -160,7 +191,9 @@ export default {
     NewComment,
     Empty,
     SubComments,
-    IconText
+    IconText,
+    ButtonSpan,
+    MoreHorizontalIcon
   },
   props: {
     comment: {
@@ -180,6 +213,7 @@ export default {
     return {
       replyComponent: 'Empty',
       isReply: false,
+      isQuoteReply: false,
       subCommentsComponent: 'Empty',
       showSubComments: false,
       showOverlay: false,
@@ -189,6 +223,16 @@ export default {
   computed: {
     createTime: function () {
       return DatetimeUtil.toTimeAgo(this.comment.create_time)
+    },
+    commentArgs: function () {
+      let args = {
+        articleId: this.comment.article_id,
+        commentId: this.comment.id
+      }
+      if (this.isQuoteReply) {
+        args['comment'] = `> ${this.comment.comment}`
+      }
+      return args
     },
     ...mapGetters(USER, {
       isLogin: IS_LOGIN,
@@ -239,13 +283,11 @@ export default {
       })
     },
     quoteReply() {
-      // // save backquote to comment editor
-      // let content = `> ${this.comment.comment}`
-      // EventBus.$emit(EVENT_SET_COMMENT_EDITOR_CONTENT, content)
-      // // scroll to comment editor
-      // EventBus.$emit(EVENT_SCROLL_TO_COMMENT_EDITOR)
-
-
+      this.isQuoteReply = true
+      this.toggleReplyCommentView()
+    },
+    reply() {
+      this.isQuoteReply = false
       this.toggleReplyCommentView()
     },
     toggleReplyCommentView() {
@@ -332,26 +374,18 @@ export default {
 
 .comment-status-left {
   align-items: center;
-  float: left;
+  margin-left: 0;
 }
 
 .comment-status-middle {
   align-items: center;
-  float: left;
   margin-left: 20px;
 }
 
 .comment-status-right {
-  float: right;
-}
-
-.comment-info {
-  display: flex;
   align-items: center;
-  color: gray;
-  font-size: small;
-  padding: 5px;
-  margin-left: 5px;
+  margin-left: auto;
+  order: 3;
 }
 
 .sub-comment-link {

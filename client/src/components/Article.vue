@@ -66,6 +66,7 @@
     </section>
     <br>
     <br>
+    <!-- tags -->
     <section
       class="container"
       align="left"
@@ -75,15 +76,17 @@
         <b>Tags: </b>
       </span>
       <BTaglist
-        v-for="t in article.tags"
-        :key="t"
+        v-for="(tag_id, idx) in article.tags_id"
+        :key="tag_id"
         class="article-tags"
       >
         <BTag
           v-if="hasTags()"
           class="article-tag"
         >
-          {{ t }}
+          <RouterLink :to="{name: 'articles_with_tag', params: {tagId: tag_id, tagName: article.tags[idx]}}">
+            {{ article.tags[idx] }}
+          </RouterLink>
         </BTag>
       </BTaglist>
     </section>
@@ -202,12 +205,12 @@ export default {
     async getArticle() {
       let api = new Api();
       let rsp = await api.visitorViewArticle(this.articleId);
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`failed to load article: ${rsp.detail}`);
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`failed to load article: ${rsp.errorDetail()}`);
         return;
       }
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`);
-      this.article = rsp.data;
+      this.article = rsp.data();
       this.trimTags();
     },
     initMarked() {
@@ -261,8 +264,8 @@ export default {
     async doDeleteArticle() {
       let api = new Api()
       let rsp = await api.deleteArticle(this.articleId)
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`failed to delete article: ${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`failed to delete article: ${rsp.detail()}`)
         return
       }
       this.$getUi().toast.success(`delete article successfully!`)

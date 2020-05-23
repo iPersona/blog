@@ -2,17 +2,12 @@ import qs from 'qs';
 import Vue from 'vue';
 import store from '@/store/index'
 import {
-    STORE_KEY
-} from '@/store/modules/user'
-import {
-    TOKEN
-} from '@/store/modules/store-types'
-import {
     LOGOUT
 } from '@/store/modules/mutation-types'
 import {
     USER
 } from '@/store/modules/module-names'
+import ApiRet from './api-ret'
 
 export default class Api {
     static api_base_url() {
@@ -28,15 +23,10 @@ export default class Api {
             // article
             createArticle: `${host}/article`, // [admin] create article
             deleteArticle: `${host}/article`, // [admin] delete article
-            // adminView: `${host}/article/admin/view`, // [admin] get article
-            // adminViewRaw: `${host}/article/admin/view_raw`, // [admin] get article markdown
-            // adminViewAll: `${host}/article/admin/view_all`, // [admin] get article list
             editArticle: `${host}/article`, // edit article
             publishArticle: `${host}/article`, // publish article
             visitorViewAll: `${host}/articles`, // get article list
             visitorViewArticle: `${host}/article`, // get article
-            // articleNumber: `${host}/article/count`, // article count
-            // articleNumberByTag: `${host}/article/tag/count`,
             articlesWithTag: function (tagId) {
                 return `${host}/tag/${tagId}/articles`
             },
@@ -53,11 +43,13 @@ export default class Api {
                 return `${host}/user/${user_id}`
             }, // user page
             login: `${host}/login`, // login
+            logout: `${host}/logout`, // logout
             signup: `${host}/user`, // register
             userExist: `${host}/user`, // check whether user exists
             editProfile: `${host}/user`, // edit user profile
             updatePassword: `${host}/user/password`, // update password
             verify: `${host}/verify`, // verify user
+            userData: `${host}/user/data`, // get user data
 
             // tag
             getTags: `${host}/tag`,
@@ -85,21 +77,6 @@ export default class Api {
             'Access-Control-Allow-Credentials': true
         }
         this.url = Api.api_urls()
-        // request拦截器
-        this.axios.interceptors.request.use(req => {
-            // Do something before request is sent
-            // console.log(`localStorage: ${JSON.stringify(localStorage[STORE_KEY])}`)
-            if (localStorage[STORE_KEY] !== undefined) {
-                // add token into headers
-                req.headers.Authorization = store.getters[`user/${TOKEN}`];
-                // console.log(`token: ${JSON.stringify(req.headers.Authorization)}`)
-            }
-            return req
-        }, error => {
-            // Do something with request error
-            console.log(error) // for debug
-            Promise.reject(error)
-        })
     }
 
     async getCommentNotifications() {
@@ -223,11 +200,19 @@ export default class Api {
             });
     }
 
+    async logout() {
+        return this.post(this.url.logout)
+    }
+
     async verify(token) {
         return this.post(
             this.url.verify, {
                 token: token,
             })
+    }
+
+    async userData() {
+        return this.get(this.url.userData)
     }
 
     async createArticle(title, rawContent, existTags, newTags, publish) {
@@ -255,25 +240,6 @@ export default class Api {
         let url = `${this.url.deleteArticle}/${id}`;
         return this.delete(url);
     }
-
-    // async adminView(id) {
-    //     return this.get(this.url.adminView, {
-    //         id: id
-    //     });
-    // }
-
-    // async adminViewRawArticle(id) {
-    //     return this.get(this.url.adminViewRaw, {
-    //         id: id
-    //     });
-    // }
-
-    // async adminViewAll(limit, offset) {
-    //     return this.get(this.url.adminViewAll, {
-    //         limit: limit,
-    //         offset: offset
-    //     });
-    // }
 
     async editArticle(
         id, title, rawContent, newChoiceAlreadyExistsTags, deselectTags,
@@ -314,70 +280,6 @@ export default class Api {
         return this.get(url);
     }
 
-    // async getArticleNumber() {
-    //     return this.get(this.url.articleNumber);
-    // }
-
-    async getResults() {
-        return this.get(this.url.results);
-    }
-
-    async getList() {
-        return this.get(this.url.list);
-    }
-
-    async getFile(path) {
-        return this.get(this.url.file, {
-            path: path
-        });
-    }
-
-    async saveFile(path, content) {
-        return this.post(this.url.save, {
-            path: path,
-            content: content
-        });
-    }
-
-    async getCaseDescription(caseSet, caseId) {
-        return this.get(this.url.description, {
-            set: caseSet,
-            id: caseId
-        });
-    }
-
-    async getTask() {
-        return this.get(this.url.task);
-    }
-
-    async getTaskInfo(caseSet, caseId) {
-        return this.get(this.url.taskinfo, {
-            set: caseSet,
-            id: caseId
-        });
-    }
-
-    async controlTask(start, taskType, cases) {
-        if (cases === undefined) {
-            return this.post(this.url.control, {
-                start: start,
-                taskType: taskType
-            });
-        }
-
-        console.log('controlTask: cases: ' + JSON.stringify(cases));
-        return this.post(
-            this.url.control, {
-                start: start,
-                taskType: taskType,
-                cases: JSON.stringify(cases)
-            });
-    }
-
-    async reloadCases() {
-        return this.post(this.url.reloadcases)
-    }
-
     async post(url, args) {
         return this.doRequest(url, 'post', args)
     }
@@ -405,16 +307,20 @@ export default class Api {
                 ', args: ' + JSON.stringify(args));
             var res;
             if (args === undefined) {
-                res = await this.axios[method](url);
+                res = await this.axios[method](url, {
+                    withCredentials: true
+                });
             } else {
                 console.log(`post-args: ${qs.stringify(args)}`)
                 let params = method === 'get' ? {
                         params: args
                     } :
                     qs.stringify(args)
-                res = await this.axios[method](url, params);
+                res = await this.axios[method](url, params, {
+                    withCredentials: true
+                });
             }
-            res = res.data;
+            res = new ApiRet(res.data)
 
             // error handler
             Api.errorHandler(res);
@@ -448,27 +354,19 @@ export default class Api {
         }
     }
 
-    static isSuccessResponse(rsp) {
-        return rsp.hasOwnProperty('data') ||
-            rsp.hasOwnProperty('status') && rsp.status === 'Ok';
-    }
-
-    static isKindOfError(rsp, code) {
-        return rsp.hasOwnProperty('status') &&
-            rsp.status === 'Err' &&
-            rsp.code === code
-    }
-
     static errorHandler(rsp) {
-        if (Api.isKindOfError(rsp, 'TokenExpired')) {
+        if (rsp.isKindOfError('TokenExpired')) {
             // need to login again
             store.commit(`${USER}/${LOGOUT}`)
-        } else if (Api.isKindOfError(rsp, 'EmailNotVerified')) {
+        } else if (rsp.isKindOfError('EmailNotVerified')) {
             // redirect to error page
-            let url = `/error?title=Email 未验证&detail=请先验证 Email 激活账户！`
+            let url = `/error?title=Email is not verified&detail=Please verify Email to activate the account！`
             let encodedUri = encodeURIComponent(url)
             console.log(`encoded uri: ${encodedUri}`)
             window.location.replace(encodedUri)
+        } else if (rsp.isKindOfError('')) {
+            // need to login again
+            store.commit(`${USER}/${LOGOUT}`)
         }
     }
 }

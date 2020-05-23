@@ -75,10 +75,10 @@ export default {
       let api = new Api()
       let rsp = await api.getTagsWithCount();
       this.$getLog().debug(`tags: ${JSON.stringify(rsp)}`)
-      if (!Api.isSuccessResponse(rsp)) {
+      if (!rsp.isSuccess()) {
         return
       }
-      return rsp.data
+      return rsp.data()
     },
     searchTag() {
       if (this.searchKey === '') {

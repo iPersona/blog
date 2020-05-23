@@ -72,12 +72,12 @@ export default {
     async loadDailyVisits(from, to) {
       let api = new Api()
       let rsp = await api.getDailyPeriod(from, to)
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getLog().debug(`getDailyPeriod failed: ${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getLog().debug(`getDailyPeriod failed: ${rsp.errorDetail()}`)
       }
-      this.$getLog().debug(`getDailyPeriod success: ${JSON.stringify(rsp.data)}`)
+      this.$getLog().debug(`getDailyPeriod success: ${JSON.stringify(rsp.data())}`)
 
-      let data = this.splitData(rsp.data)
+      let data = this.splitData(rsp.data())
       this.series = [
         {
           name: "visit times",

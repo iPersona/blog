@@ -19,7 +19,8 @@ use jsonwebtoken::{decode, encode, errors::Result, Algorithm, Header, Validation
 use crate::models::user::{UserType, Users};
 use crate::util::errors::{Error, ErrorCode};
 use crate::util::result::InternalStdResult;
-use actix_http::httpmessage::HttpMessage;
+use actix_http::{cookie::Cookie, httpmessage::HttpMessage};
+use actix_redis::SameSite;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::{HttpRequest, HttpResponse};
 use chrono::NaiveDateTime;
@@ -167,6 +168,22 @@ impl Token {
     pub fn active(&mut self) {
         self.is_active = None;
     }
+
+    pub fn into_cookie<'a>(self) -> InternalStdResult<Cookie<'a>> {
+        let token = self.encode()?;
+        let mut cb = Cookie::build("token", token)
+            .path("/")
+            .expires(time::at_utc(time::Timespec::new(self.exp, 0)));
+        // disable for debuging
+        if cfg!(not(debug_assertions)) {
+            cb = cb
+                .domain(Env::get().domain)
+                .same_site(SameSite::Strict)
+                .secure(true)
+                .http_only(true);
+        }
+        Ok(cb.finish())
+    }
 }
 
 pub struct PermissionControl;
@@ -214,13 +231,23 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        let token = req.headers().get("Authorization");
+        let token = req.cookie("token");
+        // let token = req.headers().get("Authorization");
         match token {
             // Registered user or admin
             Some(t) => {
-                let t = Token::decode(t.to_str().unwrap());
+                // let t = Token::decode(t.to_str().unwrap());
+                let t = Token::decode(t.value());
                 match t {
                     Ok(t) => {
+                        if t.expired() {
+                            return Either::B(middleware_resp_err!(
+                                req,
+                                crate::util::errors::ErrorCode::TokenExpired,
+                                "token expired!"
+                            ));
+                        }
+
                         let user_info = t.to_user_info();
                         // Insert token extension for handler usage
                         req.extensions_mut().insert(TokenExtension {

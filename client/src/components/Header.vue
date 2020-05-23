@@ -20,7 +20,7 @@ import { mapGetters } from 'vuex'
 import LoginHeader from './LoginHeader'
 import VisitorHeader from './VisitorHeader'
 import AdminHeader from './AdminHeader'
-import { USER_NAME, TOKEN, IS_LOGIN, IS_ADMIN } from '@/store/modules/store-types.js'
+import { USER_NAME, IS_LOGIN, IS_ADMIN } from '@/store/modules/store-types.js'
 import { USER } from '@/store/modules/module-names'
 
 export default {

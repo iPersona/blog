@@ -160,10 +160,10 @@ export default {
       let api = new Api()
       let rsp = await api.getTags();
       this.$getLog().debug(`tags: ${JSON.stringify(rsp)}`)
-      if (!Api.isSuccessResponse(rsp)) {
+      if (!rsp.isSuccess()) {
         return
       }
-      let tags = rsp.data
+      let tags = rsp.data()
       return this.addStatus(tags)
     },
     addStatus(tags) {
@@ -291,10 +291,10 @@ export default {
       let api = new Api()
       let rsp = await api.updateTags(modified_tags, added_tags, deleted_tags)
       console.log(`data: ${JSON.stringify(rsp)}`)
-      if (Api.isSuccessResponse(rsp)) {
+      if (rsp.isSuccess()) {
         this.$getUi().toast.success('tags are successfully updated!')
       } else {
-        this.$getUi().toast.fail(`update tags failed(${rsp.code}): ${rsp.detail}`)
+        this.$getUi().toast.fail(`update tags failed(${rsp.errorCode()}): ${rsp.errorDetail()}`)
       }
 
       // reload tags

@@ -22,6 +22,10 @@ export default class Utils {
       (Object.entries(obj).length === 0 && obj.constructor === Object)
   }
 
+  static isStringEmpty(str) {
+    return !str
+  }
+
   static blink(callback, delay, repetitions) {
     Utils.startStoppableInterval(callback, delay, repetitions)
   }

@@ -104,13 +104,13 @@ export default {
         sign: this.sign,
         email: this.email,
       })
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail('update profile failed: ${rsp.detail}')
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`update profile failed: ${rsp.errorDetail()}`)
         return
       }
 
       // save token
-      let token = rsp.data;
+      let token = rsp.data();
       this.$getLog().debug(`token: ${token}`)
       this.updateLoginData(token)
 

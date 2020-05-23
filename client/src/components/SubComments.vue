@@ -100,20 +100,20 @@ export default {
       }
       let rsp = await api.getComments(this.articleId, args)
       this.$getLog().debug(`rsp: ${JSON.stringify(rsp)}`)
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`get comments failed: ${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`get comments failed: ${rsp.errorDetail()}`)
         return
       }
 
       // update total page
-      this.totalPages = rsp.data.total
+      this.totalPages = rsp.data().total
       if (isReload) {
         // reset data
         this.comments = []
         this.currentPage = 1
       }
       // update comment data
-      this.comments = rsp.data.comments
+      this.comments = rsp.data().comments
     },
     pageChanged(currentPage) {
       // update current page

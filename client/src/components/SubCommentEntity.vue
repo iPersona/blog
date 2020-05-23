@@ -31,7 +31,7 @@
                     size="is-small"
                     style="text-decoration: none; color: gray; padding-left: 5px"
                   >
-                    <span class="comment-nickname">{{ comment.nickname }}</span>
+                    <span class="comment-nickname">{{ comment.from_nickname }}</span>
                   </b-button>
                   <b-dropdown-item
                     aria-role="listitem"
@@ -62,7 +62,11 @@
           <BField style="margin-bottom: 0px;">
             <div class="comment-status">
               <div class="comment-status-left">
-                <span class="comment-info">{{ createTime }}</span>
+                <ButtonSpan
+                  size="is-small"
+                  color="gray"
+                  :text="createTime"
+                />
               </div>
               <div
                 v-if="isLogin"
@@ -74,7 +78,7 @@
                   size="is-small"
                   style="text-decoration: none; color: gray;"
                   aria-controls="replyComment"
-                  @click="quoteReply"
+                  @click="reply"
                 >
                   <IconText
                     icon="corner-up-left"
@@ -84,6 +88,31 @@
                     text-color="gray"
                   />
                 </b-button>
+              </div>
+              <div
+                v-if="isLogin"
+                class="comment-status-right"
+              >
+                <b-dropdown
+                  hoverable
+                  aria-role="list"
+                >
+                  <b-button
+                    slot="trigger"
+                    type="is-text"
+                    size="is-small"
+                    style="text-decoration: none; color: gray;"
+                  >
+                    <MoreHorizontalIcon size="1x" />
+                  </b-button>
+
+                  <b-dropdown-item
+                    aria-role="listitem"
+                    @click="quoteReply"
+                  >
+                    Quote reply
+                  </b-dropdown-item>
+                </b-dropdown>
               </div>
             </div>
           </BField>
@@ -96,7 +125,7 @@
             <div
               :is="replyComponent"
               v-if="isLogin"
-              v-bind="{articleId: comment.article_id, commentId: comment.id}"
+              v-bind="commentArgs"
               class="reply-comment"
             />
           </b-collapse>
@@ -120,6 +149,8 @@ import { USER } from "@/store/modules/module-names";
 import Utils from '@/utils'
 import VueScrollTo from 'vue-scrollto'
 import IconText from '@/components/controllers/IconText'
+import ButtonSpan from '@/components/controllers/ButtonSpan'
+import { MoreHorizontalIcon } from 'vue-feather-icons'
 
 export default {
   name: "SubCommentEntity",
@@ -129,6 +160,8 @@ export default {
     NewComment,
     Empty,
     IconText,
+    ButtonSpan,
+    MoreHorizontalIcon
   },
   props: {
     comment: {
@@ -144,12 +177,24 @@ export default {
     return {
       replyComponent: 'Empty',
       isReply: false,
+      isQuoteReply: false,
       showOverlay: false,
     }
   },
   computed: {
     createTime: function () {
       return DatetimeUtil.toTimeAgo(this.comment.create_time)
+    },
+    commentArgs: function () {
+      let args = {
+        articleId: this.comment.article_id,
+        commentId: this.comment.id
+      }
+      if (this.isQuoteReply) {
+        args['comment'] = `> ${this.comment.comment}`
+      }
+      console.log(`commentArgs: ${JSON.stringify(args)}`)
+      return args
     },
     ...mapGetters(USER, {
       isLogin: IS_LOGIN,
@@ -190,12 +235,26 @@ export default {
         }
       })
     },
+    reply() {
+      this.isQuoteReply = false
+      this.toggleReplyCommentView()
+    },
     quoteReply() {
+      this.isQuoteReply = true
       this.toggleReplyCommentView()
     },
     toggleReplyCommentView() {
       this.isReply = !this.isReply;
       this.replyComponent = this.isReply ? 'NewComment' : 'Empty'
+    },
+    copyUserInfo() {
+      let self = this
+      let userInfo = `[@${this.comment.from_nickname}](${Url.getUrls().user(this.comment.user_id)})`
+      this.$copyText(userInfo).then(function (e) {
+        self.$getUi().toast.success('User id copied!')
+      }, function (e) {
+        self.$getUi().toast.success(`failed to copy user id: ${JSON.stringify(e)}`)
+      })
     },
   },
 }
@@ -214,8 +273,8 @@ export default {
 
 .comment-spliter {
   height: 1px;
-  width: 80%;
-  margin: 0 0;
+  /* margin: 0 0; */
+  margin-top: 0.2rem;
 }
 
 .comment-header {
@@ -252,17 +311,18 @@ export default {
 
 .comment-status-left {
   align-items: center;
-  float: left;
+  margin-left: 0;
 }
 
 .comment-status-middle {
   align-items: center;
-  float: left;
   margin-left: 20px;
 }
 
 .comment-status-right {
-  float: right;
+  align-items: center;
+  margin-left: auto;
+  order: 3;
 }
 
 .comment-info {

@@ -11,12 +11,13 @@
 </template>
 
 <script>
-import { mapMutations } from "vuex";
-import { LOAD_USER, LOAD_TAG } from "@/store/modules/mutation-types";
-import { USER, TAG } from "@/store/modules/module-names";
+import NavHeader from "@/components/Header"
+import NavFooter from "@/components/Footer"
 
-import NavHeader from "@/components/Header";
-import NavFooter from "@/components/Footer";
+import Api from "@/api"
+import { mapMutations } from 'vuex'
+import { UPDATE_LOGIN_DATA, CLEAR_STATE } from "@/store/modules/mutation-types.js"
+import { USER } from '@/store/modules/module-names'
 
 export default {
   name: "App",
@@ -28,21 +29,29 @@ export default {
     return {
     }
   },
+  created() {
+    // get user info from server
+    this.loadUserData()
+  },
   mounted() {
     console.log(`App mounted`);
-    this.loadAppData()
   },
   methods: {
     ...mapMutations(USER, {
-      loadUser: LOAD_USER
+      updateLoginData: UPDATE_LOGIN_DATA,
+      resetAppData: CLEAR_STATE,
     }),
-    ...mapMutations(TAG, {
-      loadTag: LOAD_TAG
-    }),
-    loadAppData() {
-      this.loadUser()
-      this.loadTag()
-    },
+    async loadUserData() {
+      let api = new Api()
+      let rsp = await api.userData()
+      if (!rsp.isSuccess()) {
+        // clear cached vuex data
+        this.resetAppData()
+        return
+      }
+
+      this.updateLoginData(rsp.data())
+    }
   }
 };
 </script>

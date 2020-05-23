@@ -97,18 +97,18 @@ export default {
 
       let api = new Api();
       // let rsp = await api.login(this.username, Util.password(this.password), this.remember);
-      // let rsp = await api.login("admin", Util.password("123456"), true, rechaptchaToken);
-      let rsp = await api.login("user-4", Util.password("123456"), true, rechaptchaToken);
+      let rsp = await api.login("admin", Util.password("123456"), true, rechaptchaToken);
+      // let rsp = await api.login("user-4", Util.password("123456"), true, rechaptchaToken);
       // let rsp = await api.login("user-1", Util.password("123456"), true);
       this.$getLog().debug("rsp: " + JSON.stringify(rsp));
-      if (!Api.isSuccessResponse(rsp)) {
-        this.$getUi().toast.fail(`${rsp.detail}`)
+      if (!rsp.isSuccess()) {
+        this.$getUi().toast.fail(`${rsp.errorDetail()}`)
         this.isLoading = false  // Stop loading indicator
         return
       }
 
       // save token
-      let loginData = rsp.data;
+      let loginData = rsp.data();
       this.$getLog().debug(`token: ${JSON.stringify(loginData)}`)
       this.updateLoginData(loginData)
 
@@ -116,7 +116,7 @@ export default {
       this.isLoading = false
 
       // refresh page to make other components loading data
-      window.location.reload()
+      // window.location.reload()
     },
     async recaptcha() {
       return await

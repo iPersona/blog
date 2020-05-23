@@ -6,7 +6,7 @@
     >
       <header class="modal-card-head">
         <p class="modal-card-title">
-          Signup
+          Sign Up
         </p>
       </header>
       <section class="modal-card-body">
@@ -136,7 +136,7 @@ export default {
       });
 
       console.log("signup-resp: " + JSON.stringify(rsp));
-      if (Api.isSuccessResponse(rsp)) {
+      if (rsp.isSuccess()) {
         this.$getUi().toast.success(`An verification email is send to ${this.email}. Please verify your email to active your account!`)
       } else {
         this.$getUi().toast.fail('Sorry! We are failed to create an account for you now, please try again later.');
@@ -151,7 +151,7 @@ export default {
       let rsp = await api.checkUserExist(this.email);
       console.log("result: " + JSON.stringify(rsp));
 
-      if (rsp.data === true) {
+      if (rsp.data() === true) {
         this.$getUi().toast.fail('Sorry! We are failed to create an account for you now, please try again later.')
       } else {
         this.$getUi().toast.success('Congratulation! This email can be used for register!');

@@ -21,6 +21,8 @@ use crate::util::errors::{Error, ErrorCode};
 use crate::util::redis_pool::RedisKeys;
 use crate::util::result::InternalStdResult;
 use crate::AppState;
+use actix_http::cookie::Cookie;
+use actix_redis::SameSite;
 use std::cell::Ref;
 use std::{collections::HashMap, convert::TryFrom};
 use time::Duration;
@@ -788,4 +790,51 @@ pub fn verify_data(conn: &PgConnection, token: Token) -> InternalStdResult<Login
         .notify_num(notify_num)?
         .build();
     Ok(data)
+}
+
+/// Represent user data
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserData {
+    pub is_login: bool,
+    pub user_name: String,
+    pub nickname: String,
+    pub user_id: Uuid,
+    pub email: String,
+    pub sign: Option<String>,
+    pub regist_time: NaiveDateTime,
+    pub is_admin: bool,
+    pub notify_num: i64,
+}
+
+pub fn user_data(conn: &PgConnection, user_info: &UserInfo) -> InternalStdResult<UserData> {
+    let notify_num = CommentNotify::count(user_info.id, conn, true)?;
+    Ok(UserData {
+        is_login: true,
+        user_name: user_info.account.clone(),
+        nickname: user_info.nickname.clone(),
+        user_id: user_info.id,
+        email: user_info.email.clone(),
+        sign: match &user_info.say {
+            Some(v) => Some(v.clone()),
+            None => None,
+        },
+        regist_time: user_info.create_time,
+        is_admin: user_info.is_admin(),
+        notify_num,
+    })
+}
+
+pub fn disabled_cookie<'a>() -> Cookie<'a> {
+    let mut cb = Cookie::build("token", "invalid token")
+        .path("/")
+        .expires(time::now_utc() - Duration::days(10));
+    // disable for debuging
+    if cfg!(not(debug_assertions)) {
+        cb = cb
+            .domain(Env::get().domain)
+            .same_site(SameSite::Strict)
+            .secure(true)
+            .http_only(true);
+    }
+    cb.finish()
 }
