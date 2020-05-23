@@ -60,6 +60,10 @@ export default {
     commentId: {
       type: String,
       default: ''
+    },
+    comment: {
+      type: String,
+      default: ''
     }
   },
   data() {
@@ -76,6 +80,7 @@ export default {
   mounted() {
     console.log('NewComment mounted')
     this.listenEvent()
+    this.setContent()
   },
   beforeDestroy() {
     EventBus.$off(EVENT_ARTICLE_EDITOR_CLOSED)
@@ -93,6 +98,12 @@ export default {
         console.log(`event-bus: ${EVENT_SET_COMMENT_EDITOR_CONTENT}`)
         await self.$refs.editor.setContent(content)
       })
+    },
+    async setContent() {
+      if (this.comment === '') {
+        return
+      }
+      await this.$refs.editor.setContent(this.comment)
     },
     async newComment() {
       console.log(`comment-content: ${this.$refs.editor.content()}`)
