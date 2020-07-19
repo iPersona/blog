@@ -37,3 +37,12 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 ## References
 
 - [How to make a overlay](https://jsfiddle.net/tiagomatosweb/39tfk27r/)
+
+
+## Q&A
+### These dependencies were not found: * core-js/modules/es6.array.fill
+```bash
+$ npm install --save core-js@2
+```
+Reference: 
+- [npm run build failed #4391](https://github.com/vuejs/vue-cli/issues/4391)

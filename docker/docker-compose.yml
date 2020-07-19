@@ -11,6 +11,7 @@ services:
       - ./caddy/www:/srv:rw
 
   postgres:
+    #image: postgres:11-alpine
     image: postgres:alpine
     container_name: pg
     ports:
@@ -18,6 +19,7 @@ services:
     volumes:
       - ./pg/data:/var/lib/postgresql/data:rw
       - ./pg/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
+      - ./pg/update-utils:/mnt:ro
 
   redis:
     image: redis:alpine

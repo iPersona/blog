@@ -19,7 +19,7 @@ impl Recaptcha {
         }
     }
 
-    pub fn verify(&self) -> bool {
+    pub async fn verify(&self) -> bool {
         use std::collections::HashMap;
         let mut params = HashMap::new();
         params.insert("secret", self.secret.clone());
@@ -34,10 +34,11 @@ impl Recaptcha {
         let res = client
             .post("https://www.google.com/recaptcha/api/siteverify")
             .form(&params)
-            .send();
+            .send()
+            .await;
         match res {
-            Ok(mut r) => {
-                let result = r.json::<VerifyResult>();
+            Ok(r) => {
+                let result = r.json::<VerifyResult>().await;
                 match result {
                     Ok(r) => r.is_ok(),
                     Err(e) => {
@@ -85,9 +86,9 @@ impl VerifyResult {
     }
 }
 
-pub fn verify_recaptcha(response: &str) -> bool {
+pub async fn verify_recaptcha(response: &str) -> bool {
     use crate::util::env::Env;
     let secret = Env::get().recaptcha_secret;
     let recaptcha = Recaptcha::new(secret.as_str(), response, None);
-    recaptcha.verify()
+    recaptcha.verify().await
 }

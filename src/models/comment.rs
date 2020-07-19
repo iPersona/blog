@@ -2,15 +2,17 @@ use super::super::comments;
 use super::super::comments::dsl::comments as all_comments;
 
 use super::super::UserInfo;
-use super::{mailbox::mail_box::NewCommentNotify, user::UserSettings, FormDataExtractor};
+use super::{mailbox::mail_box::NewCommentNotify, user::UserSettings};
 use crate::models::token::TokenExtension;
 use crate::util::errors::{Error, ErrorCode};
-use crate::{util::result::InternalStdResult, AppState};
+use crate::{util::result::InternalStdResult, RedisPool};
+use actix_web::web;
 use chrono::NaiveDateTime;
 use diesel;
 use diesel::prelude::*;
 use diesel::sql_types::{BigInt, Json, Nullable, Text};
 use regex::Regex;
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Represent comment query result
@@ -399,22 +401,25 @@ impl NewComments {
                     return Err(Error {
                         code: ErrorCode::ParseError,
                         detail: format!("failed to parse uuid in comment: {:?}", e),
-                    })
+                    });
                 }
             }
         }
         Ok(users)
     }
 
-    pub fn send_to_mailbox(&self, state: &AppState, comment: &CommentEntity) {
-        let conn = &state.db.connection();
-        let redis_pool = &state.cache.into_inner();
+    pub fn send_to_mailbox(
+        &self,
+        conn: &PgConnection,
+        cache: &Arc<RedisPool>,
+        comment: &CommentEntity,
+    ) {
         let users = comment.notified_users();
         if let Some(users) = users {
             let mails = users
                 .into_iter()
                 .filter(|u| {
-                    let user_settings = UserSettings::get(redis_pool, u).unwrap();
+                    let user_settings = UserSettings::get(cache, u).unwrap();
                     user_settings.settings.subscribe
                 })
                 .map(|u| NewCommentNotify {
@@ -429,48 +434,52 @@ impl NewComments {
             // TODO: send notify email
         }
     }
-}
 
-impl FormDataExtractor for NewComments {
-    type Data = ();
-
-    fn execute(
-        &self,
+    pub async fn execute(
+        self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> InternalStdResult<Self::Data> {
+    ) -> InternalStdResult<()> {
         let token_ext = TokenExtension::from_request(&req);
-        match token_ext {
-            Some(t) => {
-                if !t.is_login() {
-                    return Err(Error {
-                        code: ErrorCode::PermissionDenied,
-                        detail: format!("please login and try again!"),
-                    });
-                }
-                let conn = &state.db.connection();
-                match t.user_info {
-                    Some(user) => match self.insert(&conn, &user) {
-                        Ok(c) => {
-                            self.send_to_mailbox(state, &c);
-                            Ok(())
-                        }
-                        Err(e) => Err(Error {
-                            code: e.code,
-                            detail: format!("new_comment failed: {:?}", e.detail),
+        let conn = state.db.connection();
+        let cache = state.cache.into_inner();
+        web::block(move || -> InternalStdResult<()> {
+            match token_ext {
+                Some(t) => {
+                    if !t.is_login() {
+                        return Err(Error {
+                            code: ErrorCode::PermissionDenied,
+                            detail: format!("please login and try again!"),
+                        });
+                    }
+                    match t.user_info {
+                        Some(user) => match self.insert(&conn, &user) {
+                            Ok(c) => {
+                                self.send_to_mailbox(&conn, &cache, &c);
+                                Ok(())
+                            }
+                            Err(e) => Err(Error {
+                                code: e.code,
+                                detail: format!("new_comment failed: {:?}", e.detail),
+                            }),
+                        },
+                        None => Err(Error {
+                            code: ErrorCode::PermissionDenied,
+                            detail: format!("failed to get token extension from request!"),
                         }),
-                    },
-                    None => Err(Error {
-                        code: ErrorCode::PermissionDenied,
-                        detail: format!("failed to get token extension from request!"),
-                    }),
+                    }
                 }
+                None => Err(Error {
+                    code: ErrorCode::PermissionDenied,
+                    detail: format!("failed to get token extension from request!"),
+                }),
             }
-            None => Err(Error {
-                code: ErrorCode::PermissionDenied,
-                detail: format!("failed to get token extension from request!"),
-            }),
-        }
+        })
+        .await
+        .map_err(|e| Error {
+            code: ErrorCode::ServerError,
+            detail: format!("create comment failed: {:?}", e),
+        })
     }
 }
 
@@ -491,16 +500,12 @@ impl DeleteComment {
             false
         }
     }
-}
 
-impl FormDataExtractor for DeleteComment {
-    type Data = ();
-
-    fn execute(
-        &self,
+    pub async fn execute(
+        self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> InternalStdResult<Self::Data> {
+    ) -> InternalStdResult<()> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
@@ -519,21 +524,21 @@ impl FormDataExtractor for DeleteComment {
                             return Err(
                                 Error {
                                     code: ErrorCode::PermissionDenied,
-                                    detail: format!("Permission denied, you are not permitted to delete this comment!")
+                                    detail: format!("Permission denied, you are not permitted to delete this comment!"),
                                 }
                             );
                         }
 
-                        let pg_pool = &state.db.connection();
-                        let res = self.delete(pg_pool, &user);
-                        if res {
-                            Ok(())
-                        } else {
-                            Err(Error {
-                                code: ErrorCode::DbError,
-                                detail: format!("failed to delete comment!"),
-                            })
-                        }
+                        let conn = state.db.connection();
+                        actix_web::web::block(move || -> InternalStdResult<bool> {
+                            Ok(self.delete(&conn, &user))
+                        })
+                        .await
+                        .map_err(|e| Error {
+                            code: ErrorCode::ServerError,
+                            detail: format!("delete article failed: {:?}", e),
+                        })
+                        .map(|_| ())
                     }
                     None => Err(Error {
                         code: ErrorCode::PermissionDenied,

@@ -20,6 +20,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate lettre;
+extern crate lettre_email;
 extern crate regex;
 extern crate serde_urlencoded;
 extern crate tiny_keccak;
@@ -36,10 +37,7 @@ pub mod util;
 pub mod web;
 
 //pub(crate) use models::UserNotify;
-pub(crate) use models::{
-    ArticleList, ArticlesWithTag, EditArticle,
-    /*ModifyPublish,*/ NewArticle, /*PublishedStatistics,*/
-};
+pub(crate) use models::{ArticleList, ArticlesWithTag, NewArticle};
 pub(crate) use models::{ChangePassword, EditUser, RegisteredUser, UserInfo};
 pub(crate) use models::{Comments, DeleteComment, NewComments, SubComment};
 pub(crate) use models::{NewTag, TagCount, Tags};
@@ -49,7 +47,7 @@ pub(crate) use schema::{
 pub use util::RedisPool;
 //pub(crate) use util::{get_github_account_nickname_address, get_github_primary_email, get_github_token};
 pub use actix::Addr;
-pub(crate) use util::{get_password, markdown_render, random_string, sha3_256_encode};
+pub(crate) use util::{get_password, random_string, sha3_256_encode};
 pub use web::{Admin, ArticleWeb};
 
 pub struct AppState {

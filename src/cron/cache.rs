@@ -8,6 +8,7 @@ use time::Duration;
 use uuid::Uuid;
 
 #[derive(Message)]
+#[rtype(result = "()")]
 pub struct IncreaseArticleVisitNum {
     pub article_id: Uuid,
 }
@@ -105,6 +106,7 @@ impl Handler<IncreaseArticleVisitNum> for CacheActor {
 }
 
 #[derive(Message)]
+#[rtype(resultl = "()")]
 pub struct PersistCache;
 
 impl Handler<PersistCache> for CacheActor {
@@ -118,6 +120,7 @@ impl Handler<PersistCache> for CacheActor {
 }
 
 #[derive(Message)]
+#[rtype(resultl = "()")]
 pub struct PersistUncached;
 
 impl Handler<PersistUncached> for CacheActor {
@@ -151,6 +154,7 @@ impl Handler<PersistUncached> for CacheActor {
 }
 
 #[derive(Message)]
+#[rtype(resultl = "()")]
 pub struct LoadUserCache;
 
 impl Handler<LoadUserCache> for CacheActor {

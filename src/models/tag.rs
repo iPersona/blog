@@ -2,7 +2,6 @@ use super::super::tags;
 use super::super::tags::dsl::tags as all_tags;
 use super::Relations;
 
-use super::FormDataExtractor;
 use crate::models::token::TokenExtension;
 use crate::util::errors::{Error, ErrorCode};
 use crate::util::result::InternalStdResult;
@@ -45,8 +44,7 @@ impl Tags {
     //     }
     // }
 
-    pub fn delete_tag(state: &AppState, id: Uuid) -> Result<usize, String> {
-        let conn = &state.db.connection();
+    pub fn delete_tag(conn: &PgConnection, id: Uuid) -> Result<usize, String> {
         Relations::delete_all(conn, id, "tag");
         let res = diesel::delete(all_tags.filter(tags::id.eq(id))).execute(conn);
         match res {
@@ -59,8 +57,7 @@ impl Tags {
         self.id
     }
 
-    pub fn edit_tag(&self, state: &AppState) -> Result<usize, String> {
-        let conn = &state.db.connection();
+    pub fn edit_tag(&self, conn: &PgConnection) -> Result<usize, String> {
         let res = diesel::update(all_tags.filter(tags::id.eq(&self.id)))
             .set(tags::tag.eq(&self.tag))
             .execute(conn);
@@ -70,10 +67,10 @@ impl Tags {
         }
     }
 
-    pub fn edit_tags(tags: &Vec<Tags>, state: &AppState) -> Result<usize, String> {
+    pub fn edit_tags(tags: &Vec<Tags>, conn: &PgConnection) -> Result<usize, String> {
         let mut num = 0;
         for tag in tags.iter() {
-            let res = tag.edit_tag(state);
+            let res = tag.edit_tag(conn);
             if let Err(e) = res {
                 return Err(e);
             }
@@ -190,11 +187,10 @@ pub struct TagsData {
 }
 
 impl TagsData {
-    pub fn update(&self, state: &AppState) -> Result<(), String> {
-        let conn: &PgConnection = &state.db.connection();
+    pub fn update(&self, conn: &PgConnection) -> InternalStdResult<()> {
         let result = conn.transaction(|| {
             if let Some(tags) = &self.modified_tags {
-                let res = Tags::edit_tags(&tags, state);
+                let res = Tags::edit_tags(&tags, conn);
                 if let Err(_) = res {
                     return Err(DieselError::RollbackTransaction);
                 }
@@ -211,7 +207,7 @@ impl TagsData {
             if let Some(tag_id_array) = &self.deleted_tags {
                 let tags = tag_id_array.iter().map(|v| Tags::new(v.clone()));
                 for t in tags.into_iter() {
-                    let res = Tags::delete_tag(state, t.id);
+                    let res = Tags::delete_tag(conn, t.id);
                     if let Err(_) = res {
                         return Err(DieselError::RollbackTransaction);
                     }
@@ -223,19 +219,18 @@ impl TagsData {
 
         match result {
             Ok(_) => Ok(()),
-            Err(_) => Err("update tags failed!".to_string()),
+            Err(e) => Err(Error {
+                code: ErrorCode::DbError,
+                detail: format!("update tag failed: {:?}", e),
+            }),
         }
     }
-}
 
-impl FormDataExtractor for TagsData {
-    type Data = ();
-
-    fn execute(
-        &self,
+    pub async fn execute(
+        self,
         req: actix_web::HttpRequest,
         state: &AppState,
-    ) -> InternalStdResult<Self::Data> {
+    ) -> InternalStdResult<()> {
         // The API is only available for administrator
         if !TokenExtension::is_admin(&req) {
             return Err(Error {
@@ -244,7 +239,13 @@ impl FormDataExtractor for TagsData {
             });
         }
 
-        let res = self.update(&state);
+        let conn = state.db.connection();
+        let res = actix_web::web::block(move || -> InternalStdResult<()> { self.update(&conn) })
+            .await
+            .map_err(|e| Error {
+                code: ErrorCode::ServerError,
+                detail: format!("{:?}", e),
+            });
         match res {
             Ok(_) => Ok(()),
             Err(e) => Err(Error {

@@ -6,7 +6,7 @@ use crate::util::env::Env;
 use crate::util::errors::{Error, ErrorCode};
 use crate::util::result::InternalStdResult;
 use diesel::PgConnection;
-use lettre::builder::EmailBuilder;
+use lettre_email::EmailBuilder;
 
 pub struct SignUpVerify {
     pub email: String,
@@ -32,7 +32,7 @@ impl SignUpVerify {
         .unwrap()
         .transport();
         // Send the email
-        let result = mailer.send(email);
+        let result = mailer.send(email.into());
         match result {
             Ok(_) => {
                 debug!("Email sent");

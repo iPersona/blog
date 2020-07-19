@@ -65,7 +65,8 @@ macro_rules! into_fut_service_response {
 //#[macro_export]
 macro_rules! api_resp {
     ($api_ret:expr) => {
-        futures::future::ok(actix_web::HttpResponse::Ok().json($api_ret))
+        // futures::future::ok(actix_web::HttpResponse::Ok().json($api_ret))
+        std::result::Result::Ok(actix_web::HttpResponse::Ok().json($api_ret))
     };
     ($api_ret:expr, $( $cookie:expr ),*) => {
         {
@@ -74,7 +75,8 @@ macro_rules! api_resp {
             $(
                 rb_ptr = rb_ptr.cookie($cookie);
             )*
-            futures::future::ok(rb_ptr.json($api_ret))
+            // futures::future::ok(rb_ptr.json($api_ret))
+            std::result::Result::Ok(rb_ptr.json($api_ret))
         }
     }
 }
@@ -129,32 +131,22 @@ macro_rules! api_resp_data {
     };
 }
 
-macro_rules! extract_form_data {
-    ($data_type:ty, $req:expr, $body:expr, $state: expr) => {
-        $body
-            .map_err(actix_web::Error::from)
-            .fold(web::BytesMut::new(), move |mut body, chunk| {
-                body.extend_from_slice(&chunk);
-                Ok::<_, actix_http::Error>(body)
+macro_rules! extract_data {
+    ($body:expr, $data_type:ty) => {{
+        use futures::StreamExt;
+        let mut bytes = web::BytesMut::new();
+        while let Some(item) = $body.next().await {
+            bytes.extend_from_slice(&item?);
+        }
+
+        let config = serde_qs::Config::new(10, false);
+        config
+            .deserialize_bytes::<$data_type>(&bytes)
+            .map_err(|e| $crate::util::errors::Error {
+                code: $crate::util::errors::ErrorCode::ParseError,
+                detail: format!("deserialize query string failed: ${:?}", e),
             })
-            .and_then(move |body| {
-                use $crate::models::FormDataExtractor;
-                let config = serde_qs::Config::new(10, false);
-                let data: $data_type = config.deserialize_bytes(&body).unwrap();
-                let res = data.execute($req, &$state);
-                match res {
-                    Ok(data) => {
-                        use typename::TypeName;
-                        if data.type_name_of() == "()" {
-                            api_resp_ok!()
-                        } else {
-                            api_resp_data!(data)
-                        }
-                    }
-                    Err(e) => api_resp_err_with_code!(e.code, e.detail),
-                }
-            })
-    };
+    }};
 }
 
 /// redirect to specified url

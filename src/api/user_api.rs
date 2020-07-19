@@ -8,17 +8,15 @@ use crate::util::errors::ErrorCode;
 use crate::{AppState, ChangePassword, EditUser, RegisteredUser};
 use actix_web::web::{Data, Form};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
-use futures::stream::Stream;
-use futures::Future;
 
 pub struct UserApi;
 
 impl UserApi {
-    fn change_pwd(
+    async fn change_pwd(
         state: Data<AppState>,
         req: HttpRequest,
         params: Form<ChangePassword>,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
@@ -48,19 +46,23 @@ impl UserApi {
         }
     }
 
-    fn edit(
+    async fn edit(
         state: Data<AppState>,
         req: HttpRequest,
-        body: web::Payload,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        mut body: web::Payload,
+    ) -> Result<HttpResponse, Error> {
         debug!("edit_user");
-        extract_form_data!(EditUser, req, body, &state)
+        let res = extract_data!(body, EditUser);
+        match res {
+            Ok(data) => match data.execute(req, &state).await {
+                Ok(_) => api_resp_ok!(),
+                Err(e) => api_resp_err_with_code!(e.code, e.detail),
+            },
+            Err(e) => api_resp_err_with_code!(e.code, e.detail),
+        }
     }
 
-    fn sign_out(
-        _state: Data<AppState>,
-        req: HttpRequest,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    async fn sign_out(_state: Data<AppState>, req: HttpRequest) -> Result<HttpResponse, Error> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
@@ -79,11 +81,11 @@ impl UserApi {
         }
     }
 
-    fn create_user(
+    async fn create_user(
         state: Data<AppState>,
         _req: HttpRequest,
         params: Form<RegisteredUser>,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         let user_info = params.into_inner();
         // parse user info
         let verify = SignUpVerify {
@@ -113,25 +115,25 @@ impl UserApi {
         }
     }
 
-    fn is_user_exist(
+    async fn is_user_exist(
         state: Data<AppState>,
         _req: HttpRequest,
         params: Form<CheckUser>,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         let pg_pool = state.db.connection();
         let exist = params.into_inner().is_user_exist(&pg_pool);
         api_resp_data!(exist)
     }
 
-    fn login(
+    async fn login(
         state: Data<AppState>,
         mut _req: HttpRequest,
         params: Form<LoginUser>,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         let params = &params.into_inner();
 
         // verify reCAPTCHA
-        let is_ok = verify_recaptcha(params.token().as_str());
+        let is_ok = verify_recaptcha(params.token().as_str()).await;
         if !is_ok {
             return api_resp_err!("robot detected!");
         }
@@ -154,11 +156,11 @@ impl UserApi {
         }
     }
 
-    pub fn verify(
+    pub async fn verify(
         state: Data<AppState>,
         _req: HttpRequest,
         params: Form<Verify>,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         debug!("verify token");
 
         // decode token
@@ -199,10 +201,7 @@ impl UserApi {
         }
     }
 
-    fn user_data(
-        state: Data<AppState>,
-        req: HttpRequest,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    async fn user_data(state: Data<AppState>, req: HttpRequest) -> Result<HttpResponse, Error> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
@@ -232,16 +231,16 @@ impl UserApi {
     }
 
     pub fn configure(cfg: &mut web::ServiceConfig) {
-        cfg.service(web::resource("/user/password").route(web::patch().to_async(Self::change_pwd)))
+        cfg.service(web::resource("/user/password").route(web::patch().to(Self::change_pwd)))
             .service(
                 web::resource("/user")
-                    .route(web::put().to_async(Self::edit))
-                    .route(web::post().to_async(Self::create_user))
-                    .route(web::get().to_async(Self::is_user_exist)),
+                    .route(web::put().to(Self::edit))
+                    .route(web::post().to(Self::create_user))
+                    .route(web::get().to(Self::is_user_exist)),
             )
-            .service(web::resource("/verify").route(web::post().to_async(Self::verify)))
-            .service(web::resource("/login").route(web::post().to_async(Self::login)))
-            .service(web::resource("/logout").route(web::post().to_async(Self::sign_out)))
-            .service(web::resource("/user/data").route(web::get().to_async(Self::user_data)));
+            .service(web::resource("/verify").route(web::post().to(Self::verify)))
+            .service(web::resource("/login").route(web::post().to(Self::login)))
+            .service(web::resource("/logout").route(web::post().to(Self::sign_out)))
+            .service(web::resource("/user/data").route(web::get().to(Self::user_data)));
     }
 }

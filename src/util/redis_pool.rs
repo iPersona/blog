@@ -22,7 +22,7 @@ pub struct RedisPool {
 impl RedisPool {
     pub fn new<T>(address: T) -> Self
     where
-        T: redis::IntoConnectionInfo,
+        T: redis::IntoConnectionInfo + r2d2_redis::redis::IntoConnectionInfo,
     {
         let manager = RedisConnectionManager::new(address).unwrap();
         let pool = r2d2::Pool::new(manager).unwrap();
@@ -47,20 +47,21 @@ impl RedisPool {
     pub fn keys(&self, pattern: &str) -> Vec<String> {
         redis::cmd("keys")
             .arg(pattern)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 
     pub fn exists(&self, redis_key: &str) -> bool {
         redis::cmd("exists")
             .arg(redis_key)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 
     pub fn expire(&self, redis_key: &str, sec: i64) {
-        let a =
-            |conn: &redis::Connection| redis::cmd("expire").arg(redis_key).arg(sec).execute(conn);
+        let a = |conn: &mut redis::Connection| {
+            redis::cmd("expire").arg(redis_key).arg(sec).execute(conn)
+        };
         self.with_conn(a);
     }
 
@@ -68,20 +69,21 @@ impl RedisPool {
     where
         T: redis::ToRedisArgs,
     {
-        let a = |conn: &redis::Connection| redis::cmd("del").arg(redis_key).execute(conn);
+        let a = |conn: &mut redis::Connection| redis::cmd("del").arg(redis_key).execute(conn);
         self.with_conn(a);
     }
 
     pub fn set(&self, redis_key: &str, value: &str) {
-        let a =
-            |conn: &redis::Connection| redis::cmd("set").arg(redis_key).arg(value).execute(conn);
+        let a = |conn: &mut redis::Connection| {
+            redis::cmd("set").arg(redis_key).arg(value).execute(conn)
+        };
         self.with_conn(a);
     }
 
     pub fn get(&self, redis_key: &str) -> Option<String> {
         let res = redis::cmd("get")
             .arg(redis_key)
-            .query(&*self.pool.get().unwrap());
+            .query(&mut *self.pool.get().unwrap());
         match res {
             Ok(v) => v,
             Err(_) => {
@@ -95,7 +97,7 @@ impl RedisPool {
     where
         T: redis::ToRedisArgs,
     {
-        let a = |conn: &redis::Connection| {
+        let a = |conn: &mut redis::Connection| {
             redis::cmd("hset")
                 .arg(redis_key)
                 .arg(hash_key)
@@ -109,7 +111,7 @@ impl RedisPool {
     where
         T: redis::ToRedisArgs,
     {
-        let a = |conn: &redis::Connection| {
+        let a = |conn: &mut redis::Connection| {
             redis::cmd("hdel")
                 .arg(redis_key)
                 .arg(hash_key)
@@ -125,7 +127,7 @@ impl RedisPool {
         redis::cmd("hget")
             .arg(redis_key)
             .arg(hash_key)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .map_err(|e| Error {
                 code: ErrorCode::RedisError,
                 detail: format!(
@@ -142,7 +144,7 @@ impl RedisPool {
         redis::cmd("hmget")
             .arg(redis_key)
             .arg(hash_keys)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 
@@ -150,8 +152,9 @@ impl RedisPool {
     where
         T: redis::ToRedisArgs,
     {
-        let cmd =
-            |conn: &redis::Connection| redis::cmd("hmset").arg(redis_key).arg(val).execute(conn);
+        let cmd = |conn: &mut redis::Connection| {
+            redis::cmd("hmset").arg(redis_key).arg(val).execute(conn)
+        };
         self.with_conn(cmd);
     }
 
@@ -161,12 +164,12 @@ impl RedisPool {
     {
         redis::cmd("hgetall")
             .arg(redis_key)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 
     pub fn hincrby(&self, redis_key: &str, hash_key: &str, num: i64) {
-        let a = |conn: &redis::Connection| {
+        let a = |conn: &mut redis::Connection| {
             redis::cmd("hincrby")
                 .arg(redis_key)
                 .arg(hash_key)
@@ -180,14 +183,14 @@ impl RedisPool {
         redis::cmd("hexists")
             .arg(redis_key)
             .arg(hash_key)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 
     pub fn hlen(&self, redis_key: &str) -> i64 {
         redis::cmd("hlen")
             .arg(redis_key)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 
@@ -195,8 +198,9 @@ impl RedisPool {
     where
         T: redis::ToRedisArgs,
     {
-        let a =
-            |conn: &redis::Connection| redis::cmd("lpush").arg(redis_key).arg(value).execute(conn);
+        let a = |conn: &mut redis::Connection| {
+            redis::cmd("lpush").arg(redis_key).arg(value).execute(conn)
+        };
         self.with_conn(a)
     }
 
@@ -206,12 +210,12 @@ impl RedisPool {
     {
         redis::cmd("llen")
             .arg(redis_key)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 
     pub fn ltrim(&self, redis_key: &str, start: i64, stop: i64) {
-        let a = |conn: &redis::Connection| {
+        let a = |conn: &mut redis::Connection| {
             redis::cmd("ltrim")
                 .arg(redis_key)
                 .arg(start)
@@ -225,7 +229,7 @@ impl RedisPool {
     where
         T: redis::ToRedisArgs,
     {
-        let a = |conn: &redis::Connection| {
+        let a = |conn: &mut redis::Connection| {
             redis::cmd("lrem")
                 .arg(redis_key)
                 .arg(count)
@@ -243,12 +247,12 @@ impl RedisPool {
             .arg(redis_key)
             .arg(start)
             .arg(stop)
-            .query(&*self.pool.get().unwrap())
+            .query(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 
-    fn with_conn<F: FnOnce(&redis::Connection)>(&self, command: F) {
-        command(&*self.pool.get().unwrap());
+    fn with_conn<F: FnOnce(&mut redis::Connection)>(&self, command: F) {
+        command(&mut *self.pool.get().unwrap());
     }
 
     pub fn lua_push(&self, redis_key: &str, ip: &str) -> bool {
@@ -257,7 +261,7 @@ impl RedisPool {
             .unwrap()
             .arg(redis_key)
             .arg(ip)
-            .invoke::<bool>(&*self.pool.get().unwrap())
+            .invoke::<bool>(&mut *self.pool.get().unwrap())
             .unwrap()
     }
 

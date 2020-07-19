@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -12,6 +12,7 @@
     "axios": "^0.18.1",
     "buefy": "^0.8.2",
     "bulma-badge": "^3.0.1",
+    "core-js": "^2.6.11",
     "css-loader": "^2.0.1",
     "dateformat": "^3.0.3",
     "easymde": "^2.8.0",
@@ -20,7 +21,7 @@
     "highlight": "^0.2.4",
     "highlightjs-line-numbers.js": "^2.7.0",
     "is-valid-json": "^1.0.2",
-    "jquery": "^3.4.1",
+    "jquery": "^3.5.1",
     "jsonwebtoken": "^8.5.1",
     "marked": "^0.7.0",
     "md5": "^2.2.1",
@@ -48,7 +49,7 @@
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.12.1",
     "@vue/cli-plugin-eslint": "^3.12.1",
-    "@vue/cli-service": "^3.12.1",
+    "@vue/cli-service": "^4.4.6",
     "babel-eslint": "^10.0.3",
     "eslint": "^5.16.0",
     "eslint-plugin-vue": "^5.2.3",
@@ -56,7 +57,7 @@
     "feather-icons": "^4.26.0",
     "less": "^3.10.3",
     "less-loader": "^4.1.0",
-    "node-sass": "^4.13.1",
+    "node-sass": "^4.14.1",
     "sass-loader": "^7.3.1",
     "vue-markdown-loader": "^2.4.1",
     "vue-template-compiler": "^2.6.10"
