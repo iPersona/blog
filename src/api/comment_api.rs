@@ -9,37 +9,49 @@ use crate::{AppState, Comments, DeleteComment, NewComments, SubComment};
 use actix_web::web::{Data, Path, Query};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use diesel::PgConnection;
-use futures::stream::Stream;
-use futures::Future;
 use uuid::Uuid;
 
 pub struct CommentApi;
 
 impl CommentApi {
-    fn new_comment(
+    async fn new_comment(
         state: Data<AppState>,
         req: HttpRequest,
-        body: web::Payload,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        mut body: web::Payload,
+    ) -> Result<HttpResponse, Error> {
         debug!("new_comment");
-        extract_form_data!(NewComments, req, body, &state)
+        let res = extract_data!(body, NewComments);
+        match res {
+            Ok(data) => match data.execute(req, &state).await {
+                Ok(_) => api_resp_ok!(),
+                Err(e) => api_resp_err_with_code!(e.code, e.detail),
+            },
+            Err(e) => api_resp_err_with_code!(e.code, e.detail),
+        }
     }
 
-    fn delete_comment(
+    async fn delete_comment(
         state: Data<AppState>,
         req: HttpRequest,
-        body: web::Payload,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+        mut body: web::Payload,
+    ) -> Result<HttpResponse, Error> {
         debug!("delete_comment");
-        extract_form_data!(DeleteComment, req, body, &state)
+        let res = extract_data!(body, DeleteComment);
+        match res {
+            Ok(data) => match data.execute(req, &state).await {
+                Ok(_) => api_resp_ok!(),
+                Err(e) => api_resp_err_with_code!(e.code, e.detail),
+            },
+            Err(e) => api_resp_err_with_code!(e.code, e.detail),
+        }
     }
 
-    fn list_comments(
+    async fn list_comments(
         state: Data<AppState>,
         _req: HttpRequest,
         article_id: Path<Uuid>,
         params: Query<CommentQueryOption>,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         info!("list_comments");
         let conn = state.get_ref().db.connection();
         let is_top_comment = params.parent_comment.is_none();
@@ -97,11 +109,11 @@ impl CommentApi {
         }
     }
 
-    fn locate_comment(
+    async fn locate_comment(
         state: Data<AppState>,
         req: HttpRequest,
         params: Query<CommentLocationArgs>,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
@@ -138,17 +150,12 @@ impl CommentApi {
 
     pub fn configure(cfg: &mut web::ServiceConfig) {
         cfg.service(
-            web::resource("/comment").route(web::post().to_async(Self::new_comment)), // create comment
+            web::resource("/comment").route(web::post().to(Self::new_comment)), // create comment
         )
         .service(
-            web::resource("/comment/{comment_id}")
-                .route(web::delete().to_async(Self::delete_comment)), // delete comment
+            web::resource("/comment/{comment_id}").route(web::delete().to(Self::delete_comment)), // delete comment
         )
-        .service(
-            web::resource("/comments/{article_id}").route(web::get().to_async(Self::list_comments)),
-        )
-        .service(
-            web::resource("/location/comment").route(web::get().to_async(Self::locate_comment)),
-        );
+        .service(web::resource("/comments/{article_id}").route(web::get().to(Self::list_comments)))
+        .service(web::resource("/location/comment").route(web::get().to(Self::locate_comment)));
     }
 }

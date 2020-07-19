@@ -3,6 +3,7 @@ use crate::util::postgresql_pool::{DataBase, DataBaseConfig};
 use actix::{Actor, Handler, Message, SyncContext};
 
 #[derive(Message)]
+#[rtype(resultl = "()")]
 pub struct ClearUnverifiedUser;
 
 pub struct ClearActor {

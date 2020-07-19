@@ -11,15 +11,13 @@ use crate::{AppState, Comments};
 
 use super::super::article_with_tag::dsl::article_with_tag as all_article_with_tag;
 use super::super::articles::dsl::articles as all_articles;
-use super::super::markdown_render;
 use super::super::{article_with_tag, articles};
-use super::FormDataExtractor;
 use super::{RelationTag, Relations, UserNotify};
 use crate::cron::cache::IncreaseArticleVisitNum;
 use crate::models::token::TokenExtension;
 use crate::util::errors::{Error, ErrorCode};
 use crate::util::result::InternalStdResult;
-use std::cell::Ref;
+use std::{cell::Ref, fmt::Debug};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ArticlesWithTag {
@@ -216,7 +214,7 @@ impl ArticleSummary {
         offset: i64,
         admin: bool,
     ) -> Result<Vec<Self>, String> {
-        let raw_sql = format!("select id, title, raw_content, published, tags, tags_id, create_time, modify_time from article_with_tag where ('{}' = any(tags_id)) {} order by create_time desc limit {} offset {}", tag_id, if admin {""} else {"and published = true"}, limit, offset);
+        let raw_sql = format!("select id, title, raw_content, published, tags, tags_id, create_time, modify_time from article_with_tag where ('{}' = any(tags_id)) {} order by create_time desc limit {} offset {}", tag_id, if admin { "" } else { "and published = true" }, limit, offset);
         let res = diesel::sql_query(raw_sql).load::<Self>(conn);
         match res {
             Ok(mut data) => {
@@ -333,16 +331,16 @@ struct InsertArticle {
     title: String,
     raw_content: String,
     content: String,
+    // reserved
     published: bool,
 }
 
 impl InsertArticle {
     fn new(title: String, raw_content: String, published: bool) -> Self {
-        let content = markdown_render(&raw_content);
         InsertArticle {
             title,
             raw_content,
-            content,
+            content: String::new(),
             published,
         }
     }
@@ -355,11 +353,13 @@ impl InsertArticle {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct NewArticle {
     pub title: String,
     pub raw_content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub exist_tags: Option<Vec<Uuid>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub new_tags: Option<Vec<String>>,
     pub publish: bool,
 }
@@ -389,16 +389,12 @@ impl NewArticle {
             self.publish,
         )
     }
-}
 
-impl FormDataExtractor for NewArticle {
-    type Data = ();
-
-    fn execute(
-        &self,
+    pub async fn execute(
+        self,
         req: actix_web::HttpRequest,
         state: &AppState,
-    ) -> InternalStdResult<Self::Data> {
+    ) -> InternalStdResult<()> {
         // The API is only available for administrator
         if !TokenExtension::is_admin(&req) {
             return Err(Error {
@@ -407,8 +403,14 @@ impl FormDataExtractor for NewArticle {
             });
         }
 
-        let conn = &state.db.connection();
-        let r = self.insert(conn);
+        let conn = state.db.connection();
+        let r =
+            actix_web::web::block(move || -> InternalStdResult<bool> { Ok(self.insert(&conn)) })
+                .await
+                .map_err(|e| Error {
+                    code: ErrorCode::ServerError,
+                    detail: format!("create article failed: {:?}", e),
+                })?;
         if r {
             Ok(())
         } else {
@@ -431,43 +433,41 @@ pub struct EditArticle {
 }
 
 impl EditArticle {
-    pub fn edit_article(&self, state: &AppState) -> Result<usize, String> {
-        let conn = state.db.connection();
+    pub fn edit_article(&self, conn: &PgConnection) -> InternalStdResult<usize> {
         let res = diesel::update(all_articles.filter(articles::id.eq(self.id)))
             .set((
                 articles::title.eq(self.title.clone()),
-                articles::content.eq(markdown_render(&self.raw_content.clone())),
+                articles::content.eq(String::new()),
                 articles::raw_content.eq(self.raw_content.clone()),
             ))
-            .execute(&conn);
+            .execute(conn);
         if self.new_tags.is_some() || self.new_choice_already_exists_tags.is_some() {
             RelationTag::new(
                 self.id,
                 self.new_tags.clone(),
                 self.new_choice_already_exists_tags.clone(),
             )
-            .insert_all(&conn);
+            .insert_all(conn);
         }
         if self.deselect_tags.is_some() {
             for i in self.deselect_tags.clone().unwrap() {
-                Relations::new(self.id, i).delete_relation(&conn);
+                Relations::new(self.id, i).delete_relation(conn);
             }
         }
         match res {
             Ok(data) => Ok(data),
-            Err(err) => Err(format!("{}", err)),
+            Err(err) => Err(Error {
+                code: ErrorCode::DbError,
+                detail: format!("edit article failed: {:?}", err),
+            }),
         }
     }
-}
 
-impl FormDataExtractor for EditArticle {
-    type Data = ();
-
-    fn execute(
-        &self,
+    pub async fn execute(
+        self,
         req: actix_web::HttpRequest,
         state: &AppState,
-    ) -> InternalStdResult<Self::Data> {
+    ) -> InternalStdResult<()> {
         // The API is only available for administrator
         if !TokenExtension::is_admin(&req) {
             return Err(Error {
@@ -476,14 +476,14 @@ impl FormDataExtractor for EditArticle {
             });
         }
 
-        let res = self.edit_article(state);
-        match res {
-            Ok(_) => Ok(()),
-            Err(e) => Err(Error {
-                code: ErrorCode::DbError,
-                detail: format!("edit_article failed: {:?}", e),
-            }),
-        }
+        let conn = state.db.connection();
+        actix_web::web::block(move || -> InternalStdResult<usize> { self.edit_article(&conn) })
+            .await
+            .map_err(|e| Error {
+                code: ErrorCode::ServerError,
+                detail: format!("edit article failed: {:?}", e),
+            })
+            .map(|_| ())
     }
 }
 

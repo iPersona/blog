@@ -1,7 +1,6 @@
 use super::super::users;
 use super::super::users::dsl::users as all_users;
 
-use super::FormDataExtractor;
 use super::UserNotify;
 use crate::util::errors;
 use chrono::{NaiveDateTime, Utc};
@@ -486,16 +485,12 @@ impl EditUser {
             Err(e) => Err(format!("{}", e)),
         }
     }
-}
 
-impl FormDataExtractor for EditUser {
-    type Data = String;
-
-    fn execute(
-        &self,
+    pub async fn execute(
+        self,
         req: actix_web::HttpRequest,
         state: &crate::AppState,
-    ) -> InternalStdResult<Self::Data> {
+    ) -> InternalStdResult<String> {
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
             Some(t) => {
@@ -509,9 +504,14 @@ impl FormDataExtractor for EditUser {
 
                 match t.user_info {
                     Some(u) => {
-                        let pg_pool = &state.db.connection();
+                        let conn = state.db.connection();
                         let user_id = u.id.clone();
-                        match self.edit_user(pg_pool, user_id) {
+                        match actix_web::web::block(move || self.edit_user(&conn, user_id))
+                            .await
+                            .map_err(|e| Error {
+                                code: ErrorCode::ServerError,
+                                detail: format!("{:?}", e),
+                            }) {
                             Ok(token) => Ok(token),
                             Err(err) => Err(Error {
                                 code: ErrorCode::DbError,

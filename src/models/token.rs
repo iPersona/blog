@@ -14,7 +14,10 @@
 use crate::models::UserInfo;
 use crate::util::env::Env;
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, errors::Result, Algorithm, Header, Validation};
+use jsonwebtoken::{
+    decode, encode, errors::Result as JsonWebTokenResult, Algorithm, DecodingKey, EncodingKey,
+    Header, Validation,
+};
 
 use crate::models::user::{UserType, Users};
 use crate::util::errors::{Error, ErrorCode};
@@ -22,10 +25,11 @@ use crate::util::result::InternalStdResult;
 use actix_http::{cookie::Cookie, httpmessage::HttpMessage};
 use actix_redis::SameSite;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
+use actix_web::Error as ActixWebError;
 use actix_web::{HttpRequest, HttpResponse};
 use chrono::NaiveDateTime;
-use futures::future::{ok, Either, FutureResult};
-use futures::Poll;
+use futures::future::{ok, Either, Ready};
+use std::task::{Context, Poll};
 use typename::TypeName;
 use uuid::Uuid;
 
@@ -119,10 +123,10 @@ impl Token {
         }
     }
 
-    pub fn decode(t: &str) -> Result<Self> {
+    pub fn decode(t: &str) -> JsonWebTokenResult<Self> {
         let data = decode::<Self>(
             t,
-            Env::get().token_secret.as_bytes(),
+            &DecodingKey::from_secret(Env::get().token_secret.as_ref()),
             &Validation::default(),
         );
         match data {
@@ -137,7 +141,11 @@ impl Token {
     pub fn encode(&self) -> InternalStdResult<String> {
         let mut header = Header::default();
         header.alg = Algorithm::HS256;
-        match encode(&header, &self, Env::get().token_secret.as_bytes()) {
+        match encode(
+            &header,
+            &self,
+            &EncodingKey::from_secret(Env::get().token_secret.as_ref()),
+        ) {
             Ok(v) => Ok(v),
             Err(e) => Err(Error {
                 code: ErrorCode::EncodeError,
@@ -193,17 +201,16 @@ pub struct PermissionControl;
 // `B` - type of response's body
 impl<S, B> Transform<S> for PermissionControl
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>>,
+    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = ActixWebError>
+        + 'static,
     S::Future: 'static,
-    S::Error: 'static,
-    B: 'static,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
-    type Error = S::Error;
-    type Transform = TokenMiddleware<S>;
+    type Error = ActixWebError;
     type InitError = ();
-    type Future = FutureResult<Self::Transform, Self::InitError>;
+    type Transform = TokenMiddleware<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
         ok(TokenMiddleware { service })
@@ -216,18 +223,17 @@ pub struct TokenMiddleware<S> {
 
 impl<S, B> Service for TokenMiddleware<S>
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>>,
+    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = ActixWebError>
+        + 'static,
     S::Future: 'static,
-    S::Error: 'static,
-    B: 'static,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
-    type Error = S::Error;
-    type Future = Either<S::Future, FutureResult<Self::Response, Self::Error>>;
+    type Error = ActixWebError;
+    type Future = Either<S::Future, Ready<Result<Self::Response, Self::Error>>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.service.poll_ready()
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(cx)
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
@@ -241,7 +247,7 @@ where
                 match t {
                     Ok(t) => {
                         if t.expired() {
-                            return Either::B(middleware_resp_err!(
+                            return Either::Right(middleware_resp_err!(
                                 req,
                                 crate::util::errors::ErrorCode::TokenExpired,
                                 "token expired!"
@@ -255,18 +261,18 @@ where
                             user_type: UserType::from_token(Some(&t)),
                             is_active: t.is_active.is_none(),
                         });
-                        Either::A(self.service.call(req))
+                        Either::Left(self.service.call(req))
                     }
                     Err(e) => match e.kind() {
                         jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
                             // Need to login again
-                            Either::B(middleware_resp_err!(
+                            Either::Right(middleware_resp_err!(
                                 req,
                                 crate::util::errors::ErrorCode::TokenExpired,
                                 "token expired!"
                             ))
                         }
-                        _ => Either::B(middleware_resp_err!(
+                        _ => Either::Right(middleware_resp_err!(
                             req,
                             crate::util::errors::ErrorCode::InvalidToken,
                             "invalid token!"
@@ -281,7 +287,7 @@ where
                     user_type: UserType::Visitor,
                     is_active: false,
                 });
-                Either::A(self.service.call(req))
+                Either::Left(self.service.call(req))
             }
         }
     }

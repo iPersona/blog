@@ -8,15 +8,14 @@ use actix_web::{
     web::{self, Data},
     Error, HttpRequest, HttpResponse,
 };
-use futures::Future;
 
 pub struct MailboxApi;
 
 impl MailboxApi {
-    pub fn comment_notifies(
+    pub async fn comment_notifies(
         state: Data<AppState>,
         req: HttpRequest,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         debug!("comment_notifies");
         let token_ext = TokenExtension::from_request(&req);
         match token_ext {
@@ -50,8 +49,7 @@ impl MailboxApi {
 
     pub fn configure(cfg: &mut web::ServiceConfig) {
         cfg.service(
-            web::resource("/notification/comment")
-                .route(web::get().to_async(Self::comment_notifies)), // list comment notifications
+            web::resource("/notification/comment").route(web::get().to(Self::comment_notifies)), // list comment notifications
         );
     }
 }

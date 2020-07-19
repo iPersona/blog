@@ -5,16 +5,15 @@ use crate::AppState;
 use actix_web::web;
 use actix_web::web::{Data, HttpRequest, HttpResponse, Query};
 use actix_web::Error;
-use futures::Future;
 
 pub struct DashboardApi;
 
 impl DashboardApi {
-    pub fn get_daily_statistic(
+    pub async fn get_daily_statistic(
         state: Data<AppState>,
         req: HttpRequest,
         params: Query<Period>,
-    ) -> impl Future<Item = HttpResponse, Error = Error> {
+    ) -> Result<HttpResponse, Error> {
         debug!("get_daily_statistic");
         // The API is only available for administrator
         if !TokenExtension::is_admin(&req) {
@@ -36,7 +35,7 @@ impl DashboardApi {
 
     pub fn configure(cfg: &mut web::ServiceConfig) {
         cfg.service(
-            web::resource("/dashboard/visit").route(web::get().to_async(Self::get_daily_statistic)),
+            web::resource("/dashboard/visit").route(web::get().to(Self::get_daily_statistic)),
         );
     }
 }

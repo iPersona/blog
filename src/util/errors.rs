@@ -26,6 +26,8 @@ pub enum ErrorCode {
     DbError,
     // Redis Error
     RedisError,
+    // Internal Server Error
+    ServerError,
     // Unknown error
     Unknown,
 }
